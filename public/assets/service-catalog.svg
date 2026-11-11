@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" fill="none">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="800" y2="500" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="50%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#090D16"/>
+    </linearGradient>
+    <linearGradient id="accent2" x1="100" y1="60" x2="700" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="50%" stop-color="#EC4899"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" rx="24" fill="url(#bg2)"/>
+  
+  <!-- Browser Window Frame -->
+  <rect x="90" y="60" width="620" height="380" rx="20" fill="#0B1120" stroke="url(#accent2)" stroke-width="3"/>
+  <rect x="90" y="60" width="620" height="46" rx="20" fill="#1E293B"/>
+  <circle cx="122" cy="83" r="7" fill="#EF4444"/>
+  <circle cx="144" cy="83" r="7" fill="#F59E0B"/>
+  <circle cx="166" cy="83" r="7" fill="#10B981"/>
+  <rect x="200" y="71" width="320" height="24" rx="8" fill="#0F172A"/>
+  <text x="360" y="87" text-anchor="middle" fill="#94A3B8" font-family="system-ui, sans-serif" font-size="12">https://servi-bot-cic.web.app</text>
+
+  <!-- Catalog Cards Inside Window -->
+  <g transform="translate(125, 130)">
+    <rect width="170" height="220" rx="14" fill="#1E293B" stroke="#334155" stroke-width="2"/>
+    <rect x="14" y="14" width="142" height="85" rx="10" fill="#312E81"/>
+    <rect x="14" y="114" width="110" height="14" rx="6" fill="#E2E8F0"/>
+    <rect x="14" y="138" width="142" height="10" rx="5" fill="#64748B"/>
+    <rect x="14" y="156" width="90" height="10" rx="5" fill="#64748B"/>
+    <rect x="14" y="180" width="142" height="26" rx="8" fill="#6366F1"/>
+    <text x="85" y="197" text-anchor="middle" fill="#FFFFFF" font-family="system-ui, sans-serif" font-size="11" font-weight="700">$2,490 MXN</text>
+  </g>
+
+  <g transform="translate(315, 130)">
+    <rect width="170" height="220" rx="14" fill="#1E293B" stroke="#F59E0B" stroke-width="2"/>
+    <rect x="14" y="14" width="142" height="85" rx="10" fill="#065F46"/>
+    <rect x="14" y="114" width="120" height="14" rx="6" fill="#E2E8F0"/>
+    <rect x="14" y="138" width="142" height="10" rx="5" fill="#64748B"/>
+    <rect x="14" y="156" width="100" height="10" rx="5" fill="#64748B"/>
+    <rect x="14" y="180" width="142" height="26" rx="8" fill="#10B981"/>
+    <text x="85" y="197" text-anchor="middle" fill="#064E3B" font-family="system-ui, sans-serif" font-size="11" font-weight="700">$1,490 MXN</text>
+  </g>
+
+  <!-- Admin Sidebar Widget -->
+  <g transform="translate(505, 130)">
+    <rect width="170" height="220" rx="14" fill="#0F172A" stroke="#EC4899" stroke-width="2"/>
+    <text x="85" y="34" text-anchor="middle" fill="#F472B6" font-family="system-ui, sans-serif" font-size="13" font-weight="800">FIREBASE ADMIN</text>
+    <rect x="18" y="50" width="134" height="34" rx="8" fill="#1E293B"/>
+    <text x="85" y="71" text-anchor="middle" fill="#38BDF8" font-family="system-ui, sans-serif" font-size="11">+ Nuevo Servicio</text>
+    <rect x="18" y="96" width="134" height="34" rx="8" fill="#1E293B"/>
+    <text x="85" y="117" text-anchor="middle" fill="#6EE7B7" font-family="system-ui, sans-serif" font-size="11">Subir Imágenes</text>
+    <rect x="18" y="142" width="134" height="60" rx="8" fill="#1E1B4B" stroke="#6366F1"/>
+    <text x="85" y="166" text-anchor="middle" fill="#E0E7FF" font-family="system-ui, sans-serif" font-size="11" font-weight="700">Pedidos Bot Activos</text>
+    <text x="85" y="186" text-anchor="middle" fill="#A5B4FC" font-family="system-ui, sans-serif" font-size="11">Sincronizado SQLite</text>
+  </g>
+
+  <text x="400" y="395" text-anchor="middle" fill="#F8FAFC" font-family="system-ui, sans-serif" font-size="16" font-weight="700">FIREBASE HOSTING + FIREBASE AUTH + CATÁLOGO EN TIEMPO REAL</text>
+</svg>

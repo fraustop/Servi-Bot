@@ -1,0 +1,23 @@
+{
+  "name": "servi-bot",
+  "version": "1.0.0",
+  "description": "Servi-Bot: Plataforma de bots autonomos para WhatsApp (Evolution), Correo y Microsoft Teams con IA local (Ollama + Python) y Catalogo Dinamico en Firebase",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "evolution": "node server/evolution_server.js",
+    "deploy:hosting": "npx -y firebase-tools@latest deploy --only hosting"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.16",
+    "cloudflared": "^0.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "imapflow": "^1.0.168",
+    "mailparser": "^3.7.2",
+    "nodemailer": "^6.10.0",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4"
+  }
+}

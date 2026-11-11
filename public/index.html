@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Servi-Bot | Bots Autónomos para WhatsApp, Correo y Teams + Catálogo Dinámico</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Barra superior de estado de puertos y túnel -->
+  <div class="ports-strip">
+    <div class="ports-strip-inner">
+      <div class="status-pills">
+        <span class="pill" id="pill-node">
+          <span class="dot" id="dot-node"></span>
+          Node Server :10000
+        </span>
+        <span class="pill" id="pill-evolution">
+          <span class="dot" id="dot-evolution"></span>
+          Evolution WA :10001
+        </span>
+        <span class="pill" id="pill-ollama">
+          <span class="dot" id="dot-ollama"></span>
+          Ollama IA :10002 (<span id="label-model">llama3.2:3b</span>)
+        </span>
+        <span class="pill" id="pill-tunnel">
+          <span class="dot" id="dot-tunnel"></span>
+          Cloudflare Tunnel: <span id="label-tunnel">Conectando...</span>
+        </span>
+      </div>
+      <div style="display:flex; align-items:center; gap:0.5rem;">
+        <span style="color:var(--text-muted);">API Activa:</span>
+        <code id="active-api-label" style="color:var(--accent-cyan);">http://localhost:10000</code>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-change-api">Cambiar URL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navegación Principal -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="#catalogo" class="brand" id="link-home">
+        <span class="brand-icon">🤖</span>
+        <div>
+          <div>Servi-Bot</div>
+          <div style="font-size:0.72rem; font-weight:500; color:var(--text-muted);">Automatización Comercial IA Sin Tokens</div>
+        </div>
+      </a>
+
+      <nav class="nav-links" aria-label="Navegación principal">
+        <button type="button" class="nav-btn active" id="nav-public">Catálogo y Demo IA</button>
+        <button type="button" class="nav-btn" id="nav-admin">
+          🔒 Panel Admin <span id="badge-orders-count" class="badge-tag" style="margin-left:4px;">0</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- ==================== VISTA PÚBLICA ==================== -->
+    <section id="view-public">
+      <div class="hero">
+        <div>
+          <div class="hero-badge">🚀 IA Local con Ollama + Evolution API + Python a Demanda</div>
+          <h1>
+            Vende y atiende 24/7 en <span>WhatsApp, Correo y Teams</span> sin pagar tokens.
+          </h1>
+          <p>
+            <strong>Servi-Bot</strong> instala en tu negocio un ecosistema autónomo completo: agentes de IA con tono de servicio que conocen tu catálogo en tiempo real, responden dudas al instante, cierran ventas y registran pedidos automáticamente en tu Panel de Administración.
+          </p>
+          <div class="hero-actions">
+            <a href="#seccion-catalogo" class="btn btn-primary">Ver Servicios y Precios</a>
+            <button type="button" class="btn btn-outline" id="btn-hero-demo">Probar Cierre de Venta en Vivo</button>
+            <button type="button" class="btn btn-outline" id="btn-go-admin-hero">Abrir Panel Admin</button>
+          </div>
+
+          <div class="channel-badges">
+            <div class="channel-mini-card">
+              <strong>💬 WhatsApp (:10001)</strong>
+              <span>Evolution API gratuita sin costo por mensaje</span>
+            </div>
+            <div class="channel-mini-card">
+              <strong>📧 Correo IA (IMAP/SMTP)</strong>
+              <span>Responde hilos y cotizaciones en automático</span>
+            </div>
+            <div class="channel-mini-card">
+              <strong>👥 Microsoft Teams</strong>
+              <span>Atención corporativa y alertas de pedidos</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Widget de Chat en Vivo conectado a Python + Ollama (:10002) -->
+        <aside class="bot-widget-panel" aria-label="Demostración en vivo del Agente Servi-Bot">
+          <div class="bot-widget-header">
+            <div>
+              <strong style="display:block; font-size:0.96rem;">🤖 Asesor Comercial Servi-Bot (En Vivo)</strong>
+              <span style="font-size:0.75rem; color:var(--accent-emerald);">● Conectado a Python Worker + Ollama :10002</span>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" id="btn-reset-chat">Reiniciar</button>
+          </div>
+
+          <div class="bot-messages" id="chat-messages">
+            <div class="chat-bubble assistant">
+              ¡Hola! 👋 Soy el asesor autónomo de <strong>Servi-Bot</strong>. Estoy conectado en tiempo real a nuestro catálogo en SQLite y corro con el modelo local <code>llama3.2:3b</code>.
+              <br><br>Pregúntame por nuestros <strong>Bots Autónomos</strong> o la <strong>Interfaz de Catálogo Dinámico</strong>, o dime cuál deseas contratar para registrarte tu pedido ahora mismo.
+            </div>
+          </div>
+
+          <div class="bot-quick-prompts">
+            <button type="button" class="quick-chip" data-prompt="Hola, ¿qué servicios ofrecen y cuáles son sus precios?">¿Qué servicios y precios tienen?</button>
+            <button type="button" class="quick-chip" data-prompt="¿Cómo funciona el bot de WhatsApp, Correo y Teams sin tokens?">¿Cómo funciona sin tokens?</button>
+            <button type="button" class="quick-chip" data-prompt="Quiero contratar el servicio de Bots Autónomos, mi nombre es Carlos Ruiz y mi correo es carlos@negocio.mx, confirma mi pedido.">¡Quiero contratar Bots Autónomos!</button>
+          </div>
+
+          <form class="bot-input-bar" id="chat-form">
+            <input
+              type="text"
+              id="chat-input"
+              placeholder="Escribe un mensaje al bot vendedor..."
+              autocomplete="off"
+              required
+            />
+            <button type="submit" class="btn btn-primary" id="chat-send-btn">Enviar</button>
+          </form>
+        </aside>
+      </div>
+
+      <!-- Catálogo Dinámico de Productos y Servicios -->
+      <div id="seccion-catalogo">
+        <div class="section-head">
+          <div>
+            <h2>Catálogo Oficial de Soluciones Servi-Bot</h2>
+            <p>Sincronizado en tiempo real con SQLite y la memoria del Agente de Ventas en Python.</p>
+          </div>
+          <span class="badge-tag">Precios Comerciales Recomendados (Editables en Admin)</span>
+        </div>
+
+        <div class="catalog-grid" id="catalog-grid">
+          <!-- Renderizado dinámicamente como <article class="card"> -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== VISTA ADMINISTRACIÓN (FIREBASE AUTH) ==================== -->
+    <section id="view-admin" class="hidden">
+      <!-- Pantalla de Login Firebase Auth -->
+      <div id="auth-gate" class="panel-card" style="max-width:500px; margin:2rem auto;">
+        <div style="text-align:center; margin-bottom:1.25rem;">
+          <div class="brand-icon" style="margin:0 auto 0.75rem; width:52px; height:52px; font-size:1.6rem;">🔐</div>
+          <h2 style="margin:0;">Acceso Administrativo Servi-Bot</h2>
+          <p style="color:var(--text-muted); font-size:0.9rem; margin:0.35rem 0 0;">
+            Protegido por <strong>Firebase Authentication</strong> (Proyecto: <code>servi-bot-cic</code>)
+          </p>
+        </div>
+
+        <form id="firebase-login-form">
+          <div class="field">
+            <label for="auth-email">Correo Electrónico</label>
+            <input type="email" id="auth-email" placeholder="admin@servi-bot.com" value="admin@servi-bot.com" required />
+          </div>
+          <div class="field">
+            <label for="auth-password">Contraseña (mín. 6 caracteres)</label>
+            <input type="password" id="auth-password" placeholder="••••••••" value="ServiBot2026!" required />
+          </div>
+          <div id="auth-error-msg" style="color:#fda4af; font-size:0.84rem; margin-bottom:0.75rem;"></div>
+
+          <div style="display:flex; flex-direction:column; gap:0.6rem;">
+            <button type="submit" class="btn btn-primary" id="btn-login-email">Iniciar Sesión / Crear Admin en Firebase</button>
+            <button type="button" class="btn btn-emerald" id="btn-login-instant">⚡ Acceso Directo Firebase Auth (1 Clic)</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Panel de Administración Completo (visible tras autenticar) -->
+      <div id="admin-dashboard" class="admin-shell hidden">
+        <div class="admin-top-bar">
+          <div>
+            <h2 style="margin:0;">Panel de Administración — Servi-Bot</h2>
+            <p style="margin:0.2rem 0 0; color:var(--text-muted); font-size:0.88rem;">
+              Autenticado en Firebase como <strong id="admin-user-label" style="color:var(--accent-cyan);">admin</strong>
+            </p>
+          </div>
+          <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+            <button type="button" class="btn btn-outline btn-sm" id="btn-refresh-admin">🔄 Actualizar Datos</button>
+            <button type="button" class="btn btn-danger btn-sm" id="btn-logout">Cerrar Sesión</button>
+          </div>
+        </div>
+
+        <div class="admin-tabs" role="tablist">
+          <button type="button" class="tab-btn active" data-tab="tab-catalog">📦 Productos y Servicios</button>
+          <button type="button" class="tab-btn" data-tab="tab-orders">🛒 Pedidos Cerrados (<span id="tab-orders-count">0</span>)</button>
+          <button type="button" class="tab-btn" data-tab="tab-channels">📡 Canales (WhatsApp :10001, Correo, Teams)</button>
+          <button type="button" class="tab-btn" data-tab="tab-conversations">💬 Conversaciones & Cloudflare Tunnel</button>
+        </div>
+
+        <!-- TAB 1: GESTIÓN DE CATÁLOGO -->
+        <div id="tab-catalog" class="admin-tab-pane">
+          <div class="panel-card">
+            <h3 id="catalog-form-title" style="margin-top:0;">➕ Crear o Editar Producto / Servicio</h3>
+            <form id="catalog-form">
+              <input type="hidden" id="item-id" value="" />
+              <div class="form-grid">
+                <div class="field">
+                  <label for="item-name">Nombre del Servicio o Producto *</label>
+                  <input type="text" id="item-name" placeholder="Ej. Bot Autónomo Empresarial" required />
+                </div>
+                <div class="field">
+                  <label for="item-type">Tipo</label>
+                  <select id="item-type">
+                    <option value="service">Servicio</option>
+                    <option value="product">Producto</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="item-badge">Insignia Destacada</label>
+                  <input type="text" id="item-badge" placeholder="Ej. Más Vendido / Nuevo" />
+                </div>
+              </div>
+
+              <div class="form-grid">
+                <div class="field">
+                  <label for="item-price">Precio Comercial *</label>
+                  <input type="number" id="item-price" step="0.01" placeholder="2490" required />
+                </div>
+                <div class="field">
+                  <label for="item-currency">Moneda</label>
+                  <select id="item-currency">
+                    <option value="MXN">MXN (Pesos Mexicanos)</option>
+                    <option value="USD">USD (Dólares)</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="item-cycle">Ciclo de Cobro</label>
+                  <select id="item-cycle">
+                    <option value="mensual">Mensual</option>
+                    <option value="unico">Pago Único</option>
+                    <option value="anual">Anual</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="item-setup">Costo de Activación Inicial (Opcional)</label>
+                  <input type="number" id="item-setup" step="0.01" value="0" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="item-tagline">Subtítulo Comercial Corto</label>
+                <input type="text" id="item-tagline" placeholder="Ej. Atención automatizada 24/7 sin costo por token" />
+              </div>
+
+              <div class="field">
+                <label for="item-description">Descripción Completa (Usada también por el Bot IA para vender) *</label>
+                <textarea id="item-description" rows="3" placeholder="Describe detalladamente qué incluye y cómo ayuda al cliente..." required></textarea>
+              </div>
+
+              <div class="field">
+                <label for="item-features">Características Incluidas (Una por línea)</label>
+                <textarea id="item-features" rows="4" placeholder="Autocontestador WhatsApp sin tokens&#10;Integración con Correo y Teams&#10;Cierre de pedidos en automático"></textarea>
+              </div>
+
+              <div class="form-grid">
+                <div class="field">
+                  <label for="item-image-url">URL o Ruta de Imagen</label>
+                  <input type="text" id="item-image-url" value="/assets/service-bots.svg" />
+                </div>
+                <div class="field">
+                  <label for="item-image-file">O Subir Imagen desde tu Equipo</label>
+                  <input type="file" id="item-image-file" accept="image/*" />
+                </div>
+              </div>
+
+              <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; margin-top:0.5rem;">
+                <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                  <input type="checkbox" id="item-active" checked />
+                  <span>Mostrar activo en catálogo público y disponible para el Bot</span>
+                </label>
+                <div style="display:flex; gap:0.6rem;">
+                  <button type="button" class="btn btn-outline" id="btn-cancel-edit">Limpiar Formulario</button>
+                  <button type="submit" class="btn btn-primary">💾 Guardar en SQLite</button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <h3>Servicios y Productos Registrados en SQLite</h3>
+          <div id="admin-catalog-list" class="catalog-grid"></div>
+        </div>
+
+        <!-- TAB 2: PEDIDOS CERRADOS -->
+        <div id="tab-orders" class="admin-tab-pane hidden">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+            <div>
+              <h3 style="margin:0;">Pedidos Creados por el Bot Autónomo y la Web</h3>
+              <p style="margin:0.2rem 0 0; color:var(--text-muted); font-size:0.86rem;">
+                Cuando un prospecto confirma una compra por WhatsApp, Correo, Teams o Web, el proceso Python lo registra aquí automáticamente.
+              </p>
+            </div>
+          </div>
+
+          <div tabindex="0" role="region" aria-labelledby="orders-table-caption" class="table-wrapper">
+            <table>
+              <caption id="orders-table-caption">Registro histórico de pedidos capturados en tiempo real</caption>
+              <thead>
+                <tr>
+                  <th>Folio</th>
+                  <th>Cliente</th>
+                  <th>Canal</th>
+                  <th>Servicios / Productos</th>
+                  <th>Total</th>
+                  <th>Estado</th>
+                  <th>Fecha</th>
+                </tr>
+              </thead>
+              <tbody id="orders-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB 3: CANALES MULTICANAL -->
+        <div id="tab-channels" class="admin-tab-pane hidden">
+          <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));">
+            <!-- WHATSAPP EVOLUTION :10001 -->
+            <div class="panel-card">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0;">💬 WhatsApp (Evolution :10001)</h3>
+                <span class="badge-tag" id="wa-state-badge">Verificando...</span>
+              </div>
+              <p style="font-size:0.85rem; color:var(--text-muted);">
+                Motor Baileys gratuito y sin tokens en puerto <code>10001</code>. Escanea el código QR con tu WhatsApp o usa el simulador inferior.
+              </p>
+
+              <div id="wa-qr-container" style="text-align:center; margin:1rem 0;">
+                <p style="color:var(--text-muted); font-size:0.85rem;">Cargando estado de instancia <code>servibot-main</code>...</p>
+              </div>
+
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
+                <button type="button" class="btn btn-outline btn-sm" id="btn-wa-refresh">🔄 Actualizar QR / Estado</button>
+                <button type="button" class="btn btn-danger btn-sm" id="btn-wa-logout">Reiniciar Sesión WA</button>
+              </div>
+
+              <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
+              <h4 style="margin:0 0 0.5rem;">🧪 Simulador de Mensaje Entrante de WhatsApp</h4>
+              <div class="field">
+                <label for="sim-wa-phone">Teléfono / Nombre del Prospecto</label>
+                <input type="text" id="sim-wa-phone" value="5218119998877" />
+              </div>
+              <div class="field">
+                <label for="sim-wa-text">Mensaje de WhatsApp</label>
+                <input type="text" id="sim-wa-text" value="Hola, quiero contratar el servicio de Bots Autónomos para mi negocio, soy Laura Gómez, confirma mi pedido." />
+              </div>
+              <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-wa">Disparar Webhook WhatsApp (:10001 ➔ :10000)</button>
+            </div>
+
+            <!-- CORREO ELECTRÓNICO IMAP/SMTP -->
+            <div class="panel-card">
+              <h3 style="margin-top:0;">📧 Correo Electrónico (IMAP / SMTP)</h3>
+              <form id="email-config-form">
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="cfg-imap-host">Servidor IMAP</label>
+                    <input type="text" id="cfg-imap-host" value="imap.gmail.com" />
+                  </div>
+                  <div class="field">
+                    <label for="cfg-smtp-host">Servidor SMTP</label>
+                    <input type="text" id="cfg-smtp-host" value="smtp.gmail.com" />
+                  </div>
+                </div>
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="cfg-email-user">Correo de Atención</label>
+                    <input type="email" id="cfg-email-user" placeholder="ventas@tunegocio.com" />
+                  </div>
+                  <div class="field">
+                    <label for="cfg-email-pass">Contraseña de Aplicación</label>
+                    <input type="password" id="cfg-email-pass" placeholder="xxxx xxxx xxxx xxxx" />
+                  </div>
+                </div>
+                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; font-size:0.86rem;">
+                  <input type="checkbox" id="cfg-email-enabled" />
+                  <span>Activar lectura IMAP y respuesta automática SMTP</span>
+                </label>
+                <button type="submit" class="btn btn-primary btn-sm">Guardar Configuración de Correo</button>
+              </form>
+
+              <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
+              <h4 style="margin:0 0 0.5rem;">🧪 Simular Correo Entrante de Cliente</h4>
+              <div class="field">
+                <label for="sim-email-from">Correo del Cliente</label>
+                <input type="email" id="sim-email-from" value="director@pyme-industrial.mx" />
+              </div>
+              <div class="field">
+                <label for="sim-email-body">Cuerpo del Correo</label>
+                <input type="text" id="sim-email-body" value="Buen día, deseo contratar la Interfaz de Catálogo Dinámico y el Bot Autónomo. Soy el Ing. Roberto Díaz, por favor levanten mi pedido." />
+              </div>
+              <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-email">Procesar Correo con IA Python</button>
+            </div>
+
+            <!-- MICROSOFT TEAMS -->
+            <div class="panel-card">
+              <h3 style="margin-top:0;">👥 Microsoft Teams (Webhook Activo)</h3>
+              <p style="font-size:0.83rem; color:var(--text-muted);">
+                Endpoint para Outgoing Webhook de Teams: <code>/api/channels/teams/webhook</code>
+              </p>
+              <form id="teams-config-form">
+                <div class="field">
+                  <label for="cfg-teams-name">Nombre del Bot en Teams</label>
+                  <input type="text" id="cfg-teams-name" value="Servi-Bot Teams" />
+                </div>
+                <div class="field">
+                  <label for="cfg-teams-webhook">Incoming Webhook URL de Teams (Para alertas)</label>
+                  <input type="url" id="cfg-teams-webhook" placeholder="https://outlook.office.com/webhook/..." />
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Guardar Configuración Teams</button>
+              </form>
+
+              <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
+              <h4 style="margin:0 0 0.5rem;">🧪 Simular Mención en Microsoft Teams</h4>
+              <div class="field">
+                <label for="sim-teams-user">Usuario de Teams</label>
+                <input type="text" id="sim-teams-user" value="Sofía Méndez (Gerente TI)" />
+              </div>
+              <div class="field">
+                <label for="sim-teams-text">Mensaje en Canal de Teams</label>
+                <input type="text" id="sim-teams-text" value="@Servi-Bot queremos contratar el paquete de Bots Autónomos e Interfaz de Catálogo Dinámico para nuestra empresa, confirma el pedido." />
+              </div>
+              <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-teams">Enviar Webhook de Teams</button>
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <h4 style="margin-top:0;">📠 Resultado de la Última Prueba Multicanal</h4>
+            <div class="log-feed" id="channel-test-output">Esperando simulación o mensaje entrante...</div>
+          </div>
+        </div>
+
+        <!-- TAB 4: CONVERSACIONES Y CLOUDFLARE TUNNEL -->
+        <div id="tab-conversations" class="admin-tab-pane hidden">
+          <div class="form-grid">
+            <div class="panel-card">
+              <h3 style="margin-top:0;">🌐 Túnel Cloudflare (Conexión Firebase Hosting ➔ Local :10000)</h3>
+              <p style="font-size:0.85rem; color:var(--text-muted);">
+                Exposición pública HTTPS hacia el puerto <code>10000</code> para que clientes fuera de tu red vean el catálogo SQLite y hablen con Ollama local desde Firebase Hosting.
+              </p>
+              <div class="field">
+                <label>URL Pública HTTPS Detectada (Cloudflare)</label>
+                <input type="text" id="tunnel-public-url" readonly value="Detectando..." />
+              </div>
+              <div class="field">
+                <label for="tunnel-token-input">Token de Cloudflare Tunnel (Opcional si usas túnel con dominio propio)</label>
+                <input type="password" id="tunnel-token-input" placeholder="eyJhIjoi..." />
+              </div>
+              <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+                <button type="button" class="btn btn-primary btn-sm" id="btn-save-tunnel">Guardar y Reiniciar Túnel Cloudflare</button>
+                <button type="button" class="btn btn-outline btn-sm" id="btn-use-tunnel-url">Usar URL de Túnel en Navegador</button>
+              </div>
+            </div>
+
+            <div class="panel-card">
+              <h3 style="margin-top:0;">💬 Historial de Conversaciones Multicanal</h3>
+              <div id="conversations-list" style="max-height:280px; overflow-y:auto; display:grid; gap:0.5rem;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MANDATORY per modern-web-guidance `dialog`: native <dialog> without role="dialog" or aria-modal -->
+  <dialog id="order-dialog" closedby="any" aria-labelledby="order-dialog-title">
+    <div class="dialog-inner">
+      <div class="dialog-header">
+        <h2 id="order-dialog-title">Contratar Servicio / Crear Pedido</h2>
+        <form method="dialog">
+          <button type="submit" class="btn btn-outline btn-sm" aria-label="Cerrar ventana">✕</button>
+        </form>
+      </div>
+      <form id="direct-order-form">
+        <input type="hidden" id="order-item-slug" value="" />
+        <div class="field">
+          <label>Servicio Seleccionado</label>
+          <input type="text" id="order-item-name" readonly />
+        </div>
+        <div class="field">
+          <label for="order-cust-name">Tu Nombre Completo *</label>
+          <input type="text" id="order-cust-name" placeholder="Ej. Alejandro Torres" autofocus required />
+        </div>
+        <div class="field">
+          <label for="order-cust-contact">WhatsApp o Correo Electrónico *</label>
+          <input type="text" id="order-cust-contact" placeholder="Ej. +52 81 1234 5678 o correo@empresa.com" required />
+        </div>
+        <div class="field">
+          <label for="order-cust-company">Nombre de tu Negocio / Empresa</label>
+          <input type="text" id="order-cust-company" placeholder="Ej. Comercializadora del Norte" />
+        </div>
+        <div class="field">
+          <label for="order-cust-notes">Comentarios o Requerimientos</label>
+          <textarea id="order-cust-notes" rows="2" placeholder="Ej. Quiero conectar mi número de WhatsApp de ventas y un buzón de correo."></textarea>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:1rem;">
+          <button type="button" class="btn btn-outline" id="btn-close-order-modal">Cancelar</button>
+          <button type="submit" class="btn btn-emerald">✅ Confirmar Pedido</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
