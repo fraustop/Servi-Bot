@@ -233,9 +233,11 @@ def call_ollama_chat(ollama_url: str, model: str, messages: list) -> dict:
         "messages": messages,
         "format": "json",
         "stream": False,
+        "keep_alive": "30m",
         "options": {
-            "temperature": 0.35,
-            "num_predict": 450,
+            "temperature": 0.3,
+            "num_ctx": 2048,
+            "num_predict": 220,
         },
     }
     req = urllib.request.Request(
@@ -244,14 +246,13 @@ def call_ollama_chat(ollama_url: str, model: str, messages: list) -> dict:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    with urllib.request.urlopen(req, timeout=90) as resp:
         raw_body = resp.read().decode("utf-8")
         data = json.loads(raw_body)
         content = data.get("message", {}).get("content", "{}")
         try:
             return json.loads(content)
         except Exception:
-            # Extract JSON block if wrapped
             match = re.search(r"\{.*\}", content, re.DOTALL)
             if match:
                 try:
