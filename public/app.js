@@ -873,4 +873,10 @@ function setupEventListeners() {
   await loadPublicCatalog();
   await refreshHealth();
   setInterval(refreshHealth, 12000);
+  setInterval(() => {
+    const chTab = document.getElementById('tab-channels');
+    if (currentUser && chTab && !chTab.classList.contains('hidden')) {
+      loadWhatsAppStatus();
+    }
+  }, 4000);
 })();

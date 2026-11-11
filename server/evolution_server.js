@@ -16,6 +16,7 @@ let latestQrBase64 = null;
 let connectedPhone = null;
 let lastError = null;
 let isInitializing = false;
+let reconnectTimer = null;
 let recentEvents = [];
 
 function recordEvent(type, detail) {
@@ -41,13 +42,36 @@ async function forwardToMainWebhook(payload) {
   }
 }
 
+function cleanupExistingSocket() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (sock) {
+    try {
+      sock.ev.removeAllListeners('connection.update');
+      sock.ev.removeAllListeners('creds.update');
+      sock.ev.removeAllListeners('messages.upsert');
+      sock.ws?.close();
+    } catch {
+      // ignore cleanup errors
+    }
+    sock = null;
+  }
+}
+
 async function initBaileysInstance(forceNew = false) {
   if (isInitializing) return;
   isInitializing = true;
 
   try {
+    cleanupExistingSocket();
+
     if (forceNew && fs.existsSync(AUTH_DIR)) {
       fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+      latestQrRaw = null;
+      latestQrBase64 = null;
+      connectedPhone = null;
     }
     if (!fs.existsSync(AUTH_DIR)) {
       fs.mkdirSync(AUTH_DIR, { recursive: true });
@@ -55,15 +79,20 @@ async function initBaileysInstance(forceNew = false) {
 
     const baileys = await import('@whiskeysockets/baileys');
     const makeWASocket = baileys.default || baileys.makeWASocket;
-    const { useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } = baileys;
+    const {
+      useMultiFileAuthState,
+      fetchLatestBaileysVersion,
+      DisconnectReason,
+      Browsers
+    } = baileys;
 
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-    let version = [2, 3000, 1015901307];
+    let version = [2, 3000, 1019707846];
     try {
       const latest = await fetchLatestBaileysVersion();
       if (latest && latest.version) version = latest.version;
     } catch {
-      // Fallback to default version if offline
+      // Fallback to recent version
     }
 
     connectionState = 'connecting';
@@ -72,8 +101,13 @@ async function initBaileysInstance(forceNew = false) {
       auth: state,
       printQRInTerminal: false,
       logger: pino({ level: 'silent' }),
-      browser: ['Servi-Bot Evolution', 'Chrome', '1.0.0'],
-      syncFullHistory: false
+      browser: Browsers ? Browsers.ubuntu('Chrome') : ['Ubuntu', 'Chrome', '128.0.0'],
+      syncFullHistory: false,
+      markOnlineOnConnect: true,
+      generateHighQualityLinkPreview: false,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
+      keepAliveIntervalMs: 25000
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -92,23 +126,55 @@ async function initBaileysInstance(forceNew = false) {
         connectionState = 'open';
         latestQrRaw = null;
         latestQrBase64 = null;
+        lastError = null;
         connectedPhone = sock?.user?.id || 'Conectado';
         recordEvent('connected', `WhatsApp vinculado como ${connectedPhone}`);
-        console.log(`[Evolution:10001] WhatsApp conectado exitosamente (${connectedPhone})`);
+        console.log(`[Evolution:10001] ✅ WhatsApp conectado exitosamente (${connectedPhone})`);
       }
 
       if (connection === 'close') {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-        lastError = lastDisconnect?.error?.message || `Cerrado (${statusCode || 'unknown'})`;
-        connectionState = 'close';
-        recordEvent('disconnected', lastError);
+        const errMsg = lastDisconnect?.error?.message || `Cerrado (${statusCode || 'unknown'})`;
+        lastError = errMsg;
+        recordEvent('disconnected', `${errMsg} [code: ${statusCode}]`);
+        console.log(`[Evolution:10001] Conexión cerrada: ${errMsg} (code: ${statusCode})`);
 
-        if (!shouldReconnect) {
-          latestQrRaw = null;
-          latestQrBase64 = null;
-          connectedPhone = null;
+        // Caso 1: 515 Stream Errored (restart required) justo después de escanear el QR
+        // o desconexiones temporales de red -> Reconectar de inmediato conservando creds.json
+        if (
+          statusCode === DisconnectReason.restartRequired ||
+          statusCode === 515 ||
+          statusCode === DisconnectReason.timedOut ||
+          statusCode === DisconnectReason.connectionLost ||
+          statusCode === DisconnectReason.connectionClosed
+        ) {
+          connectionState = 'connecting';
+          recordEvent('reconnecting', `Completando emparejamiento / reconexión automática (code ${statusCode})...`);
+          reconnectTimer = setTimeout(() => {
+            initBaileysInstance(false);
+          }, 600);
+          return;
         }
+
+        // Caso 2: 440 Conflict (otra instancia cerró la sesión) -> esperar un poco y reconectar si hay credenciales
+        if (statusCode === DisconnectReason.connectionReplaced || statusCode === 440) {
+          connectionState = 'connecting';
+          reconnectTimer = setTimeout(() => {
+            initBaileysInstance(false);
+          }, 2500);
+          return;
+        }
+
+        // Caso 3: Sesión cerrada desde el teléfono (401 loggedOut) o credenciales corruptas/expiradas (403, 405, 500)
+        // Limpiar auth_info_baileys y generar un QR nuevo automáticamente
+        connectionState = 'close';
+        latestQrRaw = null;
+        latestQrBase64 = null;
+        connectedPhone = null;
+        recordEvent('session_reset', 'Credenciales expiradas o sesión cerrada; generando nuevo código QR limpio...');
+        reconnectTimer = setTimeout(() => {
+          initBaileysInstance(true);
+        }, 1000);
       }
     });
 
@@ -201,21 +267,25 @@ function startEvolutionServer() {
   });
 
   app.get('/instance/connect/:instance', async (req, res) => {
-    if (connectionState === 'close' && !isInitializing) {
+    // Solo iniciar si no hay socket activo ni inicializando
+    if (!sock && connectionState === 'close' && !isInitializing) {
       initBaileysInstance(false);
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 1200));
     }
     res.json({
       instance: req.params.instance || 'servibot-main',
       state: connectionState,
       connectedPhone,
       base64: latestQrBase64,
-      code: latestQrRaw
+      code: latestQrRaw,
+      lastError
     });
   });
 
   app.post('/instance/create', async (req, res) => {
-    await initBaileysInstance(false);
+    if (!sock && !isInitializing) {
+      await initBaileysInstance(false);
+    }
     res.json({
       instance: {
         instanceName: req.body?.instanceName || 'servibot-main',
@@ -236,8 +306,8 @@ function startEvolutionServer() {
         } catch {
           // ignore
         }
-        sock = null;
       }
+      cleanupExistingSocket();
       if (fs.existsSync(AUTH_DIR)) {
         fs.rmSync(AUTH_DIR, { recursive: true, force: true });
       }
@@ -245,10 +315,10 @@ function startEvolutionServer() {
       latestQrBase64 = null;
       latestQrRaw = null;
       connectedPhone = null;
-      recordEvent('logout', 'Sesión de WhatsApp cerrada manualmente');
-      // Re-init to generate fresh QR
+      recordEvent('logout', 'Sesión de WhatsApp reiniciada manualmente');
       initBaileysInstance(true);
-      res.json({ ok: true, state: connectionState });
+      await new Promise((r) => setTimeout(r, 1500));
+      res.json({ ok: true, state: connectionState, base64: latestQrBase64 });
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });
     }
@@ -280,7 +350,6 @@ function startEvolutionServer() {
     }
   });
 
-  // Endpoint para simular un mensaje entrante de WhatsApp hacia el webhook principal
   app.post('/webhook/simulate', async (req, res) => {
     const { phone = '5218112345678', name = 'Prospecto WhatsApp', text = 'Hola, ¿qué servicios de bots ofrecen?' } = req.body || {};
     const jid = phone.includes('@') ? phone : `${phone.replace(/\D/g, '')}@s.whatsapp.net`;
