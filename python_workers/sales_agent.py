@@ -177,53 +177,24 @@ def create_order_in_db(
 def build_system_prompt(catalog_items: list, bot_config: dict, channel: str, sender_name: str, sender_id: str) -> str:
     business_name = bot_config.get("business_name", "Servi-Bot")
     bot_name = bot_config.get("bot_name", "Asesor Servi-Bot")
-    tone = bot_config.get("tone", "Profesional, cálido, servicial y orientado a cerrar ventas.")
     promo_note = bot_config.get("promo_bundle_note", "")
 
     catalog_text_lines = []
     for idx, item in enumerate(catalog_items, start=1):
-        feats = ", ".join(item.get("features", [])[:5])
-        setup_str = f" + ${item['setup_fee']:,.0f} {item['currency']} de activación única" if item.get("setup_fee") else ""
+        setup_str = f" (+${item['setup_fee']:,.0f} activación)" if item.get("setup_fee") else ""
         catalog_text_lines.append(
-            f"{idx}. [{item['slug']}] {item['name']} ({item['type'].upper()})\n"
-            f"   - Precio: ${item['price']:,.0f} {item['currency']} / {item['billing_cycle']}{setup_str}\n"
-            f"   - Resumen: {item.get('tagline', '')} | {item['description']}\n"
-            f"   - Incluye: {feats}"
+            f"{idx}. {item['name']} [slug: {item['slug']}]: ${item['price']:,.0f} {item['currency']}/{item['billing_cycle']}{setup_str}. {item.get('tagline', '')}"
         )
 
-    catalog_block = "\n\n".join(catalog_text_lines) if catalog_text_lines else "No hay productos activos en este momento."
+    catalog_block = "\n".join(catalog_text_lines) if catalog_text_lines else "Sin servicios activos."
 
-    return f"""Eres {bot_name}, el ejecutivo de atención y ventas automatizado de {business_name}.
-Tu tono es: {tone}
-Estás atendiendo al cliente por el canal: {channel.upper()}.
-Identificador del cliente: {sender_id} (Nombre conocido: {sender_name or 'Por confirmar'}).
-
-CATÁLOGO OFICIAL DE PRODUCTOS Y SERVICIOS DISPONIBLES EN BASE DE DATOS:
-{catalog_block}
-
-PROMOCIÓN ESPECIAL:
-{promo_note}
-
-REGLAS DE ATENCIÓN Y CIERRE DE VENTAS:
-1. Contesta siempre en español con amabilidad, claridad y enfoque comercial de servicio.
-2. Si el cliente pregunta qué ofrecemos o pide información/precios, preséntale los servicios del catálogo ({', '.join(i['name'] for i in catalog_items)}) con sus precios y beneficios reales.
-3. Invita activamente al cliente a contratar o hacer su pedido. Para cerrar un pedido solo necesitas saber qué servicio(s)/producto(s) desea y su nombre o confirmación.
-4. CUANDO EL CLIENTE CONFIRME QUE DESEA CONTRATAR / COMPRAR / HACER UN PEDIDO (por ejemplo dice "lo quiero", "quiero contratar", "hazme el pedido", "confirmo", "me interesa contratar el bot", "sí, regístralo"):
-   - Marca "should_create_order": true en tu JSON de respuesta.
-   - En "selected_slugs" incluye la lista de slugs de los productos elegidos (ej. ["bots-autonomos"] o ["interfaz-catalogo-dinamico"] o ambos).
-   - En "customer_name" coloca el nombre que dio el cliente (o "{sender_name or 'Cliente ' + sender_id}").
-   - En "reply" felicítalo por su compra, confirma el resumen y dile que su pedido ha quedado registrado en el sistema de administración.
-5. Si el cliente aún solo está preguntando dudas sin confirmar el pedido, pon "should_create_order": false.
-
-DEBES RESPONDER ÚNICAMENTE CON UN OBJETO JSON VÁLIDO CON ESTA ESTRUCTURA EXACTA:
-{{
-  "reply": "Tu respuesta amable, clara y persuasiva para el cliente...",
-  "should_create_order": false,
-  "selected_slugs": [],
-  "customer_name": "{sender_name or ''}",
-  "customer_company": "",
-  "notes": ""
-}}"""
+    return (
+        f"Eres {bot_name} de {business_name} (canal {channel.upper()}). "
+        f"Responde en español, breve (máximo 3 oraciones), con tono amable de servicio y enfocado en cerrar la venta.\n"
+        f"CATÁLOGO EN SQLITE:\n{catalog_block}\n"
+        f"PROMO: {promo_note}\n"
+        f"Si el cliente confirma que desea contratar o hacer pedido, confírmale su pedido y escribe al final [PEDIDO: slug]."
+    )
 
 
 def call_ollama_chat(ollama_url: str, model: str, messages: list) -> dict:
@@ -231,13 +202,12 @@ def call_ollama_chat(ollama_url: str, model: str, messages: list) -> dict:
     payload = {
         "model": model,
         "messages": messages,
-        "format": "json",
         "stream": False,
-        "keep_alive": "30m",
+        "keep_alive": "60m",
         "options": {
             "temperature": 0.3,
-            "num_ctx": 2048,
-            "num_predict": 220,
+            "num_ctx": 1024,
+            "num_predict": 120,
         },
     }
     req = urllib.request.Request(
@@ -246,24 +216,20 @@ def call_ollama_chat(ollama_url: str, model: str, messages: list) -> dict:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=90) as resp:
+    with urllib.request.urlopen(req, timeout=60) as resp:
         raw_body = resp.read().decode("utf-8")
         data = json.loads(raw_body)
-        content = data.get("message", {}).get("content", "{}")
-        try:
-            return json.loads(content)
-        except Exception:
-            match = re.search(r"\{.*\}", content, re.DOTALL)
-            if match:
-                try:
-                    return json.loads(match.group(0))
-                except Exception:
-                    pass
-            return {
-                "reply": content.strip() or "¡Hola! Soy el asistente de Servi-Bot. ¿En qué servicio te puedo apoyar hoy?",
-                "should_create_order": False,
-                "selected_slugs": [],
-            }
+        content = data.get("message", {}).get("content", "").strip()
+        tag_match = re.search(r"\[PEDIDO:\s*([a-z0-9,-]+)\]", content, re.IGNORECASE)
+        clean_reply = re.sub(r"\[PEDIDO:[^\]]*\]", "", content, flags=re.IGNORECASE).strip()
+        slugs = []
+        if tag_match:
+            slugs = [s.strip().lower() for s in tag_match.group(1).split(",") if s.strip()]
+        return {
+            "reply": clean_reply or content,
+            "should_create_order": bool(tag_match),
+            "selected_slugs": slugs,
+        }
 
 
 def detect_explicit_order_intent(user_text: str, history: list, catalog_items: list) -> tuple:
