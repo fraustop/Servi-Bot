@@ -3,12 +3,11 @@ import {
   getAuth,
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signInAnonymously,
+  sendPasswordResetEmail,
   signOut
 } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js';
 
-// Configuración oficial del proyecto Firebase: servi-bot-cic (Servi-Bot)
+// Configuración del proyecto Firebase: servi-bot-cic (Servi-Bot)
 const firebaseConfig = {
   projectId: 'servi-bot-cic',
   appId: '1:666075664290:web:857c096cc95e522f8bacfb',
@@ -20,6 +19,13 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
+
+// Feature-detect nativo de Popover API según modern-web-guidance `navbar`
+if (!Object.hasOwn(HTMLElement.prototype, 'popover')) {
+  import('https://unpkg.com/@oddbird/popover-polyfill@latest/dist/popover.min.js').catch(() => {
+    // El navegador continuará con la navegación estándar si no puede cargar el polyfill
+  });
+}
 
 // Fallback para light-dismiss en <dialog closedby="any"> según modern-web-guidance `dialog`
 if (!('closedBy' in HTMLDialogElement.prototype)) {
@@ -38,53 +44,76 @@ if (!('closedBy' in HTMLDialogElement.prototype)) {
   }
 }
 
-let API_BASE = localStorage.getItem('servibot_api_base') || '';
+let API_BASE = '';
 let currentUser = null;
+let activeView = 'public';
+let activeAdminTab = 'tab-catalog';
 let catalogCache = [];
 let webSenderId = localStorage.getItem('servibot_sender_id') || `web-${Math.floor(10000 + Math.random() * 90000)}`;
 localStorage.setItem('servibot_sender_id', webSenderId);
 
-async function resolveInitialApiBase() {
-  if (API_BASE) {
-    updateApiLabel();
-    return;
+// ==================== CONEXIÓN CON BACKEND ====================
+async function isBackendReachable(baseUrl, timeoutMs = 2200) {
+  if (!baseUrl) return false;
+  try {
+    const res = await fetch(`${baseUrl}/api/health`, {
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return Boolean(data?.ok);
+  } catch {
+    return false;
   }
+}
+
+async function resolveInitialApiBase() {
   if (location.port === '10000') {
     API_BASE = window.location.origin;
-    updateApiLabel();
+    syncApiOverrideInput();
     return;
   }
-  // Probar primero localhost:10000 (cuando el usuario abre Firebase Hosting en la misma máquina)
-  try {
-    const r = await fetch('http://localhost:10000/api/health', { signal: AbortSignal.timeout(2200) });
-    if (r.ok) {
-      API_BASE = 'http://localhost:10000';
-      updateApiLabel();
+
+  // 1) Intentar backend local en la misma máquina
+  if (await isBackendReachable('http://localhost:10000', 2000)) {
+    API_BASE = 'http://localhost:10000';
+    syncApiOverrideInput();
+    return;
+  }
+
+  // 2) Intentar override manual guardado en este navegador si sigue activo
+  const savedBase = (localStorage.getItem('servibot_api_base') || '').trim().replace(/\/+$/, '');
+  if (savedBase) {
+    if (await isBackendReachable(savedBase, 2500)) {
+      API_BASE = savedBase;
+      syncApiOverrideInput();
       return;
     }
-  } catch {
-    // Si está fuera de la red local, leer túnel Cloudflare publicado en runtime-backend.json
+    localStorage.removeItem('servibot_api_base');
   }
+
+  // 3) Leer URL vigente del túnel Cloudflare publicada en Hosting
   try {
     const rt = await fetch('/runtime-backend.json', { cache: 'no-store' });
     if (rt.ok) {
       const cfg = await rt.json();
       if (cfg.tunnelUrl) {
-        API_BASE = cfg.tunnelUrl;
-        updateApiLabel();
+        API_BASE = cfg.tunnelUrl.trim().replace(/\/+$/, '');
+        syncApiOverrideInput();
         return;
       }
     }
   } catch {
-    // ignore
+    // ignorar error de runtime-backend.json
   }
+
   API_BASE = 'http://localhost:10000';
-  updateApiLabel();
+  syncApiOverrideInput();
 }
 
-function updateApiLabel() {
-  const lbl = document.getElementById('active-api-label');
-  if (lbl) lbl.textContent = API_BASE || window.location.origin;
+function syncApiOverrideInput() {
+  const input = document.getElementById('admin-api-override');
+  if (input) input.value = API_BASE || window.location.origin;
 }
 
 function resolveAssetUrl(url) {
@@ -104,17 +133,392 @@ async function apiFetch(endpoint, options = {}) {
       const token = await currentUser.getIdToken();
       headers['Authorization'] = `Bearer ${token}`;
     } catch {
-      // ignore token error on public endpoints
+      // continuar si el endpoint es público
     }
   }
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers
   });
-  return res.json();
+
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { ok: false, error: text || `Error HTTP ${res.status}` };
+  }
 }
 
-// ==================== ESTADO DE PUERTOS Y SALUD ====================
+// ==================== NAVBAR RESPONSIVA Y MODO DE ENCABEZADO ====================
+let navbarObserverInitialized = false;
+
+function isMenuPopoverOpen(siteMenu) {
+  if (!siteMenu || !siteMenu.hasAttribute('popover')) return false;
+  try {
+    return siteMenu.matches(':popover-open') || siteMenu.classList.contains(':popover-open');
+  } catch {
+    return siteMenu.classList.contains(':popover-open');
+  }
+}
+
+function closeMenuPopoverIfOpen() {
+  const siteMenu = document.getElementById('site-menu');
+  if (!siteMenu || !isMenuPopoverOpen(siteMenu)) return;
+  try {
+    siteMenu.hidePopover?.();
+  } catch {
+    // ignorar si el navegador no soporta hidePopover aún
+  }
+}
+
+function updateNavbarLayout() {
+  const siteHeader = document.getElementById('site-header');
+  const headerInner = document.getElementById('header-inner');
+  const siteMenu = document.getElementById('site-menu');
+  if (!siteHeader || !headerInner || !siteMenu) return;
+
+  const wasOpen = isMenuPopoverOpen(siteMenu);
+  if (wasOpen) closeMenuPopoverIfOpen();
+
+  siteHeader.classList.add('is-measuring', 'is-wide');
+  // Usar setAttribute/removeAttribute (no .popover IDL) según modern-web-guidance `navbar`
+  siteMenu.removeAttribute('popover');
+
+  const fitsInline = headerInner.scrollWidth <= headerInner.clientWidth;
+
+  if (fitsInline) {
+    siteHeader.classList.add('is-wide');
+    siteMenu.removeAttribute('popover');
+  } else {
+    siteHeader.classList.remove('is-wide');
+    siteMenu.setAttribute('popover', 'auto');
+    if (wasOpen) {
+      try {
+        siteMenu.showPopover?.();
+      } catch {
+        // ignorar
+      }
+    }
+  }
+
+  requestAnimationFrame(() => {
+    siteHeader.classList.remove('is-measuring');
+  });
+}
+
+function initNavbarMeasurement() {
+  if (navbarObserverInitialized) return;
+  const siteHeader = document.getElementById('site-header');
+  const siteMenu = document.getElementById('site-menu');
+  if (!siteHeader || !siteMenu) return;
+
+  navbarObserverInitialized = true;
+  if ('ResizeObserver' in window) {
+    const ro = new ResizeObserver(() => updateNavbarLayout());
+    ro.observe(siteHeader);
+    ro.observe(siteMenu);
+  }
+  window.addEventListener('resize', updateNavbarLayout);
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(updateNavbarLayout).catch(() => {});
+  }
+  updateNavbarLayout();
+}
+
+function syncHeaderAndNavigation() {
+  const isPublic = activeView === 'public';
+  const isAuthenticatedAdmin = Boolean(currentUser && activeView === 'admin');
+  const brandSubtitle = document.getElementById('brand-subtitle');
+  const userPill = document.getElementById('admin-user-pill');
+  const navAdmin = document.getElementById('nav-admin');
+
+  document.body.classList.toggle('is-public-view', isPublic);
+  document.body.classList.toggle('is-admin-session', isAuthenticatedAdmin);
+
+  document.querySelectorAll('.public-nav-item').forEach((el) => {
+    el.classList.toggle('hidden', isAuthenticatedAdmin);
+  });
+  document.querySelectorAll('.admin-nav-item').forEach((el) => {
+    el.classList.toggle('hidden', !isAuthenticatedAdmin);
+  });
+
+  if (isAuthenticatedAdmin) {
+    if (brandSubtitle) brandSubtitle.textContent = 'Panel Administrativo';
+    if (userPill) {
+      userPill.textContent = currentUser.email || 'Administrador';
+      userPill.classList.remove('hidden');
+    }
+    navAdmin?.removeAttribute('aria-current');
+    document.querySelectorAll('.admin-tab-nav').forEach((btn) => {
+      if (btn.dataset.tab === activeAdminTab) {
+        btn.setAttribute('aria-current', 'page');
+      } else {
+        btn.removeAttribute('aria-current');
+      }
+    });
+  } else {
+    if (brandSubtitle) brandSubtitle.textContent = 'Automatización Comercial IA';
+    if (userPill) {
+      userPill.textContent = '';
+      userPill.classList.add('hidden');
+    }
+    if (activeView === 'admin') {
+      navAdmin?.setAttribute('aria-current', 'page');
+    } else {
+      navAdmin?.removeAttribute('aria-current');
+    }
+  }
+
+  updateNavbarLayout();
+}
+
+function showView(which) {
+  activeView = which === 'admin' ? 'admin' : 'public';
+  const viewPublic = document.getElementById('view-public');
+  const viewAdmin = document.getElementById('view-admin');
+
+  closeMenuPopoverIfOpen();
+
+  if (activeView === 'admin') {
+    viewPublic?.classList.add('hidden');
+    viewAdmin?.classList.remove('hidden');
+    syncHeaderAndNavigation();
+    if (currentUser) {
+      loadAllAdminData();
+    } else {
+      setFeedback('auth-status-msg', '');
+      requestAnimationFrame(() => document.getElementById('auth-email')?.focus());
+    }
+  } else {
+    viewAdmin?.classList.add('hidden');
+    viewPublic?.classList.remove('hidden');
+    syncHeaderAndNavigation();
+    loadPublicCatalog();
+    requestAnimationFrame(() => carouselController?.syncActiveSlideInstant());
+  }
+}
+
+// ==================== CARRUSEL PÚBLICO (modern-web-guidance `carousel`) ====================
+let carouselController = null;
+
+function prefersReducedMotion() {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+}
+
+function initPublicCarousel() {
+  const carousel = document.getElementById('public-carousel');
+  const track = document.getElementById('public-carousel-track');
+  const markersNav = document.getElementById('carousel-markers');
+  const statusEl = document.getElementById('carousel-status');
+  const prevBtn = carousel?.querySelector('.carousel-arrow[data-direction="previous"]');
+  const nextBtn = carousel?.querySelector('.carousel-arrow[data-direction="next"]');
+  if (!carousel || !track || !markersNav || !prevBtn || !nextBtn) return null;
+
+  const slides = Array.from(track.querySelectorAll('.carousel-slide'));
+  if (!slides.length) return null;
+
+  let pendingTarget = null;
+  let scrollGeneration = 0;
+  let lastSettledIndex = 0;
+  let liveMarkerIndex = 0;
+  let rafScheduled = false;
+  let settleTimer = null;
+
+  // Generar botones marcadores con su nombre de destino (01 · Descripción, 02 · La Oferta)
+  markersNav.innerHTML = '';
+  const markers = slides.map((slide, idx) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = slide.dataset.markerName || `Diapositiva ${idx + 1}`;
+    btn.setAttribute('aria-label', slide.dataset.markerName || `Ir a diapositiva ${idx + 1}`);
+    if (idx === 0) btn.setAttribute('aria-current', 'true');
+    btn.addEventListener('click', () => goToSlide(idx, { announce: true }));
+    markersNav.appendChild(btn);
+    return btn;
+  });
+
+  function getNearestSlideIndex() {
+    const tr = track.getBoundingClientRect();
+    const trackCenter = tr.left + tr.width / 2;
+    let bestIdx = 0;
+    let bestDist = Number.POSITIVE_INFINITY;
+    slides.forEach((slide, idx) => {
+      const sr = slide.getBoundingClientRect();
+      const dist = Math.abs(sr.left + sr.width / 2 - trackCenter);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = idx;
+      }
+    });
+    return bestIdx;
+  }
+
+  function applyMarkerCurrent(index) {
+    if (liveMarkerIndex === index && markers[index]?.getAttribute('aria-current') === 'true') {
+      return;
+    }
+    liveMarkerIndex = index;
+    markers.forEach((btn, idx) => {
+      if (idx === index) {
+        btn.setAttribute('aria-current', 'true');
+      } else {
+        btn.removeAttribute('aria-current');
+      }
+    });
+  }
+
+  function updateEndControls(index) {
+    // Con 2 diapositivas (< 3), el carrusel es finito y deshabilita botones en los extremos
+    prevBtn.disabled = index <= 0;
+    nextBtn.disabled = index >= slides.length - 1;
+  }
+
+  function settleNavigation(expectedGen, allowAnnounce) {
+    if (expectedGen !== undefined && expectedGen !== scrollGeneration) return;
+    pendingTarget = null;
+    const settledIndex = getNearestSlideIndex();
+    applyMarkerCurrent(settledIndex);
+    updateEndControls(settledIndex);
+
+    if (allowAnnounce && settledIndex !== lastSettledIndex) {
+      lastSettledIndex = settledIndex;
+      const label = slides[settledIndex]?.dataset.markerName || `Diapositiva ${settledIndex + 1}`;
+      if (statusEl) {
+        statusEl.textContent = `Diapositiva ${settledIndex + 1} de ${slides.length}: ${label}`;
+      }
+    } else {
+      lastSettledIndex = settledIndex;
+    }
+  }
+
+  function goToSlide(targetIndex, { announce = true } = {}) {
+    const clamped = Math.max(0, Math.min(slides.length - 1, targetIndex));
+    const currentIndex = pendingTarget ?? getNearestSlideIndex();
+    if (clamped === currentIndex && pendingTarget === null) {
+      updateEndControls(clamped);
+      return;
+    }
+
+    pendingTarget = clamped;
+    scrollGeneration += 1;
+    const gen = scrollGeneration;
+
+    // Actualizar el marcador al instante al hacer clic
+    applyMarkerCurrent(clamped);
+
+    const targetSlide = slides[clamped];
+    const sr = targetSlide.getBoundingClientRect();
+    const tr = track.getBoundingClientRect();
+    const delta = sr.left + sr.width / 2 - (tr.left + tr.width / 2);
+
+    if (Math.abs(delta) < 1) {
+      settleNavigation(gen, announce);
+      return;
+    }
+
+    const instant = prefersReducedMotion();
+    track.scrollBy({
+      left: delta,
+      behavior: instant ? 'auto' : 'smooth'
+    });
+
+    if (instant) {
+      requestAnimationFrame(() => settleNavigation(gen, announce));
+    } else if (!('onscrollend' in window)) {
+      clearTimeout(settleTimer);
+      settleTimer = setTimeout(() => settleNavigation(gen, announce), 160);
+    }
+  }
+
+  prevBtn.addEventListener('click', () => {
+    const baseIndex = pendingTarget ?? getNearestSlideIndex();
+    goToSlide(baseIndex - 1, { announce: true });
+  });
+
+  nextBtn.addEventListener('click', () => {
+    const baseIndex = pendingTarget ?? getNearestSlideIndex();
+    goToSlide(baseIndex + 1, { announce: true });
+  });
+
+  track.addEventListener('scroll', () => {
+    // Si hay un destino en vuelo iniciado por botón, evitar recalcular en cada frame
+    if (pendingTarget === null && !rafScheduled) {
+      rafScheduled = true;
+      requestAnimationFrame(() => {
+        rafScheduled = false;
+        if (pendingTarget === null) {
+          applyMarkerCurrent(getNearestSlideIndex());
+        }
+      });
+    }
+
+    if (!('onscrollend' in window)) {
+      const gen = scrollGeneration;
+      clearTimeout(settleTimer);
+      settleTimer = setTimeout(() => settleNavigation(gen, true), 140);
+    }
+  }, { passive: true });
+
+  if ('onscrollend' in window) {
+    track.addEventListener('scrollend', () => {
+      settleNavigation(scrollGeneration, true);
+    });
+  }
+
+  function syncActiveSlideInstant() {
+    const targetSlide = slides[lastSettledIndex];
+    if (!targetSlide) return;
+    const sr = targetSlide.getBoundingClientRect();
+    const tr = track.getBoundingClientRect();
+    const delta = sr.left + sr.width / 2 - (tr.left + tr.width / 2);
+    if (Math.abs(delta) >= 2) {
+      track.scrollBy({ left: delta, behavior: 'auto' });
+    }
+    applyMarkerCurrent(lastSettledIndex);
+    updateEndControls(lastSettledIndex);
+  }
+
+  if ('ResizeObserver' in window) {
+    let resizeRaf = 0;
+    const ro = new ResizeObserver(() => {
+      if (pendingTarget !== null || activeView !== 'public') return;
+      cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(syncActiveSlideInstant);
+    });
+    ro.observe(track);
+  }
+
+  // Sincronización silenciosa inicial sin anunciar en la región aria-live
+  applyMarkerCurrent(0);
+  updateEndControls(0);
+
+  return {
+    goToSlide,
+    syncActiveSlideInstant
+  };
+}
+
+function switchAdminTab(tabId) {
+  activeAdminTab = tabId || 'tab-catalog';
+  closeMenuPopoverIfOpen();
+
+  document.querySelectorAll('.admin-tab-pane').forEach((p) => {
+    p.classList.toggle('hidden', p.id !== activeAdminTab);
+  });
+
+  syncHeaderAndNavigation();
+
+  if (activeAdminTab === 'tab-accounts' && currentUser) {
+    loadAdminAccounts();
+  } else if (activeAdminTab === 'tab-channels' && currentUser) {
+    loadWhatsAppStatus();
+    refreshHealth();
+  } else if (activeAdminTab === 'tab-orders' && currentUser) {
+    loadAdminOrders();
+  }
+}
+
+// ==================== ESTADO DE CANALES Y SALUD (SOLO EN ADMIN) ====================
 async function refreshHealth() {
   try {
     const data = await apiFetch('/api/health');
@@ -148,10 +552,8 @@ async function refreshHealth() {
       if (tunLbl) tunLbl.textContent = data.tunnel?.state || 'Local';
     }
 
-    const ordersBadge = document.getElementById('badge-orders-count');
-    const tabOrdersCount = document.getElementById('tab-orders-count');
-    if (ordersBadge) ordersBadge.textContent = String(data.stats?.ordersCount ?? 0);
-    if (tabOrdersCount) tabOrdersCount.textContent = String(data.stats?.ordersCount ?? 0);
+    const headerOrdersCount = document.getElementById('header-orders-count');
+    if (headerOrdersCount) headerOrdersCount.textContent = String(data.stats?.ordersCount ?? 0);
   } catch {
     document.getElementById('dot-node')?.classList.remove('online');
   }
@@ -186,7 +588,7 @@ async function loadPublicCatalog() {
             <header>
               <div class="card-meta-row">
                 <span class="badge-tag">${escapeHtml(item.type === 'service' ? 'Servicio IA' : 'Producto Digital')}</span>
-                ${item.badge ? `<span class="badge-tag" style="background:rgba(16,185,129,0.18); color:#6ee7b7; border-color:rgba(16,185,129,0.4);">${escapeHtml(item.badge)}</span>` : ''}
+                ${item.badge ? `<span class="badge-tag" style="background:rgba(212,180,106,0.16); color:#edd493; border-color:rgba(212,180,106,0.45);">${escapeHtml(item.badge)}</span>` : ''}
               </div>
               <h3>${escapeHtml(item.name)}</h3>
               ${item.tagline ? `<p class="tagline">${escapeHtml(item.tagline)}</p>` : ''}
@@ -199,7 +601,7 @@ async function loadPublicCatalog() {
                 </div>
                 ${setupHtml}
               </div>
-              <p style="margin:0; font-size:0.9rem; color:#cbd5e1;">${escapeHtml(item.description)}</p>
+              <p style="margin:0; font-size:0.9rem; color:var(--text-secondary);">${escapeHtml(item.description)}</p>
               ${featsHtml ? `<ul class="feature-list">${featsHtml}</ul>` : ''}
             </div>
             <footer>
@@ -229,16 +631,18 @@ async function loadPublicCatalog() {
           input.value = `Me interesa el servicio "${name}", ¿me explicas qué incluye y cómo lo contrato?`;
           input.focus();
           document.getElementById('chat-form')?.requestSubmit();
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          if (window.matchMedia?.('(max-width: 979px)')?.matches) {
+            input.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+          }
         }
       });
     });
   } catch (err) {
-    grid.innerHTML = `<p style="color:#fda4af;">No se pudo conectar al servidor en ${escapeHtml(API_BASE)}: ${escapeHtml(err.message)}</p>`;
+    grid.innerHTML = `<p style="color:#fda4af;">No se pudo conectar con el servicio de catálogo: ${escapeHtml(err.message)}</p>`;
   }
 }
 
-// ==================== CHAT EN VIVO CON AGENTE PYTHON + OLLAMA ====================
+// ==================== CHAT EN VIVO CON ASESOR COMERCIAL ====================
 function appendChatBubble(role, text) {
   const box = document.getElementById('chat-messages');
   if (!box) return;
@@ -276,7 +680,7 @@ async function sendChatMessage(text) {
       if (currentUser) await loadAdminOrders();
     }
   } catch (err) {
-    appendChatBubble('assistant', `Error comunicando con el servidor Python/Ollama: ${err.message}`);
+    appendChatBubble('assistant', `No se pudo obtener respuesta del asesor en este momento: ${err.message}`);
   } finally {
     if (sendBtn) {
       sendBtn.disabled = false;
@@ -294,23 +698,81 @@ function openOrderDialog(slug, name) {
   dlg.showModal();
 }
 
+// ==================== HELPERS DE FEEDBACK Y CONTRASEÑAS ====================
+function setFeedback(elId, message, isSuccess = false) {
+  const box = document.getElementById(elId);
+  if (!box) return;
+  box.textContent = message || '';
+  box.classList.toggle('is-success', Boolean(isSuccess && message));
+}
+
+function resetPasswordToggle(btnId, inputId) {
+  const btn = document.getElementById(btnId);
+  const input = document.getElementById(inputId);
+  if (input) input.type = 'password';
+  if (btn) {
+    btn.setAttribute('aria-pressed', 'false');
+    btn.textContent = 'Mostrar';
+  }
+}
+
+function setupPasswordToggle(btnId, inputId) {
+  const btn = document.getElementById(btnId);
+  const input = document.getElementById(inputId);
+  if (!btn || !input) return;
+
+  btn.addEventListener('click', () => {
+    const reveal = input.type === 'password';
+    input.type = reveal ? 'text' : 'password';
+    btn.setAttribute('aria-pressed', String(reveal));
+    btn.textContent = reveal ? 'Ocultar' : 'Mostrar';
+  });
+}
+
+function mapFirebaseAuthError(err) {
+  const code = err?.code || '';
+  switch (code) {
+    case 'auth/invalid-credential':
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+      return 'Correo o contraseña incorrectos. Verifica tus datos o solicita un restablecimiento.';
+    case 'auth/invalid-email':
+      return 'El formato del correo electrónico no es válido.';
+    case 'auth/user-disabled':
+      return 'Esta cuenta se encuentra deshabilitada.';
+    case 'auth/too-many-requests':
+      return 'Demasiados intentos fallidos. Espera un momento antes de volver a intentar.';
+    case 'auth/network-request-failed':
+      return 'Sin conexión con el servicio de autenticación. Revisa tu red.';
+    default:
+      return err?.message || 'No se pudo completar la autenticación.';
+  }
+}
+
 // ==================== FIREBASE AUTH & PANEL ADMIN ====================
 onAuthStateChanged(auth, async (user) => {
+  // Rechazar sesiones anónimas heredadas; el acceso Admin exige cuenta con correo y contraseña
+  if (user && (user.isAnonymous || !user.email)) {
+    currentUser = null;
+    await signOut(auth).catch(() => {});
+    return;
+  }
+
   currentUser = user;
   const gate = document.getElementById('auth-gate');
   const dash = document.getElementById('admin-dashboard');
-  const userLbl = document.getElementById('admin-user-label');
 
   if (user) {
     gate?.classList.add('hidden');
     dash?.classList.remove('hidden');
-    if (userLbl) {
-      userLbl.textContent = user.email || `Admin Firebase (${user.uid.slice(0, 6)})`;
-    }
+    setFeedback('auth-status-msg', '');
+    syncHeaderAndNavigation();
+    switchAdminTab(activeAdminTab);
     await loadAllAdminData();
   } else {
     gate?.classList.remove('hidden');
     dash?.classList.add('hidden');
+    syncHeaderAndNavigation();
   }
 });
 
@@ -322,6 +784,7 @@ async function loadAllAdminData() {
     loadAdminSettings(),
     loadWhatsAppStatus(),
     loadAdminConversations(),
+    loadAdminAccounts(),
     refreshHealth()
   ]);
 }
@@ -394,6 +857,9 @@ async function loadAdminOrders() {
   if (!tbody) return;
   const data = await apiFetch('/api/orders');
   const orders = data.orders || [];
+
+  const headerOrdersCount = document.getElementById('header-orders-count');
+  if (headerOrdersCount) headerOrdersCount.textContent = String(orders.length);
 
   if (!orders.length) {
     tbody.innerHTML = `<tr><th scope="row">—</th><td colspan="6" style="color:var(--text-muted);">Aún no hay pedidos registrados. Prueba el chat IA o los simuladores de canales para cerrar una venta.</td></tr>`;
@@ -497,7 +963,7 @@ async function loadAdminSettings() {
     }
     document.getElementById('tunnel-token-input').value = tun.tunnel_token || '';
   } catch {
-    // ignore
+    // ignorar error de carga inicial de ajustes
   }
 }
 
@@ -525,6 +991,42 @@ async function loadAdminConversations() {
     .join('');
 }
 
+async function loadAdminAccounts() {
+  const tbody = document.getElementById('accounts-tbody');
+  if (!tbody) return;
+
+  try {
+    const data = await apiFetch('/api/admin/accounts');
+    if (!data.ok) {
+      tbody.innerHTML = `<tr><th scope="row">—</th><td colspan="4" style="color:#fda4af;">${escapeHtml(data.error || 'No se pudieron consultar las cuentas.')}</td></tr>`;
+      return;
+    }
+
+    const accounts = data.accounts || [];
+    if (!accounts.length) {
+      tbody.innerHTML = `<tr><th scope="row">—</th><td colspan="4" style="color:var(--text-muted);">No hay cuentas registradas aún.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = accounts
+      .map((acc) => {
+        const roleLabel = acc.role === 'operator' ? 'Operador de Ventas' : 'Administrador';
+        return `
+          <tr>
+            <th scope="row">${escapeHtml(acc.display_name || acc.email)}</th>
+            <td>${escapeHtml(acc.email)}</td>
+            <td><span class="badge-tag">${escapeHtml(roleLabel)}</span></td>
+            <td>${escapeHtml(acc.created_by || 'Firebase Auth')}</td>
+            <td style="font-size:0.8rem; color:var(--text-muted);">${escapeHtml(acc.created_at || '—')}</td>
+          </tr>
+        `;
+      })
+      .join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><th scope="row">—</th><td colspan="4" style="color:#fda4af;">Error cargando cuentas: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
 function escapeHtml(str) {
   return String(str ?? '')
     .replace(/&/g, '&amp;')
@@ -535,51 +1037,142 @@ function escapeHtml(str) {
 
 // ==================== EVENT LISTENERS ====================
 function setupEventListeners() {
-  const navPublic = document.getElementById('nav-public');
-  const navAdmin = document.getElementById('nav-admin');
-  const viewPublic = document.getElementById('view-public');
-  const viewAdmin = document.getElementById('view-admin');
+  initNavbarMeasurement();
+  carouselController = initPublicCarousel();
 
-  function showView(which) {
-    if (which === 'admin') {
-      viewPublic?.classList.add('hidden');
-      viewAdmin?.classList.remove('hidden');
-      navPublic?.classList.remove('active');
-      navAdmin?.classList.add('active');
-      if (currentUser) loadAllAdminData();
-    } else {
-      viewAdmin?.classList.add('hidden');
-      viewPublic?.classList.remove('hidden');
-      navAdmin?.classList.remove('active');
-      navPublic?.classList.add('active');
-      loadPublicCatalog();
-    }
-  }
-
-  navPublic?.addEventListener('click', () => showView('public'));
-  navAdmin?.addEventListener('click', () => showView('admin'));
-  document.getElementById('btn-go-admin-hero')?.addEventListener('click', () => showView('admin'));
+  document.getElementById('nav-admin')?.addEventListener('click', () => showView('admin'));
+  document.getElementById('btn-view-store')?.addEventListener('click', () => showView('public'));
+  document.getElementById('btn-back-to-public')?.addEventListener('click', () => showView('public'));
   document.getElementById('link-home')?.addEventListener('click', (e) => {
     e.preventDefault();
     showView('public');
   });
 
+  document.getElementById('btn-go-offer')?.addEventListener('click', () => {
+    carouselController?.goToSlide(1, { announce: true });
+  });
+  document.getElementById('btn-go-description')?.addEventListener('click', () => {
+    carouselController?.goToSlide(0, { announce: true });
+  });
+
   if (location.pathname === '/admin' || location.hash === '#admin') {
     showView('admin');
+  } else {
+    syncHeaderAndNavigation();
   }
 
-  // Cambiar API Base manualmente si se desea
-  document.getElementById('btn-change-api')?.addEventListener('click', () => {
-    const next = prompt(
-      'Introduce la URL del servidor backend Node (ej. http://localhost:10000 o tu URL https://xxxx.trycloudflare.com):',
-      API_BASE || 'http://localhost:10000'
-    );
-    if (next !== null) {
-      API_BASE = next.trim().replace(/\/+$/, '');
-      localStorage.setItem('servibot_api_base', API_BASE);
-      updateApiLabel();
-      refreshHealth();
-      loadPublicCatalog();
+  // Botones de navegación del Panel Admin en el encabezado
+  document.querySelectorAll('.admin-tab-nav').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      switchAdminTab(btn.dataset.tab);
+    });
+  });
+
+  // Toggles de mostrar/ocultar contraseña
+  setupPasswordToggle('btn-toggle-login-pw', 'auth-password');
+  setupPasswordToggle('btn-toggle-new-pw', 'new-acc-password');
+
+  // Login administrativo Firebase Auth (sin autocreación ni credenciales precargadas)
+  document.getElementById('firebase-login-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('auth-email').value.trim();
+    const pass = document.getElementById('auth-password').value;
+    const submitBtn = document.getElementById('btn-login-email');
+
+    setFeedback('auth-status-msg', '');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Verificando...';
+    }
+
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (err) {
+      setFeedback('auth-status-msg', mapFirebaseAuthError(err), false);
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Iniciar sesión';
+      }
+    }
+  });
+
+  // Recuperar contraseña con Firebase Auth
+  document.getElementById('btn-forgot-password')?.addEventListener('click', async () => {
+    const emailInput = document.getElementById('auth-email');
+    const email = emailInput?.value?.trim() || '';
+    if (!email) {
+      setFeedback('auth-status-msg', 'Escribe tu correo electrónico arriba para enviarte el enlace de recuperación.', false);
+      emailInput?.focus();
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setFeedback(
+        'auth-status-msg',
+        `Se envió un correo de restablecimiento a ${email}. Revisa tu bandeja de entrada o spam.`,
+        true
+      );
+    } catch (err) {
+      setFeedback('auth-status-msg', mapFirebaseAuthError(err), false);
+    }
+  });
+
+  document.getElementById('btn-logout')?.addEventListener('click', async () => {
+    closeMenuPopoverIfOpen();
+    await signOut(auth);
+    document.getElementById('firebase-login-form')?.reset();
+    resetPasswordToggle('btn-toggle-login-pw', 'auth-password');
+    setFeedback('auth-status-msg', 'Sesión cerrada correctamente.', true);
+  });
+
+  document.getElementById('btn-refresh-admin')?.addEventListener('click', () => {
+    closeMenuPopoverIfOpen();
+    loadAllAdminData();
+  });
+
+  // Crear nueva cuenta dentro de Admin (sin cerrar sesión actual)
+  document.getElementById('create-account-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const displayName = document.getElementById('new-acc-name').value.trim();
+    const email = document.getElementById('new-acc-email').value.trim();
+    const role = document.getElementById('new-acc-role').value;
+    const password = document.getElementById('new-acc-password').value;
+    const createBtn = document.getElementById('btn-create-account');
+
+    setFeedback('create-account-feedback', '');
+    if (createBtn) {
+      createBtn.disabled = true;
+      createBtn.textContent = 'Creando cuenta...';
+    }
+
+    try {
+      const res = await apiFetch('/api/admin/accounts', {
+        method: 'POST',
+        body: JSON.stringify({ displayName, email, role, password })
+      });
+
+      if (!res.ok) {
+        setFeedback('create-account-feedback', res.error || 'No se pudo crear la cuenta.', false);
+        return;
+      }
+
+      setFeedback(
+        'create-account-feedback',
+        `✅ Cuenta creada en Firebase Auth: ${res.account?.email || email}`,
+        true
+      );
+      document.getElementById('create-account-form')?.reset();
+      resetPasswordToggle('btn-toggle-new-pw', 'new-acc-password');
+      await loadAdminAccounts();
+    } catch (err) {
+      setFeedback('create-account-feedback', `Error de conexión: ${err.message}`, false);
+    } finally {
+      if (createBtn) {
+        createBtn.disabled = false;
+        createBtn.textContent = 'Crear cuenta';
+      }
     }
   });
 
@@ -644,55 +1237,6 @@ function setupEventListeners() {
       );
       await refreshHealth();
     }
-  });
-
-  // Firebase Auth Login / Register
-  document.getElementById('firebase-login-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('auth-email').value.trim();
-    const pass = document.getElementById('auth-password').value;
-    const errBox = document.getElementById('auth-error-msg');
-    if (errBox) errBox.textContent = '';
-
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch (signInErr) {
-      // Si el usuario aún no existe en el proyecto recién creado, lo registramos automáticamente
-      try {
-        await createUserWithEmailAndPassword(auth, email, pass);
-      } catch (createErr) {
-        if (errBox) errBox.textContent = createErr.message || signInErr.message;
-      }
-    }
-  });
-
-  document.getElementById('btn-login-instant')?.addEventListener('click', async () => {
-    const errBox = document.getElementById('auth-error-msg');
-    if (errBox) errBox.textContent = '';
-    try {
-      await signInAnonymously(auth);
-    } catch (err) {
-      if (errBox) errBox.textContent = err.message;
-    }
-  });
-
-  document.getElementById('btn-logout')?.addEventListener('click', async () => {
-    await signOut(auth);
-  });
-
-  document.getElementById('btn-refresh-admin')?.addEventListener('click', () => {
-    loadAllAdminData();
-  });
-
-  // Tabs del Admin
-  document.querySelectorAll('.tab-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
-      document.querySelectorAll('.admin-tab-pane').forEach((p) => p.classList.add('hidden'));
-      btn.classList.add('active');
-      const target = document.getElementById(btn.dataset.tab);
-      target?.classList.remove('hidden');
-    });
   });
 
   // Subida de archivo de imagen en el formulario de catálogo
@@ -838,7 +1382,7 @@ function setupEventListeners() {
     await refreshHealth();
   });
 
-  // Configuración de Túnel Cloudflare
+  // Configuración de Túnel Cloudflare y override manual de URL (solo en Admin)
   document.getElementById('btn-save-tunnel')?.addEventListener('click', async () => {
     const token = document.getElementById('tunnel-token-input').value.trim();
     const res = await apiFetch('/api/settings/tunnel_config', {
@@ -856,13 +1400,28 @@ function setupEventListeners() {
   });
 
   document.getElementById('btn-use-tunnel-url')?.addEventListener('click', () => {
-    const url = document.getElementById('tunnel-public-url').value.trim();
+    const url = document.getElementById('tunnel-public-url').value.trim().replace(/\/+$/, '');
     if (url && url.startsWith('https://')) {
       API_BASE = url;
       localStorage.setItem('servibot_api_base', API_BASE);
-      updateApiLabel();
-      refreshHealth();
+      syncApiOverrideInput();
+      loadAllAdminData();
     }
+  });
+
+  document.getElementById('btn-apply-api-override')?.addEventListener('click', async () => {
+    const input = document.getElementById('admin-api-override');
+    const next = (input?.value || '').trim().replace(/\/+$/, '');
+    if (!next) {
+      localStorage.removeItem('servibot_api_base');
+      await resolveInitialApiBase();
+    } else {
+      API_BASE = next;
+      localStorage.setItem('servibot_api_base', API_BASE);
+      syncApiOverrideInput();
+    }
+    await loadPublicCatalog();
+    if (currentUser) await loadAllAdminData();
   });
 }
 
@@ -875,7 +1434,7 @@ function setupEventListeners() {
   setInterval(refreshHealth, 12000);
   setInterval(() => {
     const chTab = document.getElementById('tab-channels');
-    if (currentUser && chTab && !chTab.classList.contains('hidden')) {
+    if (currentUser && activeView === 'admin' && chTab && !chTab.classList.contains('hidden')) {
       loadWhatsAppStatus();
     }
   }, 4000);

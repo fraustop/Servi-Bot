@@ -114,13 +114,13 @@ async function requireFirebaseAuth(req, res, next) {
     }
     const data = await resp.json();
     const user = data?.users?.[0];
-    if (!user) {
-      return res.status(401).json({ ok: false, error: 'Usuario de Firebase no encontrado.' });
+    if (!user || !user.email) {
+      return res.status(401).json({ ok: false, error: 'Se requiere una cuenta válida con correo electrónico en Firebase Auth.' });
     }
     req.firebaseUser = {
       uid: user.localId,
-      email: user.email || 'admin@servi-bot.app',
-      displayName: user.displayName || user.email || 'Administrador'
+      email: user.email,
+      displayName: user.displayName || user.email
     };
     return next();
   } catch (err) {
@@ -630,6 +630,100 @@ async function main() {
     }
 
     res.json({ ok: true, key, value: merged, tunnel: getTunnelStatus() });
+  });
+
+  // --- GESTIÓN DE CUENTAS DE ADMINISTRACIÓN (FIREBASE AUTH + SQLITE) ---
+  app.get('/api/admin/accounts', requireFirebaseAuth, (req, res) => {
+    try {
+      db.prepare(`
+        INSERT INTO admin_accounts (firebase_uid, email, display_name, role, created_by)
+        VALUES (?, ?, ?, 'admin', 'firebase-auth')
+        ON CONFLICT(email) DO UPDATE SET
+          firebase_uid = COALESCE(NULLIF(excluded.firebase_uid, ''), admin_accounts.firebase_uid),
+          display_name = COALESCE(NULLIF(excluded.display_name, ''), admin_accounts.display_name)
+      `).run(req.firebaseUser.uid, req.firebaseUser.email.toLowerCase(), req.firebaseUser.displayName || '');
+
+      const accounts = db
+        .prepare('SELECT id, firebase_uid, email, display_name, role, created_by, created_at FROM admin_accounts ORDER BY id DESC')
+        .all();
+      res.json({ ok: true, accounts });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  app.post('/api/admin/accounts', requireFirebaseAuth, async (req, res) => {
+    try {
+      const email = String(req.body?.email || '').trim().toLowerCase();
+      const password = String(req.body?.password || '');
+      const displayName = String(req.body?.displayName || '').trim();
+      const role = req.body?.role === 'operator' ? 'operator' : 'admin';
+
+      if (!email || !email.includes('@')) {
+        return res.status(400).json({ ok: false, error: 'Ingresa un correo electrónico válido.' });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ ok: false, error: 'La contraseña debe tener al menos 6 caracteres.' });
+      }
+
+      const signUpResp = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, returnSecureToken: true })
+        }
+      );
+      const signUpData = await signUpResp.json();
+
+      if (!signUpResp.ok) {
+        const fbCode = signUpData?.error?.message || 'UNKNOWN';
+        const errorMap = {
+          EMAIL_EXISTS: 'Ya existe una cuenta en Firebase con este correo electrónico.',
+          INVALID_EMAIL: 'El formato del correo electrónico no es válido.',
+          OPERATION_NOT_ALLOWED: 'El registro por correo y contraseña no está habilitado en Firebase Auth.',
+          WEAK_PASSWORD: 'La contraseña es demasiado débil (mínimo 6 caracteres).'
+        };
+        const cleanMsg = Object.entries(errorMap).find(([k]) => fbCode.includes(k))?.[1] || `Firebase error: ${fbCode}`;
+        return res.status(400).json({ ok: false, error: cleanMsg });
+      }
+
+      if (displayName && signUpData.idToken) {
+        await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${FIREBASE_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idToken: signUpData.idToken,
+            displayName,
+            returnSecureToken: false
+          })
+        });
+      }
+
+      db.prepare(`
+        INSERT INTO admin_accounts (firebase_uid, email, display_name, role, created_by)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(email) DO UPDATE SET
+          firebase_uid = excluded.firebase_uid,
+          display_name = excluded.display_name,
+          role = excluded.role,
+          created_by = excluded.created_by
+      `).run(
+        signUpData.localId || '',
+        email,
+        displayName || email,
+        role,
+        req.firebaseUser.email
+      );
+
+      const created = db
+        .prepare('SELECT id, firebase_uid, email, display_name, role, created_by, created_at FROM admin_accounts WHERE email = ?')
+        .get(email);
+
+      res.json({ ok: true, account: created });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
   });
 
   // SPA fallback

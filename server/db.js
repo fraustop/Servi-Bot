@@ -73,6 +73,16 @@ db.exec(`
     value_json TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
   );
+
+  CREATE TABLE IF NOT EXISTS admin_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    firebase_uid TEXT DEFAULT '',
+    email TEXT UNIQUE NOT NULL,
+    display_name TEXT DEFAULT '',
+    role TEXT NOT NULL DEFAULT 'admin',
+    created_by TEXT DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
 `);
 
 function seedDatabase() {
