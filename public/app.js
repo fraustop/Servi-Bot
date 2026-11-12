@@ -588,7 +588,7 @@ async function loadPublicCatalog() {
             <header>
               <div class="card-meta-row">
                 <span class="badge-tag">${escapeHtml(item.type === 'service' ? 'Servicio IA' : 'Producto Digital')}</span>
-                ${item.badge ? `<span class="badge-tag" style="background:rgba(212,180,106,0.16); color:#edd493; border-color:rgba(212,180,106,0.45);">${escapeHtml(item.badge)}</span>` : ''}
+                ${item.badge ? `<span class="badge-tag badge-tag-accent">${escapeHtml(item.badge)}</span>` : ''}
               </div>
               <h3>${escapeHtml(item.name)}</h3>
               ${item.tagline ? `<p class="tagline">${escapeHtml(item.tagline)}</p>` : ''}
