@@ -7,25 +7,99 @@ const QRCode = require('qrcode');
 
 const EVOLUTION_PORT = Number(process.env.EVOLUTION_PORT || 10001);
 const MAIN_SERVER_WEBHOOK = process.env.MAIN_WEBHOOK_URL || 'http://127.0.0.1:10000/api/webhooks/evolution';
-const AUTH_DIR = path.join(__dirname, '..', 'auth_info_baileys');
+const BASE_AUTH_DIR = path.join(__dirname, '..', 'auth_info_baileys');
 
-let sock = null;
-let connectionState = 'close'; // 'close' | 'connecting' | 'qr_ready' | 'open'
-let latestQrRaw = null;
-let latestQrBase64 = null;
-let connectedPhone = null;
-let lastError = null;
-let isInitializing = false;
-let reconnectTimer = null;
-let recentEvents = [];
+const INSTANCE_IDS = Array.from({ length: 10 }, (_, idx) => `servibot-${String(idx + 1).padStart(2, '0')}`);
 
-function recordEvent(type, detail) {
+const instances = new Map();
+for (let i = 0; i < INSTANCE_IDS.length; i += 1) {
+  const instanceId = INSTANCE_IDS[i];
+  instances.set(instanceId, {
+    instanceId,
+    slotNumber: i + 1,
+    authDir: path.join(BASE_AUTH_DIR, instanceId),
+    sock: null,
+    state: 'close', // 'close' | 'connecting' | 'qr_ready' | 'open'
+    qrRaw: null,
+    qrBase64: null,
+    qrUpdatedAt: null,
+    connectedPhone: null,
+    lastError: null,
+    isInitializing: false,
+    reconnectTimer: null
+  });
+}
+
+const recentEvents = [];
+
+function recordEvent(type, detail, instanceId = 'system') {
   recentEvents.unshift({
     timestamp: new Date().toISOString(),
+    instanceId,
     type,
     detail
   });
-  if (recentEvents.length > 40) recentEvents.pop();
+  if (recentEvents.length > 80) recentEvents.pop();
+}
+
+function resolveInstanceId(rawName) {
+  const raw = String(rawName || '').trim().toLowerCase();
+  if (!raw || raw === 'servibot-main' || raw === 'default' || raw === 'main') {
+    return 'servibot-01';
+  }
+  if (instances.has(raw)) {
+    return raw;
+  }
+  const numMatch = raw.match(/^(\d{1,2})$/);
+  if (numMatch) {
+    const num = Number(numMatch[1]);
+    if (num >= 1 && num <= 10) {
+      return `servibot-${String(num).padStart(2, '0')}`;
+    }
+  }
+  return 'servibot-01';
+}
+
+function hasRegisteredSession(authDir) {
+  const credsPath = path.join(authDir, 'creds.json');
+  if (!fs.existsSync(credsPath)) return false;
+  try {
+    const raw = fs.readFileSync(credsPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    return Boolean(parsed?.me?.id || parsed?.registered);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Migra la sesión previa almacenada directamente en `auth_info_baileys/creds.json`
+ * hacia `auth_info_baileys/servibot-01/` para conservar la conexión existente.
+ */
+function migrateLegacyRootSession() {
+  const rootCreds = path.join(BASE_AUTH_DIR, 'creds.json');
+  const firstInstDir = path.join(BASE_AUTH_DIR, 'servibot-01');
+  const firstCreds = path.join(firstInstDir, 'creds.json');
+
+  if (!fs.existsSync(rootCreds) || fs.existsSync(firstCreds)) {
+    return;
+  }
+
+  try {
+    fs.mkdirSync(firstInstDir, { recursive: true });
+    const entries = fs.readdirSync(BASE_AUTH_DIR, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+      fs.copyFileSync(
+        path.join(BASE_AUTH_DIR, entry.name),
+        path.join(firstInstDir, entry.name)
+      );
+    }
+    recordEvent('session_migrated', 'Sesión WhatsApp existente migrada a servibot-01', 'servibot-01');
+    console.log('[Evolution:10001] Sesión previa migrada exitosamente a auth_info_baileys/servibot-01');
+  } catch (err) {
+    console.error('[Evolution:10001] Error migrando sesión previa:', err.message);
+  }
 }
 
 async function forwardToMainWebhook(payload) {
@@ -42,39 +116,71 @@ async function forwardToMainWebhook(payload) {
   }
 }
 
-function cleanupExistingSocket() {
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
+function cleanupInstanceSocket(inst) {
+  if (inst.reconnectTimer) {
+    clearTimeout(inst.reconnectTimer);
+    inst.reconnectTimer = null;
   }
-  if (sock) {
+  if (inst.sock) {
     try {
-      sock.ev.removeAllListeners('connection.update');
-      sock.ev.removeAllListeners('creds.update');
-      sock.ev.removeAllListeners('messages.upsert');
-      sock.ws?.close();
+      inst.sock.ev.removeAllListeners('connection.update');
+      inst.sock.ev.removeAllListeners('creds.update');
+      inst.sock.ev.removeAllListeners('messages.upsert');
+      inst.sock.ws?.close();
     } catch {
       // ignore cleanup errors
     }
-    sock = null;
+    inst.sock = null;
   }
 }
 
-async function initBaileysInstance(forceNew = false) {
-  if (isInitializing) return;
-  isInitializing = true;
+function serializeInstance(inst) {
+  return {
+    instanceName: inst.instanceId,
+    instanceId: inst.instanceId,
+    slotNumber: inst.slotNumber,
+    status: inst.state,
+    state: inst.state,
+    owner: inst.connectedPhone,
+    connectedPhone: inst.connectedPhone,
+    hasQr: Boolean(inst.qrBase64),
+    qrBase64: inst.qrBase64,
+    qrUpdatedAt: inst.qrUpdatedAt,
+    hasSavedSession: hasRegisteredSession(inst.authDir),
+    lastError: inst.lastError,
+    serverUrl: `http://127.0.0.1:${EVOLUTION_PORT}`
+  };
+}
+
+async function waitForQrOrOpen(inst, maxWaitMs = 5500) {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    if (inst.state === 'open' || inst.qrBase64 || (inst.state === 'close' && !inst.isInitializing)) {
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}
+
+async function initBaileysInstance(rawInstanceId, forceNew = false) {
+  const instanceId = resolveInstanceId(rawInstanceId);
+  const inst = instances.get(instanceId);
+  if (!inst || inst.isInitializing) return;
+  inst.isInitializing = true;
 
   try {
-    cleanupExistingSocket();
+    cleanupInstanceSocket(inst);
 
-    if (forceNew && fs.existsSync(AUTH_DIR)) {
-      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-      latestQrRaw = null;
-      latestQrBase64 = null;
-      connectedPhone = null;
+    if (forceNew && fs.existsSync(inst.authDir)) {
+      fs.rmSync(inst.authDir, { recursive: true, force: true });
+      inst.qrRaw = null;
+      inst.qrBase64 = null;
+      inst.qrUpdatedAt = null;
+      inst.connectedPhone = null;
+      inst.lastError = null;
     }
-    if (!fs.existsSync(AUTH_DIR)) {
-      fs.mkdirSync(AUTH_DIR, { recursive: true });
+    if (!fs.existsSync(inst.authDir)) {
+      fs.mkdirSync(inst.authDir, { recursive: true });
     }
 
     const baileys = await import('@whiskeysockets/baileys');
@@ -86,22 +192,23 @@ async function initBaileysInstance(forceNew = false) {
       Browsers
     } = baileys;
 
-    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    const { state, saveCreds } = await useMultiFileAuthState(inst.authDir);
     let version = [2, 3000, 1019707846];
     try {
       const latest = await fetchLatestBaileysVersion();
       if (latest && latest.version) version = latest.version;
     } catch {
-      // Fallback to recent version
+      // Fallback to pinned recent version
     }
 
-    connectionState = 'connecting';
-    sock = makeWASocket({
+    inst.state = 'connecting';
+    inst.lastError = null;
+    const sock = makeWASocket({
       version,
       auth: state,
       printQRInTerminal: false,
       logger: pino({ level: 'silent' }),
-      browser: Browsers ? Browsers.ubuntu('Chrome') : ['Ubuntu', 'Chrome', '128.0.0'],
+      browser: Browsers ? Browsers.ubuntu(`Chrome-${inst.instanceId}`) : ['Ubuntu', 'Chrome', '128.0.0'],
       syncFullHistory: false,
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: false,
@@ -109,72 +216,94 @@ async function initBaileysInstance(forceNew = false) {
       defaultQueryTimeoutMs: 60000,
       keepAliveIntervalMs: 25000
     });
+    inst.sock = sock;
 
     sock.ev.on('creds.update', saveCreds);
 
     sock.ev.on('connection.update', async (update) => {
+      if (inst.sock !== sock) return;
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
-        latestQrRaw = qr;
-        latestQrBase64 = await QRCode.toDataURL(qr, { margin: 2, width: 300 });
-        connectionState = 'qr_ready';
-        recordEvent('qr_updated', 'Nuevo código QR generado para vincular WhatsApp');
+        inst.qrRaw = qr;
+        inst.qrBase64 = await QRCode.toDataURL(qr, { margin: 2, width: 300 });
+        inst.qrUpdatedAt = new Date().toISOString();
+        inst.state = 'qr_ready';
+        inst.lastError = null;
+        recordEvent('qr_updated', `Nuevo código QR generado para ${inst.instanceId}`, inst.instanceId);
       }
 
       if (connection === 'open') {
-        connectionState = 'open';
-        latestQrRaw = null;
-        latestQrBase64 = null;
-        lastError = null;
-        connectedPhone = sock?.user?.id || 'Conectado';
-        recordEvent('connected', `WhatsApp vinculado como ${connectedPhone}`);
-        console.log(`[Evolution:10001] ✅ WhatsApp conectado exitosamente (${connectedPhone})`);
+        inst.state = 'open';
+        inst.qrRaw = null;
+        inst.qrBase64 = null;
+        inst.qrUpdatedAt = null;
+        inst.lastError = null;
+        inst.connectedPhone = sock?.user?.id || 'Conectado';
+        recordEvent('connected', `WhatsApp vinculado en ${inst.instanceId} como ${inst.connectedPhone}`, inst.instanceId);
+        console.log(`[Evolution:10001] ✅ [${inst.instanceId}] WhatsApp conectado (${inst.connectedPhone})`);
       }
 
       if (connection === 'close') {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const errMsg = lastDisconnect?.error?.message || `Cerrado (${statusCode || 'unknown'})`;
-        lastError = errMsg;
-        recordEvent('disconnected', `${errMsg} [code: ${statusCode}]`);
-        console.log(`[Evolution:10001] Conexión cerrada: ${errMsg} (code: ${statusCode})`);
+        const isRegistered = hasRegisteredSession(inst.authDir);
+        inst.sock = null;
 
-        // Caso 1: 515 Stream Errored (restart required) justo después de escanear el QR
-        // o desconexiones temporales de red -> Reconectar de inmediato conservando creds.json
+        recordEvent('disconnected', `${errMsg} [code: ${statusCode}]`, inst.instanceId);
+        console.log(`[Evolution:10001] [${inst.instanceId}] Conexión cerrada: ${errMsg} (code: ${statusCode}, registered: ${isRegistered})`);
+
+        // Caso 1: Restart required tras emparejamiento QR (515) o reconexión de sesión ya registrada
         if (
           statusCode === DisconnectReason.restartRequired ||
           statusCode === 515 ||
-          statusCode === DisconnectReason.timedOut ||
-          statusCode === DisconnectReason.connectionLost ||
-          statusCode === DisconnectReason.connectionClosed
+          (isRegistered &&
+            (statusCode === DisconnectReason.timedOut ||
+              statusCode === DisconnectReason.connectionLost ||
+              statusCode === DisconnectReason.connectionClosed))
         ) {
-          connectionState = 'connecting';
-          recordEvent('reconnecting', `Completando emparejamiento / reconexión automática (code ${statusCode})...`);
-          reconnectTimer = setTimeout(() => {
-            initBaileysInstance(false);
-          }, 600);
+          inst.state = 'connecting';
+          inst.lastError = null;
+          recordEvent('reconnecting', `Reconectando ${inst.instanceId} (code ${statusCode})...`, inst.instanceId);
+          inst.reconnectTimer = setTimeout(() => {
+            initBaileysInstance(inst.instanceId, false);
+          }, 800);
           return;
         }
 
-        // Caso 2: 440 Conflict (otra instancia cerró la sesión) -> esperar un poco y reconectar si hay credenciales
-        if (statusCode === DisconnectReason.connectionReplaced || statusCode === 440) {
-          connectionState = 'connecting';
-          reconnectTimer = setTimeout(() => {
-            initBaileysInstance(false);
+        // Caso 2: Conflicto temporal (440) en sesión registrada
+        if (isRegistered && (statusCode === DisconnectReason.connectionReplaced || statusCode === 440)) {
+          inst.state = 'connecting';
+          inst.reconnectTimer = setTimeout(() => {
+            initBaileysInstance(inst.instanceId, false);
           }, 2500);
           return;
         }
 
-        // Caso 3: Sesión cerrada desde el teléfono (401 loggedOut) o credenciales corruptas/expiradas (403, 405, 500)
-        // Limpiar auth_info_baileys y generar un QR nuevo automáticamente
-        connectionState = 'close';
-        latestQrRaw = null;
-        latestQrBase64 = null;
-        connectedPhone = null;
-        recordEvent('session_reset', 'Credenciales expiradas o sesión cerrada; generando nuevo código QR limpio...');
-        reconnectTimer = setTimeout(() => {
-          initBaileysInstance(true);
-        }, 1000);
+        // Caso 3: QR expirado sin escanear (408 / QR refs attempts ended) -> detener para no saturar
+        if (!isRegistered && (statusCode === 408 || String(errMsg).toLowerCase().includes('qr refs'))) {
+          inst.state = 'close';
+          inst.qrRaw = null;
+          inst.qrBase64 = null;
+          inst.connectedPhone = null;
+          inst.lastError = 'El código QR expiró sin escanearse. Haz clic en Generar QR para intentar de nuevo.';
+          if (fs.existsSync(inst.authDir)) {
+            fs.rmSync(inst.authDir, { recursive: true, force: true });
+          }
+          recordEvent('qr_expired', `QR expirado en ${inst.instanceId}`, inst.instanceId);
+          return;
+        }
+
+        // Caso 4: Sesión cerrada desde el teléfono (401) o credenciales inválidas -> limpiar y esperar nueva acción
+        inst.state = 'close';
+        inst.qrRaw = null;
+        inst.qrBase64 = null;
+        inst.connectedPhone = null;
+        inst.lastError = errMsg;
+        if (fs.existsSync(inst.authDir)) {
+          fs.rmSync(inst.authDir, { recursive: true, force: true });
+        }
+        recordEvent('session_reset', `Sesión cerrada/reiniciada en ${inst.instanceId}`, inst.instanceId);
       }
     });
 
@@ -194,11 +323,11 @@ async function initBaileysInstance(forceNew = false) {
         if (!text.trim()) continue;
 
         const pushName = msg.pushName || remoteJid.split('@')[0];
-        recordEvent('message_in', `De ${pushName} (${remoteJid}): ${text}`);
+        recordEvent('message_in', `[${inst.instanceId}] De ${pushName} (${remoteJid}): ${text}`, inst.instanceId);
 
         const webhookResponse = await forwardToMainWebhook({
           event: 'messages.upsert',
-          instance: 'servibot-main',
+          instance: inst.instanceId,
           data: {
             key: msg.key,
             pushName,
@@ -206,158 +335,194 @@ async function initBaileysInstance(forceNew = false) {
           }
         });
 
-        if (webhookResponse && webhookResponse.reply && sock && connectionState === 'open') {
-          await sock.sendMessage(remoteJid, { text: webhookResponse.reply });
-          recordEvent('message_out', `Para ${remoteJid}: ${webhookResponse.reply.slice(0, 120)}...`);
+        if (webhookResponse && webhookResponse.reply && inst.sock && inst.state === 'open') {
+          await inst.sock.sendMessage(remoteJid, { text: webhookResponse.reply });
+          recordEvent('message_out', `[${inst.instanceId}] Para ${remoteJid}: ${webhookResponse.reply.slice(0, 120)}...`, inst.instanceId);
         }
       }
     });
   } catch (err) {
-    lastError = err.message;
-    connectionState = 'close';
-    recordEvent('error', err.message);
+    inst.lastError = err.message;
+    inst.state = 'close';
+    inst.sock = null;
+    recordEvent('error', `[${inst.instanceId}] ${err.message}`, inst.instanceId);
   } finally {
-    isInitializing = false;
+    inst.isInitializing = false;
   }
 }
 
 function startEvolutionServer() {
+  migrateLegacyRootSession();
+
   const app = express();
   app.use(cors());
   app.use(express.json({ limit: '5mb' }));
 
   app.get('/', (req, res) => {
+    const primary = instances.get('servibot-01');
+    const summaryList = INSTANCE_IDS.map((id) => serializeInstance(instances.get(id)));
     res.json({
       status: 200,
-      service: 'Servi-Bot Evolution API Engine (Free / No-Token Baileys)',
+      service: 'Servi-Bot Evolution API Multi-Instance Engine (10 Instancias Baileys)',
       port: EVOLUTION_PORT,
-      instance: 'servibot-main',
-      connectionState,
-      connectedPhone,
-      hasQr: Boolean(latestQrBase64),
+      instanceCount: INSTANCE_IDS.length,
+      instance: primary.instanceId,
+      connectionState: primary.state,
+      connectedPhone: primary.connectedPhone,
+      hasQr: Boolean(primary.qrBase64),
+      instances: summaryList,
       webhookTarget: MAIN_SERVER_WEBHOOK,
-      recentEvents: recentEvents.slice(0, 15)
+      recentEvents: recentEvents.slice(0, 20)
     });
   });
 
   app.get('/instance/fetchInstances', (req, res) => {
-    res.json([
-      {
-        instance: {
-          instanceName: 'servibot-main',
-          status: connectionState,
-          owner: connectedPhone,
-          serverUrl: `http://127.0.0.1:${EVOLUTION_PORT}`
-        }
-      }
-    ]);
+    const list = INSTANCE_IDS.map((id) => ({
+      instance: serializeInstance(instances.get(id))
+    }));
+    res.json(list);
   });
 
   app.get('/instance/connectionState/:instance', (req, res) => {
+    const instanceId = resolveInstanceId(req.params.instance);
+    const inst = instances.get(instanceId);
     res.json({
-      instance: {
-        instanceName: req.params.instance || 'servibot-main',
-        state: connectionState,
-        connectedPhone,
-        hasQr: Boolean(latestQrBase64),
-        qrBase64: latestQrBase64,
-        lastError
-      }
+      instance: serializeInstance(inst)
     });
   });
 
-  app.get('/instance/connect/:instance', async (req, res) => {
-    // Solo iniciar si no hay socket activo ni inicializando
-    if (!sock && connectionState === 'close' && !isInitializing) {
-      initBaileysInstance(false);
-      await new Promise((r) => setTimeout(r, 1200));
+  async function handleConnectOrQr(req, res) {
+    const instanceId = resolveInstanceId(req.params.instance);
+    const inst = instances.get(instanceId);
+
+    if (inst.state !== 'open' && !inst.sock && !inst.isInitializing) {
+      initBaileysInstance(instanceId, false);
     }
+
+    if (inst.state !== 'open' && !inst.qrBase64) {
+      await waitForQrOrOpen(inst, 5500);
+    }
+
     res.json({
-      instance: req.params.instance || 'servibot-main',
-      state: connectionState,
-      connectedPhone,
-      base64: latestQrBase64,
-      code: latestQrRaw,
-      lastError
+      ok: true,
+      instance: inst.instanceId,
+      slotNumber: inst.slotNumber,
+      state: inst.state,
+      connectedPhone: inst.connectedPhone,
+      base64: inst.qrBase64,
+      qrBase64: inst.qrBase64,
+      code: inst.qrRaw,
+      qrUpdatedAt: inst.qrUpdatedAt,
+      lastError: inst.lastError
     });
-  });
+  }
+
+  app.get('/instance/connect/:instance', handleConnectOrQr);
+  app.get('/instance/qr/:instance', handleConnectOrQr);
 
   app.post('/instance/create', async (req, res) => {
-    if (!sock && !isInitializing) {
-      await initBaileysInstance(false);
+    const instanceId = resolveInstanceId(req.body?.instanceName);
+    const inst = instances.get(instanceId);
+    if (inst.state !== 'open' && !inst.sock && !inst.isInitializing) {
+      initBaileysInstance(instanceId, false);
+      await waitForQrOrOpen(inst, 5500);
     }
     res.json({
-      instance: {
-        instanceName: req.body?.instanceName || 'servibot-main',
-        status: connectionState
-      },
+      instance: serializeInstance(inst),
       qrcode: {
-        base64: latestQrBase64,
-        code: latestQrRaw
+        base64: inst.qrBase64,
+        code: inst.qrRaw
       }
     });
   });
 
-  app.delete('/instance/logout/:instance', async (req, res) => {
+  async function handleLogoutInstance(req, res) {
     try {
-      if (sock) {
+      const instanceId = resolveInstanceId(req.params.instance);
+      const inst = instances.get(instanceId);
+
+      if (inst.sock) {
         try {
-          await sock.logout();
+          await inst.sock.logout();
         } catch {
-          // ignore
+          // ignore logout errors on closing socket
         }
       }
-      cleanupExistingSocket();
-      if (fs.existsSync(AUTH_DIR)) {
-        fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+
+      cleanupInstanceSocket(inst);
+      if (fs.existsSync(inst.authDir)) {
+        fs.rmSync(inst.authDir, { recursive: true, force: true });
       }
-      connectionState = 'close';
-      latestQrBase64 = null;
-      latestQrRaw = null;
-      connectedPhone = null;
-      recordEvent('logout', 'Sesión de WhatsApp reiniciada manualmente');
-      initBaileysInstance(true);
-      await new Promise((r) => setTimeout(r, 1500));
-      res.json({ ok: true, state: connectionState, base64: latestQrBase64 });
+      inst.state = 'close';
+      inst.qrBase64 = null;
+      inst.qrRaw = null;
+      inst.qrUpdatedAt = null;
+      inst.connectedPhone = null;
+      inst.lastError = null;
+
+      recordEvent('logout', `Sesión WhatsApp reiniciada en ${instanceId}`, instanceId);
+      initBaileysInstance(instanceId, true);
+      await waitForQrOrOpen(inst, 5500);
+
+      res.json({
+        ok: true,
+        instance: inst.instanceId,
+        state: inst.state,
+        base64: inst.qrBase64,
+        qrBase64: inst.qrBase64,
+        lastError: inst.lastError
+      });
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });
     }
-  });
+  }
+
+  app.delete('/instance/logout/:instance', handleLogoutInstance);
+  app.post('/instance/logout/:instance', handleLogoutInstance);
 
   app.post('/message/sendText/:instance', async (req, res) => {
+    const instanceId = resolveInstanceId(req.params.instance);
+    const inst = instances.get(instanceId);
     const { number, text } = req.body || {};
     if (!number || !text) {
       return res.status(400).json({ ok: false, error: 'Se requiere number y text' });
     }
     const jid = number.includes('@') ? number : `${number.replace(/\D/g, '')}@s.whatsapp.net`;
 
-    if (sock && connectionState === 'open') {
+    if (inst.sock && inst.state === 'open') {
       try {
-        const sent = await sock.sendMessage(jid, { text });
-        recordEvent('message_out', `Enviado a ${jid}: ${text.slice(0, 100)}`);
-        return res.json({ ok: true, key: sent?.key, status: 'SENT' });
+        const sent = await inst.sock.sendMessage(jid, { text });
+        recordEvent('message_out', `[${instanceId}] Enviado a ${jid}: ${text.slice(0, 100)}`, instanceId);
+        return res.json({ ok: true, instance: instanceId, key: sent?.key, status: 'SENT' });
       } catch (err) {
         return res.status(500).json({ ok: false, error: err.message });
       }
     } else {
-      recordEvent('message_out_simulated', `[Simulado sin WA activo] Para ${jid}: ${text.slice(0, 100)}`);
+      recordEvent('message_out_simulated', `[${instanceId} sin WA activo] Para ${jid}: ${text.slice(0, 100)}`, instanceId);
       return res.json({
         ok: true,
         simulated: true,
-        state: connectionState,
-        message: 'WhatsApp aún no tiene QR escaneado; mensaje registrado en bitácora de simulación.'
+        instance: instanceId,
+        state: inst.state,
+        message: `La instancia ${instanceId} aún no tiene QR escaneado; mensaje registrado en bitácora de simulación.`
       });
     }
   });
 
   app.post('/webhook/simulate', async (req, res) => {
-    const { phone = '5218112345678', name = 'Prospecto WhatsApp', text = 'Hola, ¿qué servicios de bots ofrecen?' } = req.body || {};
+    const {
+      instance = 'servibot-01',
+      phone = '5218112345678',
+      name = 'Prospecto WhatsApp',
+      text = 'Hola, ¿qué servicios de bots ofrecen?'
+    } = req.body || {};
+    const instanceId = resolveInstanceId(instance);
     const jid = phone.includes('@') ? phone : `${phone.replace(/\D/g, '')}@s.whatsapp.net`;
-    recordEvent('simulated_in', `Simulación WA de ${name} (${jid}): ${text}`);
+    recordEvent('simulated_in', `[${instanceId}] Simulación WA de ${name} (${jid}): ${text}`, instanceId);
 
     const webhookResult = await forwardToMainWebhook({
       event: 'messages.upsert',
-      instance: 'servibot-main',
+      instance: instanceId,
       simulated: true,
       data: {
         key: { remoteJid: jid, fromMe: false, id: `SIM-${Date.now()}` },
@@ -367,7 +532,7 @@ function startEvolutionServer() {
     });
 
     if (webhookResult?.reply) {
-      recordEvent('simulated_out', `Respuesta IA para ${jid}: ${webhookResult.reply.slice(0, 120)}...`);
+      recordEvent('simulated_out', `[${instanceId}] Respuesta IA para ${jid}: ${webhookResult.reply.slice(0, 120)}...`, instanceId);
     }
 
     res.json(webhookResult);
@@ -375,8 +540,15 @@ function startEvolutionServer() {
 
   return new Promise((resolve) => {
     const server = app.listen(EVOLUTION_PORT, '0.0.0.0', () => {
-      console.log(`[Evolution] Backend WhatsApp (Baileys sin tokens) activo en http://127.0.0.1:${EVOLUTION_PORT}`);
-      initBaileysInstance(false);
+      console.log(`[Evolution] Backend WhatsApp Multi-Instancia (10 slots Baileys) activo en http://127.0.0.1:${EVOLUTION_PORT}`);
+      // Auto-conectar únicamente las instancias que ya tienen una sesión registrada en disco
+      for (const instId of INSTANCE_IDS) {
+        const inst = instances.get(instId);
+        if (hasRegisteredSession(inst.authDir)) {
+          console.log(`[Evolution:10001] Auto-iniciando sesión guardada para ${instId}`);
+          initBaileysInstance(instId, false);
+        }
+      }
       resolve(server);
     });
   });
@@ -388,5 +560,7 @@ if (require.main === module) {
 
 module.exports = {
   EVOLUTION_PORT,
+  INSTANCE_IDS,
+  resolveInstanceId,
   startEvolutionServer
 };

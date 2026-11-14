@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const { spawn } = require('node:child_process');
 const { db, DB_PATH, getSetting, setSetting } = require('./db');
 const { OLLAMA_PORT, ensureOllamaOnPort10002, getOllamaStatus } = require('./ollama_service');
-const { EVOLUTION_PORT, startEvolutionServer } = require('./evolution_server');
+const { EVOLUTION_PORT, INSTANCE_IDS, resolveInstanceId, startEvolutionServer } = require('./evolution_server');
 const {
   startEmailPolling,
   pollImapOnce,
@@ -32,9 +32,16 @@ if (!fs.existsSync(UPLOADS_DIR)) {
  * Ejecuta a demanda el agente de ventas en Python (python_workers/sales_agent.py)
  * conectado a SQLite y a Ollama en el puerto 10002.
  */
-function runPythonSalesAgent({ channel = 'web', sender_id = 'anon', sender_name = '', message = '' }) {
+function runPythonSalesAgent({
+  channel = 'web',
+  sender_id = 'anon',
+  sender_name = '',
+  message = '',
+  instance_id = 'servibot-01'
+}) {
   return new Promise((resolve) => {
     const botCfg = getSetting('bot_config', {});
+    const canonicalInstance = resolveInstanceId(instance_id);
     const scriptPath = path.join(__dirname, '..', 'python_workers', 'sales_agent.py');
     const payload = {
       db_path: DB_PATH,
@@ -42,6 +49,7 @@ function runPythonSalesAgent({ channel = 'web', sender_id = 'anon', sender_name 
       sender_id,
       sender_name,
       message,
+      instance_id: canonicalInstance,
       ollama_url: botCfg.ollama_host || `http://127.0.0.1:${OLLAMA_PORT}`,
       ollama_model: botCfg.ollama_model || 'llama3.2:3b'
     };
@@ -175,7 +183,8 @@ async function main() {
       totalCatalogCount: db.prepare('SELECT COUNT(*) as c FROM catalog_items').get().c,
       ordersCount: db.prepare('SELECT COUNT(*) as c FROM orders').get().c,
       pendingOrdersCount: db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'pending'").get().c,
-      conversationsCount: db.prepare('SELECT COUNT(*) as c FROM conversations').get().c
+      conversationsCount: db.prepare('SELECT COUNT(*) as c FROM conversations').get().c,
+      instancesCount: db.prepare('SELECT COUNT(*) as c FROM bot_instances').get().c
     };
 
     res.json({
@@ -489,13 +498,166 @@ async function main() {
     res.json({ ok: true, messages: msgs });
   });
 
+  function mergeInstanceWithLiveState(row, live = {}) {
+    return {
+      ...row,
+      active: Boolean(row.active),
+      state: live.state || live.status || 'close',
+      connectedPhone: live.connectedPhone || live.owner || null,
+      hasQr: Boolean(live.hasQr || live.qrBase64 || live.base64),
+      qrBase64: live.qrBase64 || live.base64 || null,
+      qrUpdatedAt: live.qrUpdatedAt || null,
+      hasSavedSession: Boolean(live.hasSavedSession),
+      lastError: live.lastError || null
+    };
+  }
+
+  // --- GESTIÓN MULTI-INSTANCIA DE SERVIBOTS (10 SLOTS BAILEYS + SISTEMA Y ALMA IA) ---
+  app.get('/api/instances', async (req, res) => {
+    try {
+      const rows = db.prepare('SELECT * FROM bot_instances ORDER BY slot_number ASC').all();
+      const liveMap = new Map();
+      try {
+        const evResp = await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/instance/fetchInstances`);
+        const evList = await evResp.json();
+        if (Array.isArray(evList)) {
+          for (const entry of evList) {
+            const instObj = entry?.instance || entry;
+            if (instObj?.instanceName) {
+              liveMap.set(resolveInstanceId(instObj.instanceName), instObj);
+            }
+          }
+        }
+      } catch {
+        // Evolution server offline fallback
+      }
+
+      const merged = rows.map((row) =>
+        mergeInstanceWithLiveState(row, liveMap.get(row.instance_id) || {})
+      );
+      res.json({ ok: true, instances: merged, totalSlots: INSTANCE_IDS.length });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  app.get('/api/instances/:instanceId', async (req, res) => {
+    try {
+      const instanceId = resolveInstanceId(req.params.instanceId);
+      const row = db.prepare('SELECT * FROM bot_instances WHERE instance_id = ?').get(instanceId);
+      if (!row) {
+        return res.status(404).json({ ok: false, error: `Instancia ${instanceId} no encontrada.` });
+      }
+      let liveObj = {};
+      try {
+        const evResp = await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/instance/connectionState/${encodeURIComponent(instanceId)}`);
+        const evData = await evResp.json();
+        liveObj = evData?.instance || {};
+      } catch {
+        liveObj = { state: 'offline' };
+      }
+      res.json({ ok: true, instance: mergeInstanceWithLiveState(row, liveObj) });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  app.put('/api/instances/:instanceId', async (req, res) => {
+    try {
+      const instanceId = resolveInstanceId(req.params.instanceId);
+      const existing = db.prepare('SELECT * FROM bot_instances WHERE instance_id = ?').get(instanceId);
+      if (!existing) {
+        return res.status(404).json({ ok: false, error: `Instancia ${instanceId} no encontrada.` });
+      }
+
+      const body = req.body || {};
+      const displayName = body.display_name !== undefined ? String(body.display_name).trim() : existing.display_name;
+      const businessName = body.business_name !== undefined ? String(body.business_name).trim() : existing.business_name;
+      const clientName = body.client_name !== undefined ? String(body.client_name).trim() : existing.client_name;
+      const clientContact = body.client_contact !== undefined ? String(body.client_contact).trim() : existing.client_contact;
+      const tone = body.tone !== undefined ? String(body.tone).trim() : existing.tone;
+      const aiSoul = body.ai_soul !== undefined ? String(body.ai_soul).trim() : existing.ai_soul;
+      const systemPrompt = body.system_prompt !== undefined ? String(body.system_prompt).trim() : existing.system_prompt;
+      const welcomeMessage = body.welcome_message !== undefined ? String(body.welcome_message).trim() : existing.welcome_message;
+      const active = body.active !== undefined ? (body.active ? 1 : 0) : existing.active;
+
+      if (!displayName) {
+        return res.status(400).json({ ok: false, error: 'El nombre del agente ServiBot es obligatorio.' });
+      }
+
+      db.prepare(`
+        UPDATE bot_instances SET
+          display_name = ?,
+          business_name = ?,
+          client_name = ?,
+          client_contact = ?,
+          tone = ?,
+          ai_soul = ?,
+          system_prompt = ?,
+          welcome_message = ?,
+          active = ?,
+          updated_at = datetime('now', 'localtime')
+        WHERE instance_id = ?
+      `).run(
+        displayName,
+        businessName,
+        clientName,
+        clientContact,
+        tone,
+        aiSoul,
+        systemPrompt,
+        welcomeMessage,
+        active,
+        instanceId
+      );
+
+      const updated = db.prepare('SELECT * FROM bot_instances WHERE instance_id = ?').get(instanceId);
+      let liveObj = {};
+      try {
+        const evResp = await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/instance/connectionState/${encodeURIComponent(instanceId)}`);
+        const evData = await evResp.json();
+        liveObj = evData?.instance || {};
+      } catch {
+        // ignore if port 10001 unavailable
+      }
+      res.json({ ok: true, instance: mergeInstanceWithLiveState(updated, liveObj) });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  app.post('/api/instances/:instanceId/connect', async (req, res) => {
+    try {
+      const instanceId = resolveInstanceId(req.params.instanceId);
+      const r = await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/instance/connect/${encodeURIComponent(instanceId)}`);
+      const data = await r.json();
+      res.json({ ok: true, ...data, instance: instanceId });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  app.post('/api/instances/:instanceId/logout', async (req, res) => {
+    try {
+      const instanceId = resolveInstanceId(req.params.instanceId);
+      const r = await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/instance/logout/${encodeURIComponent(instanceId)}`, {
+        method: 'POST'
+      });
+      const data = await r.json();
+      res.json({ ok: true, ...data, instance: instanceId });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   // --- AGENTE DE VENTAS IA (PYTHON A DEMANDA + OLLAMA PUERTO 10002) ---
   app.post('/api/chat', async (req, res) => {
     const {
       channel = 'web',
       sender_id = 'web-visitor',
       sender_name = 'Visitante Web',
-      message = ''
+      message = '',
+      instance_id = 'servibot-01'
     } = req.body || {};
 
     if (!message || !String(message).trim()) {
@@ -506,7 +668,8 @@ async function main() {
       channel,
       sender_id,
       sender_name,
-      message: String(message).trim()
+      message: String(message).trim(),
+      instance_id: resolveInstanceId(instance_id)
     });
 
     res.json(result);
@@ -521,6 +684,7 @@ async function main() {
       }
 
       const body = req.body || {};
+      const instanceId = resolveInstanceId(body.instance || body.instanceName || 'servibot-01');
       const data = body.data || {};
       const remoteJid = data.key?.remoteJid || body.sender || 'whatsapp-user';
       const pushName = data.pushName || remoteJid.split('@')[0];
@@ -538,7 +702,8 @@ async function main() {
         channel: 'whatsapp',
         sender_id: remoteJid.replace('@s.whatsapp.net', ''),
         sender_name: pushName,
-        message: text.trim()
+        message: text.trim(),
+        instance_id: instanceId
       });
 
       res.json(agentResult);
@@ -550,11 +715,12 @@ async function main() {
   // --- ENDPOINTS DE CONTROL EVOLUTION (PUENTE ADMIN -> 10001) ---
   app.get('/api/channels/whatsapp/status', requireFirebaseAuth, async (req, res) => {
     try {
-      const r = await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/instance/connect/servibot-main`);
+      const instanceId = resolveInstanceId(req.query.instance || 'servibot-01');
+      const r = await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/instance/connect/${encodeURIComponent(instanceId)}`);
       const data = await r.json();
       const rootR = await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/`);
       const rootData = await rootR.json();
-      res.json({ ok: true, ...data, recentEvents: rootData.recentEvents || [] });
+      res.json({ ok: true, ...data, instance: instanceId, recentEvents: rootData.recentEvents || [] });
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });
     }
@@ -562,10 +728,14 @@ async function main() {
 
   app.post('/api/channels/whatsapp/simulate', requireFirebaseAuth, async (req, res) => {
     try {
+      const payload = {
+        ...(req.body || {}),
+        instance: resolveInstanceId(req.body?.instance || 'servibot-01')
+      };
       const r = await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/webhook/simulate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(req.body || {})
+        body: JSON.stringify(payload)
       });
       const data = await r.json();
       res.json(data);
@@ -576,7 +746,8 @@ async function main() {
 
   app.post('/api/channels/whatsapp/logout', requireFirebaseAuth, async (req, res) => {
     try {
-      const r = await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/instance/logout/servibot-main`, {
+      const instanceId = resolveInstanceId(req.query.instance || req.body?.instance || 'servibot-01');
+      const r = await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/instance/logout/${encodeURIComponent(instanceId)}`, {
         method: 'DELETE'
       });
       const data = await r.json();

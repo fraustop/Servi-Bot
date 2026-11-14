@@ -83,6 +83,21 @@ db.exec(`
     created_by TEXT DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
   );
+
+  CREATE TABLE IF NOT EXISTS bot_instances (
+    instance_id TEXT PRIMARY KEY,
+    slot_number INTEGER NOT NULL,
+    display_name TEXT NOT NULL,
+    business_name TEXT NOT NULL DEFAULT '',
+    client_name TEXT NOT NULL DEFAULT '',
+    client_contact TEXT NOT NULL DEFAULT '',
+    tone TEXT NOT NULL DEFAULT 'Ejecutivo, cálido y resolutivo',
+    ai_soul TEXT NOT NULL DEFAULT '',
+    system_prompt TEXT NOT NULL DEFAULT '',
+    welcome_message TEXT NOT NULL DEFAULT '',
+    active INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
 `);
 
 function seedDatabase() {
@@ -190,6 +205,136 @@ function seedDatabase() {
   for (const [k, v] of Object.entries(defaultSettings)) {
     if (!getSettingStmt.get(k)) {
       insertSettingStmt.run(k, JSON.stringify(v));
+    }
+  }
+
+  // Seed 10 independent ServiBot instances if table is empty
+  const instCountRow = db.prepare('SELECT COUNT(*) as total FROM bot_instances').get();
+  if (instCountRow && instCountRow.total === 0) {
+    const insertInstance = db.prepare(`
+      INSERT INTO bot_instances (
+        instance_id, slot_number, display_name, business_name, client_name, client_contact,
+        tone, ai_soul, system_prompt, welcome_message, active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const defaultInstances = [
+      {
+        instance_id: 'servibot-01',
+        slot_number: 1,
+        display_name: 'ServiBot #01 · Principal',
+        business_name: 'Servi-Bot Central',
+        tone: 'Consultivo, ejecutivo y persuasivo',
+        ai_soul: 'Asesor comercial experto en automatización omnicanal con IA, enfocado en entender el giro del cliente y cerrar citas o ventas sin fricción.',
+        system_prompt: 'Prioriza identificar el dolor operativo del cliente, ofrece agendar demostración o activar su bot y responde en máximo 3 párrafos breves.',
+        welcome_message: '¡Hola! Soy ServiBot #01. ¿Listo para automatizar la atención y ventas de tu negocio?'
+      },
+      {
+        instance_id: 'servibot-02',
+        slot_number: 2,
+        display_name: 'ServiBot #02 · Clínica / Salud',
+        business_name: 'Espacio Disponible #02',
+        tone: 'Empático, profesional y cuidadoso',
+        ai_soul: 'Recepcionista médica digital con trato humano y cálido, enfocada en dar tranquilidad al paciente y gestionar citas clínicas.',
+        system_prompt: 'Atiende consultas de horarios, especialidades y agendamiento de citas médicas con precisión y empatía.',
+        welcome_message: '¡Hola! Bienvenido a nuestra línea de atención y citas. ¿En qué podemos ayudarte hoy?'
+      },
+      {
+        instance_id: 'servibot-03',
+        slot_number: 3,
+        display_name: 'ServiBot #03 · Inmobiliaria',
+        business_name: 'Espacio Disponible #03',
+        tone: 'Asesor patrimonial sofisticado y dinámico',
+        ai_soul: 'Especialista inmobiliario que perfila presupuesto, zona de interés y agenda visitas guiadas con alto sentido de oportunidad.',
+        system_prompt: 'Califica al prospecto preguntando zona, presupuesto e intención (compra o renta) y agenda visita.',
+        welcome_message: '¡Hola! Estoy listo para ayudarte a encontrar tu próxima propiedad ideal.'
+      },
+      {
+        instance_id: 'servibot-04',
+        slot_number: 4,
+        display_name: 'ServiBot #04 · Restaurante / Gastro',
+        business_name: 'Espacio Disponible #04',
+        tone: 'Anfitrión cordial, ágil y antojadizo',
+        ai_soul: 'Anfitrión gastronómico entusiasta que recomienda platillos estrella, confirma reservaciones y toma pedidos rápidamente.',
+        system_prompt: 'Ayuda a reservar mesa indicando fecha, hora y número de personas, o sugiere especialidades del menú.',
+        welcome_message: '¡Hola! Qué gusto saludarte. ¿Te gustaría reservar una mesa o conocer nuestro menú?'
+      },
+      {
+        instance_id: 'servibot-05',
+        slot_number: 5,
+        display_name: 'ServiBot #05 · E-Commerce / Retail',
+        business_name: 'Espacio Disponible #05',
+        tone: 'Personal shopper energético y directo',
+        ai_soul: 'Vendedor experto en catálogo digital, tallas, envíos y cierre rápido de carritos de compra.',
+        system_prompt: 'Resuelve dudas de disponibilidad y envío al instante e impulsa el cierre de la compra.',
+        welcome_message: '¡Hola! ¿Buscas algún producto en especial hoy? Te ayudo a elegir.'
+      },
+      {
+        instance_id: 'servibot-06',
+        slot_number: 6,
+        display_name: 'ServiBot #06 · Despacho / Legal',
+        business_name: 'Espacio Disponible #06',
+        tone: 'Formal, confidencial y estructurado',
+        ai_soul: 'Asistente jurídico-contable discreto y ordenado que filtra casos urgentes y agenda asesorías.',
+        system_prompt: 'Recaba el motivo general de la consulta con total discreción y ofrece horarios de asesoría.',
+        welcome_message: 'Buen día. Le atiende nuestro asistente digital. ¿En qué asunto legal o corporativo podemos asistirle?'
+      },
+      {
+        instance_id: 'servibot-07',
+        slot_number: 7,
+        display_name: 'ServiBot #07 · Fitness / Wellness',
+        business_name: 'Espacio Disponible #07',
+        tone: 'Motivador, cercano y positivo',
+        ai_soul: 'Coach de bienvenida que inspira a iniciar un estilo de vida saludable y agenda clases muestra.',
+        system_prompt: 'Invita al usuario a conocer planes de entrenamiento y agendar su clase de prueba.',
+        welcome_message: '¡Hola! Qué gran paso escribirnos hoy. ¿Agendamos tu sesión de valoración?'
+      },
+      {
+        instance_id: 'servibot-08',
+        slot_number: 8,
+        display_name: 'ServiBot #08 · Educación / Academia',
+        business_name: 'Espacio Disponible #08',
+        tone: 'Orientador académico claro e inspirador',
+        ai_soul: 'Consejero educativo que guía a estudiantes y padres sobre programas, inscripciones y becas.',
+        system_prompt: 'Identifica el curso de interés del aspirante y comparte requisitos e inicio de clases.',
+        welcome_message: '¡Hola! Bienvenido a admisiones. ¿Qué programa o curso te interesa conocer?'
+      },
+      {
+        instance_id: 'servibot-09',
+        slot_number: 9,
+        display_name: 'ServiBot #09 · Automotriz / Taller',
+        business_name: 'Espacio Disponible #09',
+        tone: 'Técnico, confiable y transparente',
+        ai_soul: 'Asesor de servicio automotriz que transmite confianza técnica, cotiza mantenimientos y agenda ingreso a taller.',
+        system_prompt: 'Solicita marca, modelo y año del vehículo para cotizar servicio o agendar cita en bahía.',
+        welcome_message: '¡Hola! Te ayudamos con el mantenimiento o revisión de tu auto. ¿Qué modelo tienes?'
+      },
+      {
+        instance_id: 'servibot-10',
+        slot_number: 10,
+        display_name: 'ServiBot #10 · Personalizado',
+        business_name: 'Espacio Disponible #10',
+        tone: 'Versátil, adaptable y centrado en el cliente',
+        ai_soul: 'Agente autónomo listo para moldear su personalidad, esencia y reglas de negocio al 100% según la marca del cliente.',
+        system_prompt: 'Adapta tu conversación al giro configurado por el cliente, resuelve dudas y agenda citas.',
+        welcome_message: '¡Hola! Soy tu ServiBot personalizado. ¿Cómo puedo ayudarte hoy?'
+      }
+    ];
+
+    for (const inst of defaultInstances) {
+      insertInstance.run(
+        inst.instance_id,
+        inst.slot_number,
+        inst.display_name,
+        inst.business_name,
+        '',
+        '',
+        inst.tone,
+        inst.ai_soul,
+        inst.system_prompt,
+        inst.welcome_message,
+        1
+      );
     }
   }
 }

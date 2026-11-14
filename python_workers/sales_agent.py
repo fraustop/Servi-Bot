@@ -58,6 +58,16 @@ def load_catalog_and_settings(conn: sqlite3.Connection):
     return items, bot_config
 
 
+def load_instance_config(conn: sqlite3.Connection, instance_id: str) -> dict:
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM bot_instances WHERE instance_id = ?", (instance_id,))
+    row = cur.fetchone()
+    if not row and instance_id != "servibot-01":
+        cur.execute("SELECT * FROM bot_instances WHERE instance_id = 'servibot-01'")
+        row = cur.fetchone()
+    return dict(row) if row else {}
+
+
 def get_or_create_conversation(conn: sqlite3.Connection, channel: str, sender_id: str, sender_name: str, last_msg: str) -> int:
     cur = conn.cursor()
     cur.execute(
@@ -174,9 +184,22 @@ def create_order_in_db(
     }
 
 
-def build_system_prompt(catalog_items: list, bot_config: dict, channel: str, sender_name: str, sender_id: str) -> str:
-    business_name = bot_config.get("business_name", "Servi-Bot")
-    bot_name = bot_config.get("bot_name", "Asesor Servi-Bot")
+def build_system_prompt(
+    catalog_items: list,
+    bot_config: dict,
+    channel: str,
+    sender_name: str,
+    sender_id: str,
+    instance_cfg: dict = None,
+) -> str:
+    inst = instance_cfg or {}
+    inst_id = inst.get("instance_id") or "servibot-01"
+    business_name = (inst.get("business_name") or "").strip() or bot_config.get("business_name", "Servi-Bot")
+    bot_name = (inst.get("display_name") or "").strip() or bot_config.get("bot_name", "Asesor Servi-Bot")
+    tone = (inst.get("tone") or "").strip() or bot_config.get("tone", "Profesional, cálido y resolutivo")
+    ai_soul = (inst.get("ai_soul") or "").strip()
+    system_rules = (inst.get("system_prompt") or "").strip()
+    welcome_msg = (inst.get("welcome_message") or "").strip()
     promo_note = bot_config.get("promo_bundle_note", "")
 
     catalog_text_lines = []
@@ -188,13 +211,38 @@ def build_system_prompt(catalog_items: list, bot_config: dict, channel: str, sen
 
     catalog_block = "\n".join(catalog_text_lines) if catalog_text_lines else "Sin servicios activos."
 
-    return (
-        f"Eres {bot_name} de {business_name} (canal {channel.upper()}). "
-        f"Responde en español, breve (máximo 3 oraciones), con tono amable de servicio y enfocado en cerrar la venta.\n"
-        f"CATÁLOGO EN SQLITE:\n{catalog_block}\n"
-        f"PROMO: {promo_note}\n"
-        f"Si el cliente confirma que desea contratar o hacer pedido, confírmale su pedido y escribe al final [PEDIDO: slug]."
+    parts = [
+        f"IDENTIDAD DE LA INSTANCIA ACTIVA ({inst_id}):",
+        f"- Eres {bot_name}, agente autónomo de {business_name} en el canal {channel.upper()}.",
+        f"- Tono de comunicación: {tone}.",
+    ]
+    if ai_soul:
+        parts.append(f"ALMA DE LA IA (PERSONALIDAD Y ESENCIA):\n{ai_soul}")
+    if system_rules:
+        parts.append(f"SISTEMA E INSTRUCCIONES DEL NEGOCIO:\n{system_rules}")
+    if welcome_msg:
+        parts.append(f"MENSAJE DE BIENVENIDA DE REFERENCIA:\n{welcome_msg}")
+
+    parts.append(
+        "Responde siempre en español de forma clara y breve (máximo 3 párrafos cortos), respetando fielmente tu identidad, alma e instrucciones."
     )
+    parts.append(f"CATÁLOGO EN SQLITE (referencia):\n{catalog_block}")
+    if promo_note and inst_id == "servibot-01":
+        parts.append(f"PROMO: {promo_note}")
+    parts.append(
+        "Si el cliente confirma que desea contratar o hacer pedido de algún servicio del catálogo, confírmale su pedido y escribe al final [PEDIDO: slug]."
+    )
+    return "\n".join(parts)
+
+
+def generate_smart_fallback(bot_config: dict, instance_cfg: dict = None) -> str:
+    inst = instance_cfg or {}
+    welcome_msg = (inst.get("welcome_message") or "").strip()
+    if welcome_msg:
+        return welcome_msg
+    bot_name = (inst.get("display_name") or "").strip() or bot_config.get("bot_name", "Asesor Servi-Bot")
+    business_name = (inst.get("business_name") or "").strip() or bot_config.get("business_name", "Servi-Bot")
+    return f"¡Hola! Soy {bot_name} de {business_name}. ¿En qué puedo ayudarte hoy?"
 
 
 def call_ollama_chat(ollama_url: str, model: str, messages: list) -> dict:
@@ -206,8 +254,8 @@ def call_ollama_chat(ollama_url: str, model: str, messages: list) -> dict:
         "keep_alive": "60m",
         "options": {
             "temperature": 0.3,
-            "num_ctx": 1024,
-            "num_predict": 120,
+            "num_ctx": 2048,
+            "num_predict": 160,
         },
     }
     req = urllib.request.Request(
@@ -276,6 +324,7 @@ def detect_explicit_order_intent(user_text: str, history: list, catalog_items: l
 def process_request(payload: dict) -> dict:
     db_path = payload.get("db_path") or os.path.join(os.path.dirname(__file__), "..", "data", "servibot.db")
     channel = payload.get("channel", "web")
+    instance_id = str(payload.get("instance_id") or "servibot-01").strip() or "servibot-01"
     sender_id = str(payload.get("sender_id", "anon"))
     sender_name = str(payload.get("sender_name", "")).strip()
     user_message = str(payload.get("message", "")).strip()
@@ -288,14 +337,23 @@ def process_request(payload: dict) -> dict:
     conn = get_db_connection(db_path)
     try:
         catalog_items, bot_config = load_catalog_and_settings(conn)
+        instance_cfg = load_instance_config(conn, instance_id)
+        resolved_instance_id = instance_cfg.get("instance_id") or instance_id
         ollama_url = payload.get("ollama_url") or bot_config.get("ollama_host") or "http://127.0.0.1:10002"
         ollama_model = payload.get("ollama_model") or bot_config.get("ollama_model") or "llama3.2:3b"
 
-        conv_id = get_or_create_conversation(conn, channel, sender_id, sender_name, user_message)
+        conv_channel = channel if resolved_instance_id == "servibot-01" else f"{channel}:{resolved_instance_id}"
+        conv_id = get_or_create_conversation(conn, conv_channel, sender_id, sender_name, user_message)
         history = fetch_conversation_history(conn, conv_id, limit=8)
-        append_message(conn, conv_id, "user", user_message, {"sender_id": sender_id, "channel": channel})
+        append_message(
+            conn,
+            conv_id,
+            "user",
+            user_message,
+            {"sender_id": sender_id, "channel": channel, "instance_id": resolved_instance_id},
+        )
 
-        system_prompt = build_system_prompt(catalog_items, bot_config, channel, sender_name, sender_id)
+        system_prompt = build_system_prompt(catalog_items, bot_config, channel, sender_name, sender_id, instance_cfg)
         ollama_messages = [{"role": "system", "content": system_prompt}]
         for h in history:
             ollama_messages.append({"role": h["role"], "content": h["content"]})
@@ -329,7 +387,9 @@ def process_request(payload: dict) -> dict:
                 or f"Cliente {channel.capitalize()} ({sender_id})"
             )
             cust_company = str(ai_result.get("customer_company") or "").strip()
-            notes = str(ai_result.get("notes") or "").strip() or f"Solicitud vía {channel}: {user_message[:200]}"
+            notes = str(ai_result.get("notes") or "").strip() or (
+                f"[{resolved_instance_id}] Solicitud vía {channel}: {user_message[:180]}"
+            )
             created_order = create_order_in_db(
                 conn=conn,
                 customer_name=cust_name,
@@ -351,10 +411,7 @@ def process_request(payload: dict) -> dict:
                 reply_text = f"{reply_text}{order_banner}"
 
         if not reply_text:
-            reply_text = (
-                "¡Hola! Soy el asesor virtual de Servi-Bot. Contamos con Bots Autónomos para WhatsApp, "
-                "Correo y Teams, así como nuestra Interfaz de Catálogo Dinámico. ¿Cuál te gustaría conocer o contratar?"
-            )
+            reply_text = generate_smart_fallback(bot_config, instance_cfg)
 
         append_message(
             conn,
@@ -362,6 +419,7 @@ def process_request(payload: dict) -> dict:
             "assistant",
             reply_text,
             {
+                "instance_id": resolved_instance_id,
                 "order_created": bool(created_order),
                 "order_code": created_order["order_code"] if created_order else None,
                 "model": ollama_model,
@@ -371,6 +429,9 @@ def process_request(payload: dict) -> dict:
         return {
             "ok": True,
             "channel": channel,
+            "instance_id": resolved_instance_id,
+            "instance_name": instance_cfg.get("display_name") or bot_config.get("bot_name", "Servi-Bot"),
+            "business_name": instance_cfg.get("business_name") or bot_config.get("business_name", "Servi-Bot"),
             "sender_id": sender_id,
             "conversation_id": conv_id,
             "reply": reply_text,
@@ -382,8 +443,9 @@ def process_request(payload: dict) -> dict:
     except Exception as exc:
         return {
             "ok": False,
+            "instance_id": instance_id,
             "error": str(exc),
-            "reply": "Hola, gracias por comunicarte a Servi-Bot. En este instante estoy procesando tu solicitud, ¿me confirmas qué servicio te interesa?",
+            "reply": generate_smart_fallback({}, {"instance_id": instance_id}),
         }
     finally:
         conn.close()
