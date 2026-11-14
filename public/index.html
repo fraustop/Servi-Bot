@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Servi-Bot | Bots Autónomos para WhatsApp, Correo y Teams</title>
+  <link rel="icon" type="image/png" sizes="128x128" href="/assets/servibot-icon.png" />
+  <link rel="apple-touch-icon" href="/assets/servibot-logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -18,7 +20,16 @@
     <div class="header-inner" id="header-inner">
       <div class="header-brand-group">
         <a href="#inicio" class="brand" id="admin-link-home">
-          <span class="brand-icon" aria-hidden="true">🤖</span>
+          <span class="brand-icon" aria-hidden="true">
+            <img
+              src="/assets/servibot-logo.png"
+              alt=""
+              class="brand-logo-img"
+              width="48"
+              height="48"
+              decoding="async"
+            />
+          </span>
           <span>
             <span class="brand-title">Servi-Bot</span>
             <span class="brand-subtitle" id="brand-subtitle">Automatización Comercial IA</span>
@@ -105,7 +116,16 @@
       <section class="carousel" id="public-carousel" aria-roledescription="carousel" aria-label="Descripción y configuración de Servi-Bot">
         <div class="carousel-topbar" id="carousel-topbar">
           <a href="/" class="brand carousel-brand" id="link-home">
-            <span class="brand-icon" aria-hidden="true">🤖</span>
+            <span class="brand-icon" aria-hidden="true">
+            <img
+              src="/assets/servibot-logo.png"
+              alt=""
+              class="brand-logo-img"
+              width="48"
+              height="48"
+              decoding="async"
+            />
+          </span>
             <span>
               <span class="brand-title">Servi-Bot</span>
               <span class="brand-subtitle">Automatización Comercial IA</span>
@@ -579,12 +599,22 @@
       <!-- Simulador de Conversación Comercial pegado a la derecha -->
       <aside class="bot-widget-panel simulator-dock" aria-label="Simulador de atención comercial Servi-Bot">
         <div class="bot-widget-header">
-          <div>
-            <strong class="sim-title">Asesor Comercial Servi-Bot</strong>
-            <span class="sim-status">
-              <span class="sim-status-dot" aria-hidden="true"></span>
-              <span id="sim-active-instance-label">En línea · Listo para conversar</span>
-            </span>
+          <div class="sim-brand-head">
+            <img
+              src="/assets/servibot-logo.png"
+              alt=""
+              class="sim-bot-avatar"
+              width="40"
+              height="40"
+              decoding="async"
+            />
+            <div>
+              <strong class="sim-title">Asesor Comercial Servi-Bot</strong>
+              <span class="sim-status">
+                <span class="sim-status-dot" aria-hidden="true"></span>
+                <span id="sim-active-instance-label">En línea · Listo para conversar</span>
+              </span>
+            </div>
           </div>
           <button type="button" class="btn btn-outline btn-sm" id="btn-reset-chat">Reiniciar</button>
         </div>
