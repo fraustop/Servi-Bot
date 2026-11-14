@@ -49,8 +49,10 @@ let currentUser = null;
 let activeView = 'public';
 let activeAdminTab = 'tab-catalog';
 let catalogCache = [];
-let instancesCache = [];
-let selectedInstanceId = localStorage.getItem('servibot_selected_instance') || 'servibot-01';
+let clientInstanceId = localStorage.getItem('servibot_client_instance_id') || '';
+let activeChatInstanceId = clientInstanceId || 'servibot-01';
+let provisionedInstance = null;
+let wizardCurrentStep = 1;
 let webSenderId = localStorage.getItem('servibot_sender_id') || `web-${Math.floor(10000 + Math.random() * 90000)}`;
 localStorage.setItem('servibot_sender_id', webSenderId);
 
@@ -317,7 +319,7 @@ function showView(which, { syncUrl = true } = {}) {
     viewPublic?.classList.remove('hidden');
     syncHeaderAndNavigation();
     loadPublicCatalog();
-    loadBotInstances({ populateForm: instancesCache.length === 0 });
+    loadClientProvisionedInstance({ populateForm: !provisionedInstance });
     requestAnimationFrame(() => carouselController?.syncActiveSlideInstant());
   }
 }
@@ -610,7 +612,46 @@ async function refreshHealth() {
   }
 }
 
-// ==================== CONFIGURADOR MULTI-INSTANCIA (10 SLOTS BAILEYS) ====================
+// ==================== CONFIGURADOR INTERACTIVO SERVIBOT (WIZARD 3 PASOS) ====================
+const GIRO_PRESETS = {
+  clinica: {
+    label: 'Clínica / Consultorio',
+    tone: 'Cálido, empático y profesional',
+    ai_soul: 'Atender a pacientes con calma y claridad, resolver dudas sobre servicios o estudios y agendar citas solicitando nombre, horario preferido y motivo.',
+    system_prompt: 'Reglas: pedir nombre completo y horario deseado para citas; no emitir diagnósticos médicos; confirmar teléfono de contacto.'
+  },
+  restaurante: {
+    label: 'Restaurante / Café',
+    tone: 'Dinámico, amigable y entusiasta',
+    ai_soul: 'Dar la bienvenida con calidez, recomendar platillos o bebidas destacadas, tomar reservaciones y confirmar pedidos para recoger o a domicilio.',
+    system_prompt: 'Reglas: preguntar número de personas, fecha y hora para reservaciones; confirmar dirección exacta para entregas.'
+  },
+  salon: {
+    label: 'Salón / Spa / Barbería',
+    tone: 'Cercano, amable y orientado al cuidado personal',
+    ai_soul: 'Asesorar sobre servicios de belleza, tratamientos o cortes, recomendar disponibilidad y cerrar citas rápidas sin hacer esperar al cliente.',
+    system_prompt: 'Reglas: consultar servicio deseado y preferencia de día/hora; recordar políticas de puntualidad con amabilidad.'
+  },
+  tienda: {
+    label: 'Tienda / E-commerce',
+    tone: 'Ágil, resolutivo y enfocado en cierre de venta',
+    ai_soul: 'Guiar al comprador para elegir el producto ideal, resolver dudas de envíos, precios y existencias, y cerrar pedidos completos.',
+    system_prompt: 'Reglas: confirmar modelo/talla o cantidad, solicitar nombre y datos de entrega para cotizar envío y cerrar compra.'
+  },
+  inmobiliaria: {
+    label: 'Inmobiliaria / Autos',
+    tone: 'Ejecutivo, directo y consultivo',
+    ai_soul: 'Calificar presupuesto y necesidades del prospecto, presentar ventajas clave de la propiedad o vehículo y agendar visita o prueba.',
+    system_prompt: 'Reglas: preguntar zona de interés, rango de inversión o modelo buscado y confirmar número telefónico para seguimiento.'
+  },
+  servicios: {
+    label: 'Servicios Profesionales',
+    tone: 'Confiable, claro y estructurado',
+    ai_soul: 'Escuchar el requerimiento del cliente, explicar alcances de manera sencilla y agendar una llamada o diagnóstico formal.',
+    system_prompt: 'Reglas: solicitar giro o necesidad principal, ciudad/empresa y mejor horario para llamada de diagnóstico.'
+  }
+};
+
 function getInstanceStateMeta(inst) {
   const state = inst?.state || 'close';
   if (state === 'open') {
@@ -625,92 +666,126 @@ function getInstanceStateMeta(inst) {
   return { cls: 'is-close', label: 'Disponible', dotClass: '' };
 }
 
-function syncSimulatorInstanceSelect() {
-  const selectEl = document.getElementById('sim-instance-select');
+function syncSimulatorHeaderLabel(inst = provisionedInstance) {
   const activeLbl = document.getElementById('sim-active-instance-label');
-  if (selectEl && instancesCache.length) {
-    selectEl.innerHTML = instancesCache
-      .map((inst) => {
-        const title = inst.business_name || inst.display_name || inst.instance_id;
-        return `<option value="${escapeHtml(inst.instance_id)}">${escapeHtml(inst.instance_id)} · ${escapeHtml(title)}</option>`;
-      })
-      .join('');
-    selectEl.value = selectedInstanceId;
-  }
-  if (activeLbl) {
-    const current = instancesCache.find((i) => i.instance_id === selectedInstanceId);
-    const labelName = current ? `${current.instance_id} · ${current.business_name || current.display_name}` : selectedInstanceId;
-    activeLbl.textContent = labelName;
+  if (!activeLbl) return;
+  if (inst && inst.business_name && !String(inst.business_name).startsWith('Espacio Disponible')) {
+    activeLbl.textContent = `${inst.display_name || 'ServiBot'} · ${inst.business_name}`;
+  } else {
+    activeLbl.textContent = 'En línea · Listo para conversar';
   }
 }
 
-function renderInstancesSelectorGrid() {
-  const grid = document.getElementById('instances-selector-grid');
-  const summaryPill = document.getElementById('instances-summary-pill');
-  if (!grid) return;
+function updateWizardLivePreview() {
+  const botEl = document.getElementById('wizard-preview-bot-name');
+  const msgEl = document.getElementById('wizard-preview-greeting');
+  if (!botEl || !msgEl) return;
 
-  if (!instancesCache.length) {
-    grid.innerHTML = '<p style="color:var(--text-muted); font-size:0.84rem;">No se pudieron cargar las instancias del backend.</p>';
-    return;
+  const bizName = document.getElementById('cfg-business-name')?.value.trim() || 'tu negocio';
+  const displayName = document.getElementById('cfg-display-name')?.value.trim() || `Asistente de ${bizName}`;
+  const welcomeVal = document.getElementById('cfg-welcome-message')?.value.trim();
+
+  botEl.textContent = `${displayName} · ${bizName}`;
+  msgEl.textContent =
+    welcomeVal ||
+    `¡Hola! Soy ${displayName}, asesor inteligente de ${bizName}. ¿En qué te ayudo hoy?`;
+}
+
+function goToWizardStep(stepNum, { focusHeading = false } = {}) {
+  const step = Math.min(3, Math.max(1, Number(stepNum) || 1));
+  wizardCurrentStep = step;
+
+  const titles = {
+    1: 'Paso 1 de 3 · Tu Negocio',
+    2: 'Paso 2 de 3 · Alma e IA',
+    3: 'Paso 3 de 3 · WhatsApp y Prueba'
+  };
+
+  const progressEl = document.getElementById('wizard-progress-bar');
+  const counterEl = document.getElementById('wizard-step-counter');
+  if (progressEl) {
+    progressEl.value = step;
+    progressEl.textContent = `Paso ${step} de 3`;
+  }
+  if (counterEl) {
+    counterEl.textContent = titles[step] || titles[1];
   }
 
-  const connectedCount = instancesCache.filter((i) => i.state === 'open').length;
-  if (summaryPill) {
-    summaryPill.textContent = `${instancesCache.length} instancias · ${connectedCount} WhatsApp activo${connectedCount === 1 ? '' : 's'}`;
-  }
-
-  grid.innerHTML = instancesCache
-    .map((inst) => {
-      const meta = getInstanceStateMeta(inst);
-      const isActive = inst.instance_id === selectedInstanceId;
-      const bizLabel = inst.business_name || inst.display_name || `Slot #${inst.slot_number}`;
-      return `
-        <button
-          type="button"
-          role="tab"
-          class="instance-slot-btn ${isActive ? 'active' : ''}"
-          aria-selected="${isActive ? 'true' : 'false'}"
-          data-instance-id="${escapeHtml(inst.instance_id)}"
-        >
-          <span class="instance-slot-top">
-            <span class="instance-slot-id">${escapeHtml(inst.instance_id)}</span>
-            <span class="instance-slot-state ${meta.cls}">
-              <span class="dot ${meta.dotClass}" aria-hidden="true"></span>
-              <span>${escapeHtml(meta.label)}</span>
-            </span>
-          </span>
-          <span class="instance-slot-biz">${escapeHtml(bizLabel)}</span>
-        </button>
-      `;
-    })
-    .join('');
-
-  grid.querySelectorAll('.instance-slot-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.instanceId;
-      if (id) selectBotInstance(id);
-    });
+  document.querySelectorAll('#wizard-steps-list .wizard-step-item').forEach((li) => {
+    const itemStep = Number(li.dataset.step);
+    const btn = li.querySelector('.wizard-step-btn');
+    const isActive = itemStep === step;
+    const isDone = itemStep < step || (itemStep === 3 && Boolean(clientInstanceId));
+    li.classList.toggle('is-active', isActive);
+    li.classList.toggle('is-done', !isActive && isDone);
+    if (btn) {
+      if (isActive) {
+        btn.setAttribute('aria-current', 'step');
+      } else {
+        btn.removeAttribute('aria-current');
+      }
+      if (itemStep === 3) {
+        btn.disabled = !clientInstanceId;
+      }
+    }
   });
+
+  [1, 2, 3].forEach((n) => {
+    const pane = document.getElementById(`wizard-step-${n}`);
+    if (!pane) return;
+    const isCurrent = n === step;
+    pane.classList.toggle('hidden', !isCurrent);
+    if (isCurrent) {
+      pane.removeAttribute('hidden');
+    } else {
+      pane.setAttribute('hidden', '');
+    }
+  });
+
+  if (focusHeading) {
+    const heading = document.getElementById(`wizard-step-${step}-title`);
+    if (heading) {
+      requestAnimationFrame(() => heading.focus({ preventScroll: true }));
+    }
+  }
 }
 
-function populateInstanceForm(inst) {
+function populateWizardForm(inst) {
   if (!inst) return;
   const setVal = (id, val) => {
     const el = document.getElementById(id);
     if (el) el.value = val ?? '';
   };
-  setVal('cfg-instance-id', inst.instance_id);
-  setVal('cfg-business-name', inst.business_name);
-  setVal('cfg-display-name', inst.display_name);
-  setVal('cfg-tone', inst.tone);
-  setVal('cfg-ai-soul', inst.ai_soul);
-  setVal('cfg-system-prompt', inst.system_prompt);
-  setVal('cfg-welcome-message', inst.welcome_message);
+  setVal('cfg-instance-id', inst.instance_id || '');
+  setVal('cfg-client-name', inst.client_name || '');
+  setVal('cfg-client-contact', inst.client_contact || '');
+  setVal('cfg-business-name', inst.business_name || '');
+  setVal('cfg-display-name', inst.display_name || '');
+  setVal('cfg-tone', inst.tone || '');
+  setVal('cfg-ai-soul', inst.ai_soul || '');
+  setVal('cfg-system-prompt', inst.system_prompt || '');
+  setVal('cfg-welcome-message', inst.welcome_message || '');
+  updateWizardLivePreview();
+}
 
-  const badge = document.getElementById('cfg-active-slot-badge');
-  if (badge) badge.textContent = inst.instance_id;
-  const meta = document.getElementById('cfg-updated-meta');
-  if (meta) meta.textContent = `Slot #${String(inst.slot_number || 1).padStart(2, '0')} · ${inst.updated_at || 'Listo'}`;
+function renderWizardSummary(inst) {
+  if (!inst) return;
+  const titleEl = document.getElementById('wizard-summary-title');
+  const metaEl = document.getElementById('wizard-summary-meta');
+  const soulEl = document.getElementById('wizard-summary-soul');
+
+  if (titleEl) {
+    titleEl.textContent = `${inst.display_name || 'ServiBot'} · ${inst.business_name || 'Tu Negocio'}`;
+  }
+  if (metaEl) {
+    const ownerPart = inst.client_name ? `Responsable: ${inst.client_name}` : 'Configuración personalizada';
+    const contactPart = inst.client_contact ? ` (${inst.client_contact})` : '';
+    const tonePart = inst.tone ? ` · Tono: ${inst.tone}` : '';
+    metaEl.textContent = `${ownerPart}${contactPart}${tonePart}`;
+  }
+  if (soulEl) {
+    soulEl.textContent = inst.ai_soul || 'Asistente listo para atender consultas, citas y ventas.';
+  }
 }
 
 function renderInstanceWaPanel(inst) {
@@ -721,7 +796,9 @@ function renderInstanceWaPanel(inst) {
   const connectBtn = document.getElementById('btn-cfg-wa-connect');
 
   const meta = getInstanceStateMeta(inst);
-  if (slotLabel) slotLabel.textContent = `Baileys · ${inst.instance_id}`;
+  if (slotLabel) {
+    slotLabel.textContent = `WhatsApp · ${inst.business_name || 'Tu ServiBot'}`;
+  }
   if (badge) {
     badge.textContent = meta.label.toUpperCase();
     badge.className = `badge-tag ${inst.state === 'open' ? 'badge-tag-accent' : ''}`;
@@ -729,14 +806,14 @@ function renderInstanceWaPanel(inst) {
   if (connectBtn) {
     connectBtn.disabled = inst.state === 'open';
     connectBtn.textContent =
-      inst.state === 'open' ? 'WhatsApp Vinculado ✓' : 'Vincular / Generar QR WhatsApp';
+      inst.state === 'open' ? 'WhatsApp Vinculado ✓' : 'Generar QR de WhatsApp';
   }
 
   if (!qrBox) return;
   if (inst.state === 'open') {
     qrBox.innerHTML = `
       <div class="cfg-wa-connected">
-        <strong>✅ Sesión Activa en ${escapeHtml(inst.instance_id)}</strong><br />
+        <strong>✅ WhatsApp Conectado para ${escapeHtml(inst.business_name || inst.display_name || 'tu ServiBot')}</strong><br />
         <span>Número: ${escapeHtml(inst.connectedPhone || 'Vinculado')}</span>
       </div>
     `;
@@ -744,68 +821,143 @@ function renderInstanceWaPanel(inst) {
     const src = inst.qrBase64 || inst.base64;
     qrBox.innerHTML = `
       <div class="qr-box">
-        <img src="${src}" alt="Código QR WhatsApp para ${escapeHtml(inst.instance_id)}" />
+        <img src="${src}" alt="Código QR WhatsApp para ${escapeHtml(inst.business_name || 'tu ServiBot')}" />
       </div>
       <p class="cfg-wa-placeholder">
-        Abre WhatsApp ➔ Dispositivos vinculados ➔ Vincular un dispositivo para activar <strong>${escapeHtml(inst.instance_id)}</strong>.
+        Abre WhatsApp ➔ Dispositivos vinculados ➔ Vincular un dispositivo y escanea este código para activar tu bot.
       </p>
     `;
   } else {
     const infoMsg = inst.lastError
       ? escapeHtml(inst.lastError)
-      : `Sesión independiente libre para ${escapeHtml(inst.instance_id)}. Haz clic en el botón verde para generar su código QR exclusivo.`;
+      : 'Tu ServiBot ya tiene su espacio dedicado. Haz clic en el botón verde para generar su código QR de WhatsApp.';
     qrBox.innerHTML = `<p class="cfg-wa-placeholder">${infoMsg}</p>`;
   }
 }
 
-function selectBotInstance(instanceId) {
-  const inst = instancesCache.find((i) => i.instance_id === instanceId) || instancesCache[0];
-  if (!inst) return;
-  selectedInstanceId = inst.instance_id;
-  localStorage.setItem('servibot_selected_instance', selectedInstanceId);
-  setFeedback('instance-save-status', '');
-  setFeedback('instance-wa-feedback', '');
-  renderInstancesSelectorGrid();
-  syncSimulatorInstanceSelect();
-  populateInstanceForm(inst);
-  renderInstanceWaPanel(inst);
+function validateWizardStep1() {
+  const clientInput = document.getElementById('cfg-client-name');
+  const contactInput = document.getElementById('cfg-client-contact');
+  const bizInput = document.getElementById('cfg-business-name');
+
+  setFeedback('wizard-step-1-error', '');
+
+  if (!clientInput?.value.trim()) {
+    setFeedback('wizard-step-1-error', 'Por favor escribe tu nombre completo para continuar.', false);
+    clientInput?.focus();
+    return false;
+  }
+  if (!contactInput?.value.trim()) {
+    setFeedback('wizard-step-1-error', 'Indica tu WhatsApp o correo de contacto.', false);
+    contactInput?.focus();
+    return false;
+  }
+  if (!bizInput?.value.trim()) {
+    setFeedback('wizard-step-1-error', 'Escribe el nombre de tu empresa o marca.', false);
+    bizInput?.focus();
+    return false;
+  }
+
+  const bizName = bizInput.value.trim();
+  const displayInput = document.getElementById('cfg-display-name');
+  if (displayInput && !displayInput.value.trim()) {
+    displayInput.value = `Asistente de ${bizName}`;
+  }
+
+  const welcomeInput = document.getElementById('cfg-welcome-message');
+  if (welcomeInput && (!welcomeInput.value.trim() || welcomeInput.dataset.autoFilled === '1')) {
+    const agentName = displayInput?.value.trim() || `Asistente de ${bizName}`;
+    welcomeInput.value = `¡Hola! Soy ${agentName}, asesor inteligente de ${bizName}. ¿En qué te ayudo hoy?`;
+    welcomeInput.dataset.autoFilled = '1';
+  }
+
+  updateWizardLivePreview();
+  return true;
 }
 
-async function loadBotInstances({ populateForm = true } = {}) {
-  const grid = document.getElementById('instances-selector-grid');
-  try {
-    const data = await apiFetch('/api/instances');
-    if (!data.ok || !Array.isArray(data.instances)) {
-      throw new Error(data.error || 'Respuesta inválida de instancias');
-    }
-    instancesCache = data.instances;
-    if (!instancesCache.some((i) => i.instance_id === selectedInstanceId)) {
-      selectedInstanceId = instancesCache[0]?.instance_id || 'servibot-01';
-    }
-    renderInstancesSelectorGrid();
-    syncSimulatorInstanceSelect();
+function resetWizardForNewBot() {
+  clientInstanceId = '';
+  provisionedInstance = null;
+  activeChatInstanceId = 'servibot-01';
+  localStorage.removeItem('servibot_client_instance_id');
 
-    const activeInst = instancesCache.find((i) => i.instance_id === selectedInstanceId) || instancesCache[0];
-    if (activeInst) {
-      if (populateForm) populateInstanceForm(activeInst);
-      renderInstanceWaPanel(activeInst);
+  const form = document.getElementById('servibot-wizard-form');
+  form?.reset();
+  const idInput = document.getElementById('cfg-instance-id');
+  if (idInput) idInput.value = '';
+
+  ['cfg-tone', 'cfg-ai-soul', 'cfg-system-prompt', 'cfg-welcome-message'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      delete el.dataset.fromPreset;
+      delete el.dataset.autoFilled;
     }
-  } catch (err) {
-    if (grid) {
-      grid.innerHTML = `<p style="color:#fda4af; font-size:0.84rem;">No se pudieron cargar las instancias: ${escapeHtml(err.message)}</p>`;
+  });
+
+  document.querySelectorAll('.preset-chip').forEach((chip) => {
+    chip.classList.remove('is-selected');
+    chip.setAttribute('aria-pressed', 'false');
+  });
+
+  setFeedback('wizard-step-1-error', '');
+  setFeedback('instance-save-status', '');
+  setFeedback('instance-wa-feedback', '');
+  syncSimulatorHeaderLabel(null);
+  updateWizardLivePreview();
+  goToWizardStep(1, { focusHeading: true });
+}
+
+async function loadClientProvisionedInstance({ populateForm = true } = {}) {
+  if (!clientInstanceId) {
+    activeChatInstanceId = 'servibot-01';
+    syncSimulatorHeaderLabel(null);
+    if (populateForm) {
+      updateWizardLivePreview();
+      goToWizardStep(wizardCurrentStep || 1);
     }
+    return;
+  }
+
+  try {
+    const data = await apiFetch(`/api/instances/${encodeURIComponent(clientInstanceId)}`);
+    if (!data.ok || !data.instance) {
+      throw new Error('Instancia previa no disponible');
+    }
+    const inst = data.instance;
+    const isUnconfigured =
+      String(inst.business_name || '').startsWith('Espacio Disponible') && !String(inst.client_name || '').trim();
+    if (isUnconfigured) {
+      clientInstanceId = '';
+      localStorage.removeItem('servibot_client_instance_id');
+      activeChatInstanceId = 'servibot-01';
+      syncSimulatorHeaderLabel(null);
+      return;
+    }
+
+    provisionedInstance = inst;
+    activeChatInstanceId = inst.instance_id;
+    syncSimulatorHeaderLabel(inst);
+    renderWizardSummary(inst);
+    renderInstanceWaPanel(inst);
+
+    if (populateForm) {
+      populateWizardForm(inst);
+      goToWizardStep(3);
+    }
+  } catch {
+    clientInstanceId = '';
+    localStorage.removeItem('servibot_client_instance_id');
+    activeChatInstanceId = 'servibot-01';
+    syncSimulatorHeaderLabel(null);
   }
 }
 
-async function refreshSelectedInstanceWaOnly() {
+async function refreshProvisionedInstanceWaOnly() {
+  if (!clientInstanceId) return;
   try {
-    const data = await apiFetch(`/api/instances/${encodeURIComponent(selectedInstanceId)}`);
+    const data = await apiFetch(`/api/instances/${encodeURIComponent(clientInstanceId)}`);
     if (!data.ok || !data.instance) return;
-    const idx = instancesCache.findIndex((i) => i.instance_id === data.instance.instance_id);
-    if (idx >= 0) {
-      instancesCache[idx] = { ...instancesCache[idx], ...data.instance };
-    }
-    renderInstancesSelectorGrid();
+    provisionedInstance = data.instance;
     renderInstanceWaPanel(data.instance);
   } catch {
     // ignore transient polling failure
@@ -921,7 +1073,7 @@ async function sendChatMessage(text) {
       method: 'POST',
       body: JSON.stringify({
         channel: 'web',
-        instance_id: selectedInstanceId,
+        instance_id: activeChatInstanceId || 'servibot-01',
         sender_id: webSenderId,
         sender_name: 'Prospecto Web',
         message: text
@@ -1440,106 +1592,204 @@ function setupEventListeners() {
     }
   });
 
-  // Selector de instancia en el Simulador
-  document.getElementById('sim-instance-select')?.addEventListener('change', (e) => {
-    const chosenId = e.target.value;
-    selectBotInstance(chosenId);
-    const inst = instancesCache.find((i) => i.instance_id === chosenId);
-    const box = document.getElementById('chat-messages');
-    if (box && inst) {
-      const greeting = inst.welcome_message || `¡Hola! Soy ${inst.display_name} de ${inst.business_name || 'tu negocio'}. ¿En qué puedo apoyarte?`;
-      box.innerHTML = `<div class="chat-bubble assistant">[${escapeHtml(inst.instance_id)}] ${escapeHtml(greeting)}</div>`;
+  // Wizard Interactivo de 3 Pasos para Crear / Editar ServiBot
+  document.querySelectorAll('#preset-giro-chips .preset-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const giroKey = chip.dataset.giro;
+      const preset = GIRO_PRESETS[giroKey];
+      document.querySelectorAll('#preset-giro-chips .preset-chip').forEach((c) => {
+        const active = c === chip;
+        c.classList.toggle('is-selected', active);
+        c.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      if (!preset) return;
+
+      const applyPresetField = (id, val) => {
+        const el = document.getElementById(id);
+        if (el && (!el.value.trim() || el.dataset.fromPreset === '1')) {
+          el.value = val;
+          el.dataset.fromPreset = '1';
+        }
+      };
+      applyPresetField('cfg-tone', preset.tone);
+      applyPresetField('cfg-ai-soul', preset.ai_soul);
+      applyPresetField('cfg-system-prompt', preset.system_prompt);
+      updateWizardLivePreview();
+    });
+  });
+
+  document.querySelectorAll('#preset-tone-chips .preset-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const toneInput = document.getElementById('cfg-tone');
+      if (toneInput) {
+        toneInput.value = chip.dataset.tone || chip.textContent.trim();
+        delete toneInput.dataset.fromPreset;
+      }
+      document.querySelectorAll('#preset-tone-chips .preset-chip').forEach((c) => {
+        const active = c === chip;
+        c.classList.toggle('is-selected', active);
+        c.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      updateWizardLivePreview();
+    });
+  });
+
+  ['cfg-tone', 'cfg-ai-soul', 'cfg-system-prompt'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('input', (e) => {
+      delete e.target.dataset.fromPreset;
+    });
+  });
+
+  ['cfg-business-name', 'cfg-display-name', 'cfg-welcome-message'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('input', (e) => {
+      setFeedback('wizard-step-1-error', '');
+      if (id === 'cfg-welcome-message') {
+        delete e.target.dataset.autoFilled;
+      }
+      updateWizardLivePreview();
+    });
+  });
+
+  ['cfg-client-name', 'cfg-client-contact'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('input', () => {
+      setFeedback('wizard-step-1-error', '');
+    });
+  });
+
+  document.querySelectorAll('#wizard-steps-list .wizard-step-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const targetStep = Number(btn.dataset.step);
+      if (targetStep === 1) {
+        goToWizardStep(1, { focusHeading: true });
+      } else if (targetStep === 2) {
+        if (validateWizardStep1()) {
+          goToWizardStep(2, { focusHeading: true });
+        }
+      } else if (targetStep === 3 && clientInstanceId) {
+        goToWizardStep(3, { focusHeading: true });
+      }
+    });
+  });
+
+  document.getElementById('btn-wizard-next-1')?.addEventListener('click', () => {
+    if (validateWizardStep1()) {
+      goToWizardStep(2, { focusHeading: true });
     }
   });
 
-  // Configurador de Instancia ServiBot (Sistema + Alma de la IA + Sesión WA Baileys)
-  document.getElementById('instance-config-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const saveBtn = document.getElementById('btn-save-instance');
-    const businessInput = document.getElementById('cfg-business-name');
-    const displayInput = document.getElementById('cfg-display-name');
+  document.getElementById('btn-wizard-prev-2')?.addEventListener('click', () => {
+    setFeedback('instance-save-status', '');
+    goToWizardStep(1, { focusHeading: true });
+  });
 
-    if (!businessInput?.value.trim()) {
-      businessInput?.setCustomValidity('Ingresa el nombre de tu negocio o marca.');
-      businessInput?.reportValidity();
-      businessInput?.focus();
+  document.getElementById('btn-wizard-edit')?.addEventListener('click', () => {
+    goToWizardStep(2, { focusHeading: true });
+  });
+
+  document.getElementById('btn-wizard-new')?.addEventListener('click', () => {
+    resetWizardForNewBot();
+  });
+
+  document.getElementById('servibot-wizard-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (wizardCurrentStep === 1) {
+      if (validateWizardStep1()) goToWizardStep(2, { focusHeading: true });
       return;
     }
-    businessInput?.setCustomValidity('');
+
+    const saveBtn = document.getElementById('btn-save-instance');
+    const displayInput = document.getElementById('cfg-display-name');
+    const soulInput = document.getElementById('cfg-ai-soul');
+    setFeedback('instance-save-status', '');
 
     if (!displayInput?.value.trim()) {
-      displayInput?.setCustomValidity('Ingresa un nombre para tu asistente ServiBot.');
-      displayInput?.reportValidity();
+      setFeedback('instance-save-status', 'Asigna un nombre para tu asistente ServiBot.', false);
       displayInput?.focus();
       return;
     }
-    displayInput?.setCustomValidity('');
+    if (!soulInput?.value.trim()) {
+      setFeedback('instance-save-status', 'Describe brevemente el propósito o alma de tu asistente.', false);
+      soulInput?.focus();
+      return;
+    }
 
-    const targetId = document.getElementById('cfg-instance-id')?.value || selectedInstanceId;
     const payload = {
-      business_name: businessInput.value.trim(),
+      instance_id: clientInstanceId || document.getElementById('cfg-instance-id')?.value || '',
+      client_name: document.getElementById('cfg-client-name')?.value.trim() || '',
+      client_contact: document.getElementById('cfg-client-contact')?.value.trim() || '',
+      business_name: document.getElementById('cfg-business-name')?.value.trim() || '',
       display_name: displayInput.value.trim(),
       tone: document.getElementById('cfg-tone')?.value.trim() || '',
-      ai_soul: document.getElementById('cfg-ai-soul')?.value.trim() || '',
+      ai_soul: soulInput.value.trim(),
       system_prompt: document.getElementById('cfg-system-prompt')?.value.trim() || '',
       welcome_message: document.getElementById('cfg-welcome-message')?.value.trim() || ''
     };
 
-    setFeedback('instance-save-status', '');
     if (saveBtn) {
       saveBtn.disabled = true;
-      saveBtn.textContent = 'Guardando instancia...';
+      saveBtn.textContent = 'Creando tu ServiBot...';
     }
 
     try {
-      const res = await apiFetch(`/api/instances/${encodeURIComponent(targetId)}`, {
-        method: 'PUT',
+      const res = await apiFetch('/api/instances/provision', {
+        method: 'POST',
         body: JSON.stringify(payload)
       });
 
       if (!res.ok || !res.instance) {
-        setFeedback('instance-save-status', res.error || 'No se pudo guardar la instancia.', false);
+        setFeedback('instance-save-status', res.error || 'No se pudo configurar tu ServiBot.', false);
         return;
       }
 
-      const idx = instancesCache.findIndex((i) => i.instance_id === targetId);
-      if (idx >= 0) instancesCache[idx] = res.instance;
-      renderInstancesSelectorGrid();
-      syncSimulatorInstanceSelect();
-      populateInstanceForm(res.instance);
-      setFeedback(
-        'instance-save-status',
-        `✅ Configuración de ${res.instance.instance_id} (${res.instance.business_name}) guardada y activa en Ollama.`,
-        true
-      );
+      const inst = res.instance;
+      clientInstanceId = inst.instance_id;
+      activeChatInstanceId = inst.instance_id;
+      provisionedInstance = inst;
+      localStorage.setItem('servibot_client_instance_id', clientInstanceId);
+
+      const idHidden = document.getElementById('cfg-instance-id');
+      if (idHidden) idHidden.value = inst.instance_id;
+
+      syncSimulatorHeaderLabel(inst);
+      renderWizardSummary(inst);
+      renderInstanceWaPanel(inst);
+
+      const box = document.getElementById('chat-messages');
+      if (box) {
+        const greeting =
+          inst.welcome_message ||
+          `¡Hola! Soy ${inst.display_name} de ${inst.business_name}. ¿En qué te ayudo hoy?`;
+        box.innerHTML = `<div class="chat-bubble assistant"><strong>${escapeHtml(inst.display_name)} · ${escapeHtml(inst.business_name)}</strong><br />${escapeHtml(greeting)}</div>`;
+      }
+
+      setFeedback('instance-wa-feedback', '');
+      goToWizardStep(3, { focusHeading: true });
     } catch (err) {
       setFeedback('instance-save-status', `Error de conexión: ${err.message}`, false);
     } finally {
       if (saveBtn) {
         saveBtn.disabled = false;
-        saveBtn.textContent = 'Guardar Configuración de Instancia';
+        saveBtn.textContent = 'Crear mi ServiBot y Conectar WhatsApp →';
       }
     }
   });
 
-  ['cfg-business-name', 'cfg-display-name'].forEach((id) => {
-    document.getElementById(id)?.addEventListener('input', (e) => {
-      e.target.setCustomValidity('');
-    });
-  });
-
   document.getElementById('btn-test-instance-sim')?.addEventListener('click', () => {
-    const inst = instancesCache.find((i) => i.instance_id === selectedInstanceId);
+    const inst = provisionedInstance;
     const input = document.getElementById('chat-input');
     const box = document.getElementById('chat-messages');
-    const currentBiz = document.getElementById('cfg-business-name')?.value.trim() || inst?.business_name || 'mi negocio';
-    const currentWelcome = document.getElementById('cfg-welcome-message')?.value.trim() || inst?.welcome_message || `¡Hola! Soy ${selectedInstanceId}.`;
+    const currentBiz = inst?.business_name || document.getElementById('cfg-business-name')?.value.trim() || 'mi negocio';
+    const currentName = inst?.display_name || document.getElementById('cfg-display-name')?.value.trim() || 'ServiBot';
+    const currentWelcome =
+      inst?.welcome_message ||
+      document.getElementById('cfg-welcome-message')?.value.trim() ||
+      `¡Hola! Soy ${currentName} de ${currentBiz}.`;
 
     if (box) {
-      box.innerHTML = `<div class="chat-bubble assistant">[${escapeHtml(selectedInstanceId)} · ${escapeHtml(currentBiz)}] ${escapeHtml(currentWelcome)}</div>`;
+      box.innerHTML = `<div class="chat-bubble assistant"><strong>${escapeHtml(currentName)} · ${escapeHtml(currentBiz)}</strong><br />${escapeHtml(currentWelcome)}</div>`;
     }
     if (input) {
-      input.value = 'Hola, ¿cómo me puedes atender hoy y qué estilo de servicio tienes?';
+      input.value = 'Hola, ¿me puedes explicar cómo atiendes a los clientes de nuestro negocio?';
       input.focus();
       if (window.matchMedia?.('(max-width: 979px)')?.matches) {
         input.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
@@ -1548,48 +1798,49 @@ function setupEventListeners() {
   });
 
   document.getElementById('btn-cfg-wa-connect')?.addEventListener('click', async () => {
+    if (!clientInstanceId) {
+      setFeedback('instance-wa-feedback', 'Primero completa el Paso 2 para crear tu ServiBot.', false);
+      return;
+    }
     const btn = document.getElementById('btn-cfg-wa-connect');
     setFeedback('instance-wa-feedback', '');
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Generando QR Baileys...';
+      btn.textContent = 'Generando QR WhatsApp...';
     }
     try {
-      const data = await apiFetch(`/api/instances/${encodeURIComponent(selectedInstanceId)}/connect`, {
+      const data = await apiFetch(`/api/instances/${encodeURIComponent(clientInstanceId)}/connect`, {
         method: 'POST'
       });
       if (!data.ok) {
-        setFeedback('instance-wa-feedback', data.error || 'No se pudo iniciar la sesión Baileys.', false);
+        setFeedback('instance-wa-feedback', data.error || 'No se pudo iniciar la sesión WhatsApp.', false);
       } else {
-        const idx = instancesCache.findIndex((i) => i.instance_id === selectedInstanceId);
-        if (idx >= 0) {
-          instancesCache[idx] = {
-            ...instancesCache[idx],
-            state: data.state,
-            connectedPhone: data.connectedPhone,
-            qrBase64: data.qrBase64 || data.base64,
-            hasQr: Boolean(data.qrBase64 || data.base64),
-            lastError: data.lastError || null
-          };
-          renderInstancesSelectorGrid();
-          renderInstanceWaPanel(instancesCache[idx]);
-        }
+        provisionedInstance = {
+          ...(provisionedInstance || { instance_id: clientInstanceId }),
+          state: data.state,
+          connectedPhone: data.connectedPhone,
+          qrBase64: data.qrBase64 || data.base64,
+          hasQr: Boolean(data.qrBase64 || data.base64),
+          lastError: data.lastError || null
+        };
+        renderInstanceWaPanel(provisionedInstance);
         if (data.lastError) {
           setFeedback('instance-wa-feedback', data.lastError, false);
         }
       }
     } catch (err) {
-      setFeedback('instance-wa-feedback', `Error conectando con Baileys: ${err.message}`, false);
+      setFeedback('instance-wa-feedback', `Error conectando con WhatsApp: ${err.message}`, false);
     } finally {
-      const current = instancesCache.find((i) => i.instance_id === selectedInstanceId);
       if (btn) {
-        btn.disabled = current?.state === 'open';
-        btn.textContent = current?.state === 'open' ? 'WhatsApp Vinculado ✓' : 'Vincular / Generar QR WhatsApp';
+        btn.disabled = provisionedInstance?.state === 'open';
+        btn.textContent =
+          provisionedInstance?.state === 'open' ? 'WhatsApp Vinculado ✓' : 'Generar QR de WhatsApp';
       }
     }
   });
 
   document.getElementById('btn-cfg-wa-logout')?.addEventListener('click', async () => {
+    if (!clientInstanceId) return;
     const btn = document.getElementById('btn-cfg-wa-logout');
     setFeedback('instance-wa-feedback', '');
     if (btn) {
@@ -1597,22 +1848,18 @@ function setupEventListeners() {
       btn.textContent = 'Reiniciando sesión...';
     }
     try {
-      const data = await apiFetch(`/api/instances/${encodeURIComponent(selectedInstanceId)}/logout`, {
+      const data = await apiFetch(`/api/instances/${encodeURIComponent(clientInstanceId)}/logout`, {
         method: 'POST'
       });
-      const idx = instancesCache.findIndex((i) => i.instance_id === selectedInstanceId);
-      if (idx >= 0) {
-        instancesCache[idx] = {
-          ...instancesCache[idx],
-          state: data.state || 'close',
-          connectedPhone: null,
-          qrBase64: data.qrBase64 || data.base64 || null,
-          hasQr: Boolean(data.qrBase64 || data.base64)
-        };
-        renderInstancesSelectorGrid();
-        renderInstanceWaPanel(instancesCache[idx]);
-      }
-      setFeedback('instance-wa-feedback', `Sesión WhatsApp de ${selectedInstanceId} reiniciada.`, true);
+      provisionedInstance = {
+        ...(provisionedInstance || { instance_id: clientInstanceId }),
+        state: data.state || 'close',
+        connectedPhone: null,
+        qrBase64: data.qrBase64 || data.base64 || null,
+        hasQr: Boolean(data.qrBase64 || data.base64)
+      };
+      renderInstanceWaPanel(provisionedInstance);
+      setFeedback('instance-wa-feedback', 'Sesión de WhatsApp reiniciada correctamente.', true);
     } catch (err) {
       setFeedback('instance-wa-feedback', `Error reiniciando sesión: ${err.message}`, false);
     } finally {
@@ -1638,20 +1885,19 @@ function setupEventListeners() {
     });
   });
 
-  document.querySelectorAll('.btn-hero-demo').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      sendChatMessage('Hola, quiero contratar el servicio de Bots Autónomos para mi negocio, mi nombre es Alejandro Garza y mi WhatsApp es 8115559900, por favor registra mi pedido.');
-    });
-  });
-
   document.getElementById('btn-reset-chat')?.addEventListener('click', () => {
     webSenderId = `web-${Math.floor(10000 + Math.random() * 90000)}`;
     localStorage.setItem('servibot_sender_id', webSenderId);
-    const inst = instancesCache.find((i) => i.instance_id === selectedInstanceId);
-    const greeting = inst?.welcome_message || 'Sesión reiniciada. ¡Hola! Soy el asesor de Servi-Bot, ¿en qué servicio te puedo apoyar hoy?';
+    const inst = provisionedInstance;
+    const greeting =
+      inst?.welcome_message ||
+      'Sesión reiniciada. ¡Hola! Soy el asesor de Servi-Bot, ¿en qué servicio te puedo apoyar hoy?';
     const box = document.getElementById('chat-messages');
     if (box) {
-      box.innerHTML = `<div class="chat-bubble assistant">[${escapeHtml(selectedInstanceId)}] ${escapeHtml(greeting)}</div>`;
+      const header = inst
+        ? `<strong>${escapeHtml(inst.display_name || 'ServiBot')} · ${escapeHtml(inst.business_name || '')}</strong><br />`
+        : '';
+      box.innerHTML = `<div class="chat-bubble assistant">${header}${escapeHtml(greeting)}</div>`;
     }
   });
 
@@ -1871,7 +2117,7 @@ function setupEventListeners() {
       localStorage.setItem('servibot_api_base', API_BASE);
       syncApiOverrideInput();
     }
-    await Promise.all([loadBotInstances({ populateForm: true }), loadPublicCatalog()]);
+    await Promise.all([loadClientProvisionedInstance({ populateForm: true }), loadPublicCatalog()]);
     if (currentUser) await loadAllAdminData();
   });
 }
@@ -1880,17 +2126,16 @@ function setupEventListeners() {
 (async () => {
   await resolveInitialApiBase();
   setupEventListeners();
-  await Promise.all([loadBotInstances({ populateForm: true }), loadPublicCatalog()]);
+  await Promise.all([loadClientProvisionedInstance({ populateForm: true }), loadPublicCatalog()]);
   await refreshHealth();
   setInterval(refreshHealth, 12000);
   setInterval(() => {
     const chTab = document.getElementById('tab-channels');
     if (currentUser && activeView === 'admin' && chTab && !chTab.classList.contains('hidden')) {
       loadWhatsAppStatus();
-    } else if (activeView === 'public') {
-      const currentInst = instancesCache.find((i) => i.instance_id === selectedInstanceId);
-      if (currentInst && (currentInst.state === 'connecting' || currentInst.state === 'qr_ready')) {
-        refreshSelectedInstanceWaOnly();
+    } else if (activeView === 'public' && clientInstanceId && provisionedInstance) {
+      if (provisionedInstance.state === 'connecting' || provisionedInstance.state === 'qr_ready') {
+        refreshProvisionedInstanceWaOnly();
       }
     }
   }, 4000);

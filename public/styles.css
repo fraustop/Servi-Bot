@@ -1151,6 +1151,329 @@ body.is-admin-session .container {
   gap: 0.5rem;
 }
 
+/* ==================== WIZARD INTERACTIVO (CREA TU SERVIBOT) ==================== */
+.wizard-shell {
+  padding: 1.2rem 1.3rem;
+}
+
+.wizard-nav {
+  margin-bottom: 1.1rem;
+  padding-bottom: 0.95rem;
+  border-bottom: 1px solid var(--metal-border);
+}
+
+.wizard-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.65rem;
+}
+
+.wizard-step-counter {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8cc8ff;
+}
+
+.wizard-progress-bar {
+  inline-size: 160px;
+  max-inline-size: 100%;
+  block-size: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  accent-color: var(--wa-green);
+}
+
+.wizard-progress-bar::-webkit-progress-bar {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+}
+
+.wizard-progress-bar::-webkit-progress-value {
+  background: linear-gradient(90deg, var(--outlook-blue-bright), var(--wa-green));
+  border-radius: 999px;
+  transition: inline-size 0.28s ease;
+}
+
+.wizard-steps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.wizard-step-btn {
+  inline-size: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.52rem 0.68rem;
+  border-radius: 10px;
+  border: 1px solid var(--metal-border);
+  background: rgba(11, 15, 22, 0.72);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.wizard-step-btn:hover:not(:disabled) {
+  border-color: var(--metal-border-strong);
+  color: var(--text-main);
+}
+
+.wizard-step-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.wizard-step-btn:focus-visible,
+.preset-chip:focus-visible {
+  outline: 2px solid var(--outlook-blue-bright);
+  outline-offset: 2px;
+}
+
+.wizard-step-num {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 22px;
+  block-size: 22px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--metal-border);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.wizard-step-text {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wizard-step-item.is-active .wizard-step-btn {
+  border-color: rgba(88, 166, 255, 0.72);
+  background: linear-gradient(155deg, rgba(16, 36, 58, 0.9), rgba(10, 14, 21, 0.95));
+  color: var(--text-main);
+}
+
+.wizard-step-item.is-active .wizard-step-num {
+  background: var(--outlook-blue-bright);
+  border-color: var(--outlook-blue-bright);
+  color: #050a12;
+}
+
+.wizard-step-item.is-done .wizard-step-btn {
+  border-color: rgba(37, 211, 102, 0.48);
+  color: #b7f7cc;
+}
+
+.wizard-step-item.is-done .wizard-step-num {
+  background: var(--wa-green);
+  border-color: var(--wa-green);
+  color: #04150c;
+}
+
+.wizard-pane-head {
+  margin-bottom: 0.95rem;
+}
+
+.wizard-pane-title {
+  font-family: var(--font-serif);
+  font-size: 1.24rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+  color: var(--text-main);
+}
+
+.wizard-pane-title:focus {
+  outline: none;
+}
+
+.wizard-pane-sub {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.preset-group {
+  margin-bottom: 0.95rem;
+}
+
+.preset-label {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 0.45rem;
+}
+
+.preset-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.preset-chip {
+  appearance: none;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.4rem 0.78rem;
+  border-radius: 999px;
+  border: 1px solid var(--metal-border-strong);
+  background: rgba(15, 20, 28, 0.85);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.preset-chip:hover {
+  border-color: rgba(88, 166, 255, 0.65);
+  color: var(--text-main);
+}
+
+.preset-chip.is-selected,
+.preset-chip[aria-pressed='true'] {
+  border-color: var(--wa-green);
+  background: rgba(37, 211, 102, 0.14);
+  color: #86efac;
+  box-shadow: 0 0 0 1px rgba(37, 211, 102, 0.25);
+}
+
+.wizard-shell input[type='text'],
+.wizard-shell textarea {
+  font: inherit;
+  font-size: max(1rem, 0.94rem);
+}
+
+.wizard-live-preview {
+  margin: 0.35rem 0 0.85rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: linear-gradient(155deg, rgba(16, 30, 24, 0.75), rgba(10, 14, 20, 0.92));
+  border: 1px solid rgba(37, 211, 102, 0.35);
+}
+
+.wizard-preview-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--wa-green-bright);
+  margin-bottom: 0.4rem;
+}
+
+.wizard-preview-bubble strong {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  margin-bottom: 0.2rem;
+}
+
+.wizard-preview-bubble p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.wizard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.wizard-actions-end {
+  justify-content: flex-end;
+}
+
+.wizard-step3-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 780px) {
+  .wizard-step3-grid {
+    grid-template-columns: minmax(0, 1.05fr) minmax(260px, 0.95fr);
+  }
+}
+
+.wizard-summary-box {
+  background: linear-gradient(155deg, rgba(16, 23, 34, 0.92), rgba(10, 13, 19, 0.98));
+  border: 1px solid rgba(88, 166, 255, 0.38);
+  border-radius: 14px;
+  padding: 1.05rem 1.15rem;
+}
+
+.wizard-summary-box h4 {
+  font-family: var(--font-serif);
+  font-size: 1.22rem;
+  margin: 0.45rem 0 0.35rem;
+  color: var(--text-main);
+}
+
+.wizard-summary-meta {
+  font-size: 0.82rem;
+  color: #93c5fd;
+  margin: 0 0 0.65rem;
+}
+
+.wizard-summary-soul {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0 0 1rem;
+  overflow-wrap: anywhere;
+}
+
+.wizard-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (max-width: 600px) {
+  .wizard-shell {
+    padding: 0.95rem 0.88rem;
+  }
+
+  .wizard-steps-list {
+    grid-template-columns: 1fr;
+  }
+
+  .wizard-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .wizard-actions .btn {
+    inline-size: 100%;
+    justify-content: center;
+  }
+}
+
 .hero-badge {
   display: inline-flex;
   align-self: flex-start;

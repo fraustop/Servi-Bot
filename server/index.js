@@ -541,6 +541,123 @@ async function main() {
     }
   });
 
+  app.post('/api/instances/provision', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const businessName = String(body.business_name || '').trim();
+      const clientName = String(body.client_name || '').trim();
+      const clientContact = String(body.client_contact || '').trim();
+      const displayName = String(body.display_name || '').trim()
+        || (businessName ? `Asistente ${businessName}` : 'ServiBot');
+      const tone = String(body.tone || '').trim() || 'Profesional, cálido y orientado a resultados';
+      const aiSoul = String(body.ai_soul || '').trim();
+      const systemPrompt = String(body.system_prompt || '').trim();
+      const welcomeMessage = String(body.welcome_message || '').trim()
+        || (businessName
+          ? `¡Hola! Soy ${displayName}, asesor inteligente de ${businessName}. ¿En qué te ayudo hoy?`
+          : '¡Hola! Soy tu ServiBot. ¿En qué te ayudo hoy?');
+
+      if (!businessName || !aiSoul) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Indica al menos el nombre de tu negocio y el alma o propósito de tu ServiBot.'
+        });
+      }
+
+      const poolRows = db
+        .prepare('SELECT * FROM bot_instances WHERE slot_number >= 2 ORDER BY slot_number ASC')
+        .all();
+
+      if (!poolRows.length) {
+        return res.status(503).json({
+          ok: false,
+          error: 'No hay instancias disponibles en el servidor en este momento.'
+        });
+      }
+
+      let liveMap = {};
+      try {
+        const evResp = await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/instance/fetchInstances`);
+        const evData = await evResp.json();
+        const evList = Array.isArray(evData) ? evData : (evData?.instances || []);
+        for (const item of evList) {
+          const name = item?.instance?.instanceName || item?.instanceName;
+          if (name) liveMap[name] = item?.instance || item;
+        }
+      } catch {
+        // port 10001 temporarily unavailable; treat live state as unknown/close
+      }
+
+      let targetRow = null;
+      if (body.instance_id) {
+        const requestedId = resolveInstanceId(body.instance_id);
+        targetRow = poolRows.find((r) => r.instance_id === requestedId) || null;
+      }
+
+      if (!targetRow) {
+        targetRow = poolRows.find((r) => {
+          const liveState = liveMap[r.instance_id]?.state || liveMap[r.instance_id]?.status || 'close';
+          const isDefaultSlot = String(r.business_name || '').startsWith('Espacio Disponible')
+            && !String(r.client_name || '').trim();
+          return liveState !== 'open' && isDefaultSlot;
+        }) || null;
+      }
+
+      if (!targetRow) {
+        const availableNonOpen = poolRows
+          .filter((r) => (liveMap[r.instance_id]?.state || liveMap[r.instance_id]?.status || 'close') !== 'open')
+          .sort((a, b) => String(a.updated_at || '').localeCompare(String(b.updated_at || '')) || a.slot_number - b.slot_number);
+        targetRow = availableNonOpen[0] || null;
+      }
+
+      if (!targetRow) {
+        return res.status(409).json({
+          ok: false,
+          error: 'Todas las instancias disponibles tienen una sesión activa de WhatsApp en este momento.'
+        });
+      }
+
+      const instanceId = targetRow.instance_id;
+      db.prepare(`
+        UPDATE bot_instances SET
+          display_name = ?,
+          business_name = ?,
+          client_name = ?,
+          client_contact = ?,
+          tone = ?,
+          ai_soul = ?,
+          system_prompt = ?,
+          welcome_message = ?,
+          active = 1,
+          updated_at = datetime('now', 'localtime')
+        WHERE instance_id = ?
+      `).run(
+        displayName,
+        businessName,
+        clientName,
+        clientContact,
+        tone,
+        aiSoul,
+        systemPrompt,
+        welcomeMessage,
+        instanceId
+      );
+
+      const updated = db.prepare('SELECT * FROM bot_instances WHERE instance_id = ?').get(instanceId);
+      let liveObj = liveMap[instanceId] || {};
+      try {
+        const evResp = await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/instance/connectionState/${encodeURIComponent(instanceId)}`);
+        const evData = await evResp.json();
+        liveObj = evData?.instance || liveObj;
+      } catch {
+        // ignore if port 10001 unavailable
+      }
+      res.json({ ok: true, instance: mergeInstanceWithLiveState(updated, liveObj) });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   app.get('/api/instances/:instanceId', async (req, res) => {
     try {
       const instanceId = resolveInstanceId(req.params.instanceId);

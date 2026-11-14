@@ -158,9 +158,6 @@
                   <button type="button" class="btn btn-primary btn-go-offer" id="btn-go-offer">
                     <span>Configurar mi ServiBot →</span>
                   </button>
-                  <button type="button" class="btn btn-outline btn-hero-demo" id="btn-hero-demo">
-                    <span>Probar Cierre en Simulador</span>
-                  </button>
                 </div>
               </div>
 
@@ -209,9 +206,6 @@
                 <div class="hero-actions">
                   <button type="button" class="btn btn-primary btn-go-offer">
                     <span>Configurar mi ServiBot →</span>
-                  </button>
-                  <button type="button" class="btn btn-outline btn-hero-demo">
-                    <span>Probar Cierre en Simulador</span>
                   </button>
                 </div>
               </div>
@@ -263,9 +257,6 @@
                   <button type="button" class="btn btn-primary btn-go-offer">
                     <span>Configurar mi ServiBot →</span>
                   </button>
-                  <button type="button" class="btn btn-outline btn-hero-demo">
-                    <span>Probar Cierre en Simulador</span>
-                  </button>
                 </div>
               </div>
 
@@ -286,7 +277,7 @@
             </div>
           </article>
 
-          <!-- DIAPOSITIVA 4: CONFIGURA TU PRIMER SERVIBOT -->
+          <!-- DIAPOSITIVA 4: CONFIGURADOR INTERACTIVO DE SERVIBOT -->
           <article
             class="carousel-slide slide-configurator"
             role="group"
@@ -298,10 +289,10 @@
             <div class="slide-inner slide-inner-configurator">
               <div class="section-head">
                 <div>
-                  <span class="hero-badge">10 Instancias Baileys · Multi-Sesión WhatsApp</span>
-                  <h2>Configura tu Primer ServiBot</h2>
+                  <span class="hero-badge">Asistente Interactivo · Tu ServiBot a la Medida</span>
+                  <h2 id="configurator-heading">Crea tu Primer ServiBot</h2>
                   <p>
-                    Elige una de las 10 instancias independientes en Baileys. Cada instancia opera con su propia sesión de WhatsApp, su propio sistema operativo y el alma de la IA personalizada para tu negocio.
+                    Cuéntanos sobre tu negocio y define la personalidad de tu asistente en 3 pasos. Preparamos su entorno al instante para que lo pruebes aquí mismo y lo conectes a tu WhatsApp.
                   </p>
                 </div>
                 <button type="button" class="btn btn-outline btn-sm" id="btn-go-description">
@@ -309,61 +300,132 @@
                 </button>
               </div>
 
-              <div class="instances-bar-section">
-                <div class="instances-bar-head">
-                  <span class="instances-bar-title">Selecciona la instancia a configurar (10 slots independientes):</span>
-                  <span class="instances-summary-pill" id="instances-summary-pill">Cargando instancias...</span>
-                </div>
-                <div
-                  class="instances-selector-grid"
-                  id="instances-selector-grid"
-                  role="tablist"
-                  aria-label="Selector de 10 instancias Baileys de ServiBot"
-                ></div>
-              </div>
+              <section class="configurator-form-card wizard-shell" id="servibot-wizard-card" aria-labelledby="configurator-heading">
+                <nav class="wizard-nav" aria-label="Pasos para crear tu ServiBot">
+                  <div class="wizard-progress-header">
+                    <span class="wizard-step-counter" id="wizard-step-counter">Paso 1 de 3 · Tu Negocio</span>
+                    <progress class="wizard-progress-bar" id="wizard-progress-bar" max="3" value="1">Paso 1 de 3</progress>
+                  </div>
+                  <ol class="wizard-steps-list" id="wizard-steps-list">
+                    <li class="wizard-step-item is-active" data-step="1">
+                      <button type="button" class="wizard-step-btn" data-step="1" aria-current="step">
+                        <span class="wizard-step-num" aria-hidden="true">1</span>
+                        <span class="wizard-step-text">Tu Negocio</span>
+                      </button>
+                    </li>
+                    <li class="wizard-step-item" data-step="2">
+                      <button type="button" class="wizard-step-btn" data-step="2">
+                        <span class="wizard-step-num" aria-hidden="true">2</span>
+                        <span class="wizard-step-text">Alma e IA</span>
+                      </button>
+                    </li>
+                    <li class="wizard-step-item" data-step="3">
+                      <button type="button" class="wizard-step-btn" data-step="3" disabled>
+                        <span class="wizard-step-num" aria-hidden="true">3</span>
+                        <span class="wizard-step-text">WhatsApp y Prueba</span>
+                      </button>
+                    </li>
+                  </ol>
+                </nav>
 
-              <div class="configurator-workspace">
-                <section class="configurator-form-card" aria-labelledby="configurator-form-title">
-                  <header class="cfg-card-head">
-                    <div>
-                      <span class="badge-tag" id="cfg-active-slot-badge">servibot-01</span>
-                      <h3 id="configurator-form-title">Sistema y Alma de la IA</h3>
+                <form id="servibot-wizard-form" action="/api/instances/provision" method="POST" novalidate>
+                  <input type="hidden" id="cfg-instance-id" name="instance_id" value="" />
+
+                  <!-- PASO 1: IDENTIDAD DEL NEGOCIO Y CONTACTO -->
+                  <div class="wizard-pane" id="wizard-step-1" data-step="1">
+                    <header class="wizard-pane-head">
+                      <h3 id="wizard-step-1-title" tabindex="-1" class="wizard-pane-title">1. Cuéntanos sobre tu negocio</h3>
+                      <p class="wizard-pane-sub">Elige tu giro para sugerirte una configuración base o escribe tus datos directamente.</p>
+                    </header>
+
+                    <div class="preset-group">
+                      <span class="preset-label" id="giro-presets-label">Giro o industria (opcional, rellena ideas iniciales):</span>
+                      <div class="preset-chips-row" id="preset-giro-chips" role="group" aria-labelledby="giro-presets-label">
+                        <button type="button" class="preset-chip" data-giro="clinica" aria-pressed="false">Clínica / Consultorio</button>
+                        <button type="button" class="preset-chip" data-giro="restaurante" aria-pressed="false">Restaurante / Café</button>
+                        <button type="button" class="preset-chip" data-giro="salon" aria-pressed="false">Salón / Spa / Barbería</button>
+                        <button type="button" class="preset-chip" data-giro="tienda" aria-pressed="false">Tienda / E-commerce</button>
+                        <button type="button" class="preset-chip" data-giro="inmobiliaria" aria-pressed="false">Inmobiliaria / Autos</button>
+                        <button type="button" class="preset-chip" data-giro="servicios" aria-pressed="false">Servicios Profesionales</button>
+                      </div>
                     </div>
-                    <span class="cfg-updated-meta" id="cfg-updated-meta">Instancia #01</span>
-                  </header>
 
-                  <form id="instance-config-form" action="/api/instances" method="POST" aria-labelledby="configurator-form-title">
-                    <input type="hidden" id="cfg-instance-id" name="instance_id" value="servibot-01" />
+                    <div class="cfg-two-col">
+                      <div class="field">
+                        <label for="cfg-client-name">Tu nombre completo <span aria-hidden="true">*</span></label>
+                        <input
+                          type="text"
+                          id="cfg-client-name"
+                          name="client_name"
+                          autocomplete="name"
+                          enterkeyhint="next"
+                          placeholder="Ej.: Mariana López"
+                          aria-describedby="cfg-client-name-help"
+                          required
+                        />
+                        <span id="cfg-client-name-help" class="field-hint">Para dirigirnos a ti durante tu configuración.</span>
+                      </div>
 
-                    <fieldset class="cfg-fieldset">
-                      <legend>Identidad de tu Negocio y Agente</legend>
-                      <div class="cfg-two-col">
-                        <div class="field">
-                          <label for="cfg-business-name">Nombre de tu negocio <span aria-hidden="true">*</span></label>
-                          <input
-                            type="text"
-                            id="cfg-business-name"
-                            name="business_name"
-                            autocomplete="organization"
-                            enterkeyhint="next"
-                            aria-describedby="cfg-business-help"
-                            required
-                          />
-                          <span id="cfg-business-help" class="field-hint">Marca o empresa asignada a esta instancia.</span>
-                        </div>
+                      <div class="field">
+                        <label for="cfg-client-contact">Tu WhatsApp o correo <span aria-hidden="true">*</span></label>
+                        <input
+                          type="text"
+                          id="cfg-client-contact"
+                          name="client_contact"
+                          autocomplete="email"
+                          enterkeyhint="next"
+                          placeholder="Ej.: 8112345678 o hola@tunegocio.mx"
+                          aria-describedby="cfg-client-contact-help"
+                          required
+                        />
+                        <span id="cfg-client-contact-help" class="field-hint">Medio de contacto para dar seguimiento a tu ServiBot.</span>
+                      </div>
+                    </div>
 
-                        <div class="field">
-                          <label for="cfg-display-name">Nombre del asistente ServiBot <span aria-hidden="true">*</span></label>
-                          <input
-                            type="text"
-                            id="cfg-display-name"
-                            name="display_name"
-                            enterkeyhint="next"
-                            aria-describedby="cfg-display-help"
-                            required
-                          />
-                          <span id="cfg-display-help" class="field-hint">Cómo se identificará al hablar con tus clientes.</span>
-                        </div>
+                    <div class="field">
+                      <label for="cfg-business-name">Nombre de tu empresa o marca <span aria-hidden="true">*</span></label>
+                      <input
+                        type="text"
+                        id="cfg-business-name"
+                        name="business_name"
+                        autocomplete="organization"
+                        enterkeyhint="done"
+                        placeholder="Ej.: Clínica Dental Sonrisa Norte"
+                        aria-describedby="cfg-business-help"
+                        required
+                      />
+                      <span id="cfg-business-help" class="field-hint">Nombre público con el que tu ServiBot representará a tu negocio.</span>
+                    </div>
+
+                    <div id="wizard-step-1-error" class="auth-feedback" role="status" aria-live="polite"></div>
+
+                    <div class="wizard-actions wizard-actions-end">
+                      <button type="button" class="btn btn-primary" id="btn-wizard-next-1">
+                        Continuar al Alma de tu IA →
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- PASO 2: ALMA, TONO Y REGLAS DEL BOT -->
+                  <div class="wizard-pane hidden" id="wizard-step-2" data-step="2" hidden>
+                    <header class="wizard-pane-head">
+                      <h3 id="wizard-step-2-title" tabindex="-1" class="wizard-pane-title">2. Define la personalidad y reglas de tu ServiBot</h3>
+                      <p class="wizard-pane-sub">Indica cómo hablará con tus clientes y qué objetivos debe cumplir al conversar.</p>
+                    </header>
+
+                    <div class="cfg-two-col">
+                      <div class="field">
+                        <label for="cfg-display-name">Nombre de tu asistente ServiBot <span aria-hidden="true">*</span></label>
+                        <input
+                          type="text"
+                          id="cfg-display-name"
+                          name="display_name"
+                          enterkeyhint="next"
+                          placeholder="Ej.: Sofía, Asistente de Sonrisa Norte"
+                          aria-describedby="cfg-display-help"
+                          required
+                        />
+                        <span id="cfg-display-help" class="field-hint">Nombre propio con el que saludará en WhatsApp.</span>
                       </div>
 
                       <div class="field">
@@ -373,89 +435,140 @@
                           id="cfg-tone"
                           name="tone"
                           enterkeyhint="next"
+                          placeholder="Ej.: Cálido, profesional y empático"
                           aria-describedby="cfg-tone-help"
                         />
-                        <span id="cfg-tone-help" class="field-hint">Ej.: empático y médico, ejecutivo y persuasivo, cálido y familiar.</span>
+                        <span id="cfg-tone-help" class="field-hint">Personaliza el carácter de cada respuesta.</span>
                       </div>
-                    </fieldset>
+                    </div>
 
-                    <fieldset class="cfg-fieldset">
-                      <legend>Alma de la IA y Sistema de Atención</legend>
-                      <div class="field">
-                        <label for="cfg-ai-soul">Alma de la IA (personalidad, esencia y criterio)</label>
-                        <textarea
-                          id="cfg-ai-soul"
-                          name="ai_soul"
-                          rows="3"
-                          aria-describedby="cfg-soul-help"
-                        ></textarea>
-                        <span id="cfg-soul-help" class="field-hint">Define la esencia única de esta instancia (la detallaremos a fondo en el siguiente paso).</span>
+                    <div class="preset-group">
+                      <span class="preset-label" id="tone-presets-label">Tono rápido:</span>
+                      <div class="preset-chips-row" id="preset-tone-chips" role="group" aria-labelledby="tone-presets-label">
+                        <button type="button" class="preset-chip" data-tone="Cálido, cercano y empático" aria-pressed="false">Cálido y Empático</button>
+                        <button type="button" class="preset-chip" data-tone="Ejecutivo, directo y orientado a cierre" aria-pressed="false">Ejecutivo y Directo</button>
+                        <button type="button" class="preset-chip" data-tone="Elegante, consultivo y de alto nivel" aria-pressed="false">Premium / Elegante</button>
+                        <button type="button" class="preset-chip" data-tone="Dinámico, amigable y entusiasta" aria-pressed="false">Entusiasta y Cercano</button>
                       </div>
+                    </div>
 
+                    <div class="field">
+                      <label for="cfg-ai-soul">Propósito y alma de tu IA <span aria-hidden="true">*</span></label>
+                      <textarea
+                        id="cfg-ai-soul"
+                        name="ai_soul"
+                        rows="3"
+                        placeholder="Ej.: Atender pacientes que preguntan por limpieza, ortodoncia o urgencias, resolver sus dudas con calma y agendar su cita pidiendo nombre y horario."
+                        aria-describedby="cfg-soul-help"
+                        required
+                      ></textarea>
+                      <span id="cfg-soul-help" class="field-hint">Describe a quién atiende, cómo hace sentir al cliente y qué debe lograr en cada charla.</span>
+                    </div>
+
+                    <div class="cfg-two-col">
                       <div class="field">
-                        <label for="cfg-system-prompt">Sistema e instrucciones operativas</label>
+                        <label for="cfg-system-prompt">Horarios, precios o reglas clave</label>
                         <textarea
                           id="cfg-system-prompt"
                           name="system_prompt"
                           rows="3"
+                          placeholder="Ej.: Abrimos L-S de 9am a 7pm. Consulta de valoración en $400 MXN. Confirmar siempre sucursal y teléfono."
                           aria-describedby="cfg-system-help"
                         ></textarea>
-                        <span id="cfg-system-help" class="field-hint">Reglas de operación, citas, ventas o filtros específicos para esta instancia.</span>
+                        <span id="cfg-system-help" class="field-hint">Información real que el bot debe respetar sin inventar datos.</span>
                       </div>
 
                       <div class="field">
-                        <label for="cfg-welcome-message">Mensaje de bienvenida inicial</label>
-                        <input
-                          type="text"
+                        <label for="cfg-welcome-message">Saludo inicial sugerido</label>
+                        <textarea
                           id="cfg-welcome-message"
                           name="welcome_message"
-                          enterkeyhint="done"
-                        />
+                          rows="3"
+                          placeholder="Ej.: ¡Hola! Soy Sofía de Clínica Dental Sonrisa Norte, ¿en qué puedo ayudarte hoy?"
+                        ></textarea>
+                        <span class="field-hint">Primera impresión al iniciar chat o probar en el simulador.</span>
                       </div>
-                    </fieldset>
+                    </div>
+
+                    <div class="wizard-live-preview" aria-live="polite">
+                      <div class="wizard-preview-label">Vista previa en tiempo real</div>
+                      <div class="wizard-preview-bubble">
+                        <strong id="wizard-preview-bot-name">Tu ServiBot</strong>
+                        <p id="wizard-preview-greeting">¡Hola! Cuéntame en qué puedo ayudar a tu negocio hoy.</p>
+                      </div>
+                    </div>
 
                     <div id="instance-save-status" class="auth-feedback" role="status" aria-live="polite"></div>
 
-                    <div class="cfg-actions-row">
+                    <div class="wizard-actions">
+                      <button type="button" class="btn btn-outline" id="btn-wizard-prev-2">
+                        ← Atrás
+                      </button>
                       <button type="submit" class="btn btn-primary" id="btn-save-instance">
-                        Guardar Configuración de Instancia
-                      </button>
-                      <button type="button" class="btn btn-outline" id="btn-test-instance-sim">
-                        Probar en el Simulador →
+                        Crear mi ServiBot y Conectar WhatsApp →
                       </button>
                     </div>
-                  </form>
-                </section>
+                  </div>
 
-                <aside class="configurator-wa-card" id="instance-wa-panel" aria-labelledby="cfg-wa-title">
-                  <header class="cfg-card-head">
-                    <div>
-                      <span class="badge-tag badge-tag-accent" id="cfg-wa-slot-label">Baileys · servibot-01</span>
-                      <h3 id="cfg-wa-title">Sesión de WhatsApp</h3>
+                  <!-- PASO 3: CONFIRMACIÓN, SIMULADOR Y VINCULACIÓN WHATSAPP -->
+                  <div class="wizard-pane hidden" id="wizard-step-3" data-step="3" hidden>
+                    <header class="wizard-pane-head">
+                      <h3 id="wizard-step-3-title" tabindex="-1" class="wizard-pane-title">3. ¡Tu ServiBot está creado y listo!</h3>
+                      <p class="wizard-pane-sub">Pruébalo ahora mismo en el simulador de la derecha o escanea tu QR para activarlo en WhatsApp.</p>
+                    </header>
+
+                    <div class="wizard-step3-grid">
+                      <div class="wizard-summary-box" id="wizard-created-card">
+                        <span class="badge-tag badge-tag-accent">ServiBot Configurado</span>
+                        <h4 id="wizard-summary-title">Asistente Listo</h4>
+                        <p id="wizard-summary-meta" class="wizard-summary-meta">Listo para conversar con tus clientes.</p>
+                        <p id="wizard-summary-soul" class="wizard-summary-soul"></p>
+
+                        <div class="wizard-summary-actions">
+                          <button type="button" class="btn btn-primary btn-sm" id="btn-test-instance-sim">
+                            Probar en el Simulador →
+                          </button>
+                          <button type="button" class="btn btn-outline btn-sm" id="btn-wizard-edit">
+                            Editar datos
+                          </button>
+                          <button type="button" class="btn btn-outline btn-sm" id="btn-wizard-new">
+                            Crear otro ServiBot
+                          </button>
+                        </div>
+                      </div>
+
+                      <aside class="configurator-wa-card" id="instance-wa-panel" aria-labelledby="cfg-wa-title">
+                        <header class="cfg-card-head">
+                          <div>
+                            <span class="badge-tag badge-tag-accent" id="cfg-wa-slot-label">WhatsApp Multi-Dispositivo</span>
+                            <h4 id="cfg-wa-title">Sesión de WhatsApp</h4>
+                          </div>
+                          <span class="badge-tag" id="cfg-wa-state-badge">DISPONIBLE</span>
+                        </header>
+
+                        <p class="cfg-wa-desc">
+                          Vincula tu número comercial escaneando este QR desde WhatsApp en tu teléfono para responder en automático.
+                        </p>
+
+                        <div class="cfg-wa-qr-box" id="cfg-wa-qr-container">
+                          <p class="cfg-wa-placeholder">Haz clic en el botón verde para generar tu código QR de WhatsApp.</p>
+                        </div>
+
+                        <div id="instance-wa-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
+
+                        <div class="cfg-wa-actions">
+                          <button type="button" class="btn btn-emerald btn-sm" id="btn-cfg-wa-connect">
+                            Generar QR de WhatsApp
+                          </button>
+                          <button type="button" class="btn btn-outline btn-sm" id="btn-cfg-wa-logout">
+                            Reiniciar Sesión WA
+                          </button>
+                        </div>
+                      </aside>
                     </div>
-                    <span class="badge-tag" id="cfg-wa-state-badge">VERIFICANDO</span>
-                  </header>
-
-                  <p class="cfg-wa-desc">
-                    Sesión multi-dispositivo aislada en puerto <code>10001</code>. Cada instancia puede vincular su propio número de WhatsApp.
-                  </p>
-
-                  <div class="cfg-wa-qr-box" id="cfg-wa-qr-container">
-                    <p class="cfg-wa-placeholder">Consultando estado de sesión en Baileys...</p>
                   </div>
-
-                  <div id="instance-wa-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
-
-                  <div class="cfg-wa-actions">
-                    <button type="button" class="btn btn-emerald btn-sm" id="btn-cfg-wa-connect">
-                      Vincular / Generar QR WhatsApp
-                    </button>
-                    <button type="button" class="btn btn-outline btn-sm" id="btn-cfg-wa-logout">
-                      Reiniciar Sesión WA
-                    </button>
-                  </div>
-                </aside>
-              </div>
+                </form>
+              </section>
             </div>
           </article>
         </div>
@@ -470,17 +583,10 @@
             <strong class="sim-title">Asesor Comercial Servi-Bot</strong>
             <span class="sim-status">
               <span class="sim-status-dot" aria-hidden="true"></span>
-              <span id="sim-active-instance-label">Instancia: servibot-01</span>
+              <span id="sim-active-instance-label">En línea · Listo para conversar</span>
             </span>
           </div>
           <button type="button" class="btn btn-outline btn-sm" id="btn-reset-chat">Reiniciar</button>
-        </div>
-
-        <div class="sim-instance-bar">
-          <label for="sim-instance-select">Instancia activa:</label>
-          <select id="sim-instance-select" name="sim_instance_id" aria-label="Seleccionar instancia para probar en el simulador">
-            <option value="servibot-01">servibot-01 · Principal</option>
-          </select>
         </div>
 
         <div class="bot-messages" id="chat-messages">
