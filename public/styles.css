@@ -458,7 +458,9 @@ body.is-admin-session .container {
   }
   .slide-description h1 span,
   .slide-description h1 .accent-wa,
-  .slide-description h1 .accent-outlook {
+  .slide-description h1 .accent-outlook,
+  .desc-hero-title .accent-wa,
+  .desc-hero-title .accent-outlook {
     background: none;
     color: CanvasText;
   }
@@ -744,8 +746,130 @@ body.is-admin-session .container {
 }
 
 .slide-inner-hero {
-  max-inline-size: 880px;
+  max-inline-size: 1020px;
   gap: 1.35rem;
+}
+
+.desc-story-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+}
+
+@media (min-width: 860px) {
+  .desc-story-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(290px, 0.92fr);
+    align-items: center;
+    gap: clamp(1.25rem, 2.4vw, 2.25rem);
+  }
+}
+
+.desc-copy-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.05rem;
+  min-inline-size: 0;
+}
+
+.desc-hero-title {
+  font-family: var(--font-serif);
+  font-size: clamp(1.85rem, 1.25rem + 1.8vw, 2.95rem);
+  font-weight: 600;
+  line-height: 1.14;
+  margin: 0;
+  letter-spacing: -0.015em;
+  color: var(--text-main);
+}
+
+.desc-hero-title-long {
+  font-size: clamp(1.38rem, 1rem + 1.1vw, 2.05rem);
+  line-height: 1.22;
+}
+
+.desc-hero-title .accent-wa,
+.slide-description h1 .accent-wa {
+  font-style: italic;
+  background: linear-gradient(95deg, #25d366 0%, #6ee7b7 100%);
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.desc-hero-title .accent-outlook,
+.slide-description h1 .accent-outlook {
+  font-style: italic;
+  background: linear-gradient(95deg, #3898ff 0%, #7dd3fc 100%);
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.desc-step-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.desc-step-pill {
+  cursor: pointer;
+  touch-action: manipulation;
+  min-block-size: 2.05rem;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--metal-border-strong);
+  background: rgba(13, 17, 24, 0.86);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+}
+
+.desc-step-pill:hover {
+  color: var(--text-main);
+  border-color: var(--outlook-blue-bright);
+  background: var(--outlook-blue-soft);
+}
+
+.desc-step-pill[aria-current="true"] {
+  background: linear-gradient(135deg, rgba(37, 211, 102, 0.2), rgba(0, 120, 212, 0.24));
+  border-color: var(--wa-green);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.desc-step-pill:focus-visible {
+  outline: 2px solid var(--wa-green-bright);
+  outline-offset: 2px;
+}
+
+.desc-visual-card {
+  margin: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  background: linear-gradient(160deg, #131822, #090c12);
+  box-shadow: var(--shadow-metallic), 0 0 36px -14px rgba(0, 120, 212, 0.35);
+}
+
+.desc-visual-card img {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-bottom: 1px solid var(--metal-border);
+}
+
+.desc-visual-caption {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.72rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(8, 11, 16, 0.94);
 }
 
 .slide-inner-offer {
@@ -783,30 +907,6 @@ body.is-admin-session .container {
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-}
-
-.slide-description h1 {
-  font-family: var(--font-serif);
-  font-size: clamp(2.05rem, 1.35rem + 2.3vw, 3.35rem);
-  font-weight: 600;
-  line-height: 1.12;
-  margin: 0;
-  letter-spacing: -0.015em;
-  color: var(--text-main);
-}
-
-.slide-description h1 .accent-wa {
-  font-style: italic;
-  background: linear-gradient(95deg, #25d366 0%, #6ee7b7 100%);
-  -webkit-background-clip: text;
-  color: transparent;
-}
-
-.slide-description h1 .accent-outlook {
-  font-style: italic;
-  background: linear-gradient(95deg, #3898ff 0%, #7dd3fc 100%);
-  -webkit-background-clip: text;
-  color: transparent;
 }
 
 .hero-lead {

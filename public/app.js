@@ -338,6 +338,14 @@ function initPublicCarousel() {
   const slides = Array.from(track.querySelectorAll('.carousel-slide'));
   if (!slides.length) return null;
 
+  const offerSlideIndex = slides.findIndex((s) => s.dataset.section === 'offer');
+  const sections = [
+    { key: 'description', label: '01 · Descripción', targetIndex: 0 },
+    { key: 'offer', label: '02 · La Oferta', targetIndex: offerSlideIndex >= 0 ? offerSlideIndex : slides.length - 1 }
+  ];
+
+  const stepPills = Array.from(carousel.querySelectorAll('.desc-step-pill[data-goto-slide]'));
+
   let pendingTarget = null;
   let scrollGeneration = 0;
   let lastSettledIndex = 0;
@@ -345,17 +353,27 @@ function initPublicCarousel() {
   let rafScheduled = false;
   let settleTimer = null;
 
-  // Generar botones marcadores con su nombre de destino (01 · Descripción, 02 · La Oferta)
+  // Generar botones marcadores principales de sección (01 · Descripción, 02 · La Oferta)
   markersNav.innerHTML = '';
-  const markers = slides.map((slide, idx) => {
+  const markers = sections.map((sec, idx) => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.textContent = slide.dataset.markerName || `Diapositiva ${idx + 1}`;
-    btn.setAttribute('aria-label', slide.dataset.markerName || `Ir a diapositiva ${idx + 1}`);
+    btn.textContent = sec.label;
+    btn.setAttribute('aria-label', sec.label);
+    btn.dataset.section = sec.key;
     if (idx === 0) btn.setAttribute('aria-current', 'true');
-    btn.addEventListener('click', () => goToSlide(idx, { announce: true }));
+    btn.addEventListener('click', () => goToSlide(sec.targetIndex, { announce: true }));
     markersNav.appendChild(btn);
     return btn;
+  });
+
+  stepPills.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.gotoSlide);
+      if (Number.isInteger(idx)) {
+        goToSlide(idx, { announce: true });
+      }
+    });
   });
 
   function getNearestSlideIndex() {
@@ -375,15 +393,24 @@ function initPublicCarousel() {
   }
 
   function applyMarkerCurrent(index) {
-    if (liveMarkerIndex === index && markers[index]?.getAttribute('aria-current') === 'true') {
+    const activeSection = slides[index]?.dataset.section || 'description';
+    const currentSectionBtn = markers.find((m) => m.dataset.section === activeSection);
+    if (liveMarkerIndex === index && currentSectionBtn?.getAttribute('aria-current') === 'true') {
       return;
     }
     liveMarkerIndex = index;
-    markers.forEach((btn, idx) => {
-      if (idx === index) {
+    markers.forEach((btn) => {
+      if (btn.dataset.section === activeSection) {
         btn.setAttribute('aria-current', 'true');
       } else {
         btn.removeAttribute('aria-current');
+      }
+    });
+    stepPills.forEach((pill) => {
+      if (Number(pill.dataset.gotoSlide) === index) {
+        pill.setAttribute('aria-current', 'true');
+      } else {
+        pill.removeAttribute('aria-current');
       }
     });
   }
@@ -1072,8 +1099,11 @@ function setupEventListeners() {
   document.getElementById('link-home')?.addEventListener('click', goHomeAndDescription);
   document.getElementById('admin-link-home')?.addEventListener('click', goHomeAndDescription);
 
-  document.getElementById('btn-go-offer')?.addEventListener('click', () => {
-    carouselController?.goToSlide(1, { announce: true });
+  document.querySelectorAll('.btn-go-offer').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const offerIdx = Math.max(0, document.querySelectorAll('#public-carousel-track .carousel-slide').length - 1);
+      carouselController?.goToSlide(offerIdx, { announce: true });
+    });
   });
   document.getElementById('btn-go-description')?.addEventListener('click', () => {
     carouselController?.goToSlide(0, { announce: true });
@@ -1219,8 +1249,10 @@ function setupEventListeners() {
     });
   });
 
-  document.getElementById('btn-hero-demo')?.addEventListener('click', () => {
-    sendChatMessage('Hola, quiero contratar el servicio de Bots Autónomos para mi negocio, mi nombre es Alejandro Garza y mi WhatsApp es 8115559900, por favor registra mi pedido.');
+  document.querySelectorAll('.btn-hero-demo').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      sendChatMessage('Hola, quiero contratar el servicio de Bots Autónomos para mi negocio, mi nombre es Alejandro Garza y mi WhatsApp es 8115559900, por favor registra mi pedido.');
+    });
   });
 
   document.getElementById('btn-reset-chat')?.addEventListener('click', () => {
