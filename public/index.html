@@ -13,11 +13,11 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body class="is-public-view">
-  <!-- Encabezado principal único -->
-  <header class="site-header" id="site-header">
+  <!-- Encabezado exclusivo para sesión administrativa -->
+  <header class="site-header hidden" id="site-header" aria-label="Barra administrativa">
     <div class="header-inner" id="header-inner">
       <div class="header-brand-group">
-        <a href="#inicio" class="brand" id="link-home">
+        <a href="#inicio" class="brand" id="admin-link-home">
           <span class="brand-icon" aria-hidden="true">🤖</span>
           <span>
             <span class="brand-title">Servi-Bot</span>
@@ -42,14 +42,6 @@
         </button>
 
         <ul id="site-menu" class="site-menu" popover="auto">
-          <!-- Navegación Pública: solo acceso Admin (sin botón redundante de Catálogo) -->
-          <li class="public-nav-item">
-            <button type="button" class="nav-btn nav-btn-admin" id="nav-admin">
-              <span class="nav-icon" aria-hidden="true">🔐</span>
-              <span>Admin</span>
-            </button>
-          </li>
-
           <!-- Navegación Sección Admin (ocupa todo el ancho disponible) -->
           <li class="admin-nav-item hidden">
             <button type="button" class="nav-btn admin-tab-nav" data-tab="tab-catalog" aria-current="page">
@@ -111,7 +103,14 @@
     <section id="view-public" class="public-stage">
       <!-- Carrusel principal: Diapositiva 1 Descripción / Diapositiva 2 Oferta -->
       <section class="carousel" id="public-carousel" aria-roledescription="carousel" aria-label="Descripción y oferta de Servi-Bot">
-        <div class="carousel-topbar">
+        <div class="carousel-topbar" id="carousel-topbar">
+          <a href="/" class="brand carousel-brand" id="link-home">
+            <span class="brand-icon" aria-hidden="true">🤖</span>
+            <span>
+              <span class="brand-title">Servi-Bot</span>
+              <span class="brand-subtitle">Automatización Comercial IA</span>
+            </span>
+          </a>
           <nav class="carousel-markers" id="carousel-markers" aria-label="Seleccionar sección"></nav>
         </div>
 

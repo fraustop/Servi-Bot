@@ -175,7 +175,7 @@ function updateNavbarLayout() {
   const siteHeader = document.getElementById('site-header');
   const headerInner = document.getElementById('header-inner');
   const siteMenu = document.getElementById('site-menu');
-  if (!siteHeader || !headerInner || !siteMenu) return;
+  if (!siteHeader || !headerInner || !siteMenu || siteHeader.classList.contains('hidden')) return;
 
   const wasOpen = isMenuPopoverOpen(siteMenu);
   if (wasOpen) closeMenuPopoverIfOpen();
@@ -225,19 +225,43 @@ function initNavbarMeasurement() {
   updateNavbarLayout();
 }
 
+function hasAdminUrlParam(loc = window.location) {
+  const params = new URLSearchParams(loc.search);
+  if (params.has('admin')) {
+    const val = (params.get('admin') || '').trim().toLowerCase();
+    return val !== '0' && val !== 'false';
+  }
+  return loc.pathname === '/admin' || loc.hash === '#admin';
+}
+
+function syncUrlWithView(targetView) {
+  const url = new URL(window.location.href);
+  if (targetView === 'admin') {
+    if (!hasAdminUrlParam()) {
+      url.searchParams.set('admin', '');
+      const searchStr = url.search.replace(/=(?=&|$)/g, '');
+      window.history.pushState({ view: 'admin' }, '', `${url.pathname}${searchStr}${url.hash}`);
+    }
+  } else if (hasAdminUrlParam()) {
+    url.searchParams.delete('admin');
+    const cleanPath = url.pathname === '/admin' ? '/' : url.pathname;
+    const cleanHash = url.hash === '#admin' ? '' : url.hash;
+    const searchStr = url.search.replace(/=(?=&|$)/g, '');
+    window.history.pushState({ view: 'public' }, '', `${cleanPath}${searchStr}${cleanHash}`);
+  }
+}
+
 function syncHeaderAndNavigation() {
   const isPublic = activeView === 'public';
   const isAuthenticatedAdmin = Boolean(currentUser && activeView === 'admin');
+  const siteHeader = document.getElementById('site-header');
   const brandSubtitle = document.getElementById('brand-subtitle');
   const userPill = document.getElementById('admin-user-pill');
-  const navAdmin = document.getElementById('nav-admin');
 
   document.body.classList.toggle('is-public-view', isPublic);
   document.body.classList.toggle('is-admin-session', isAuthenticatedAdmin);
+  siteHeader?.classList.toggle('hidden', !isAuthenticatedAdmin);
 
-  document.querySelectorAll('.public-nav-item').forEach((el) => {
-    el.classList.toggle('hidden', isAuthenticatedAdmin);
-  });
   document.querySelectorAll('.admin-nav-item').forEach((el) => {
     el.classList.toggle('hidden', !isAuthenticatedAdmin);
   });
@@ -248,7 +272,6 @@ function syncHeaderAndNavigation() {
       userPill.textContent = currentUser.email || 'Administrador';
       userPill.classList.remove('hidden');
     }
-    navAdmin?.removeAttribute('aria-current');
     document.querySelectorAll('.admin-tab-nav').forEach((btn) => {
       if (btn.dataset.tab === activeAdminTab) {
         btn.setAttribute('aria-current', 'page');
@@ -256,26 +279,24 @@ function syncHeaderAndNavigation() {
         btn.removeAttribute('aria-current');
       }
     });
+    updateNavbarLayout();
   } else {
     if (brandSubtitle) brandSubtitle.textContent = 'Automatización Comercial IA';
     if (userPill) {
       userPill.textContent = '';
       userPill.classList.add('hidden');
     }
-    if (activeView === 'admin') {
-      navAdmin?.setAttribute('aria-current', 'page');
-    } else {
-      navAdmin?.removeAttribute('aria-current');
-    }
   }
-
-  updateNavbarLayout();
 }
 
-function showView(which) {
+function showView(which, { syncUrl = true } = {}) {
   activeView = which === 'admin' ? 'admin' : 'public';
   const viewPublic = document.getElementById('view-public');
   const viewAdmin = document.getElementById('view-admin');
+
+  if (syncUrl) {
+    syncUrlWithView(activeView);
+  }
 
   closeMenuPopoverIfOpen();
 
@@ -1040,13 +1061,16 @@ function setupEventListeners() {
   initNavbarMeasurement();
   carouselController = initPublicCarousel();
 
-  document.getElementById('nav-admin')?.addEventListener('click', () => showView('admin'));
   document.getElementById('btn-view-store')?.addEventListener('click', () => showView('public'));
   document.getElementById('btn-back-to-public')?.addEventListener('click', () => showView('public'));
-  document.getElementById('link-home')?.addEventListener('click', (e) => {
+
+  const goHomeAndDescription = (e) => {
     e.preventDefault();
     showView('public');
-  });
+    carouselController?.goToSlide(0, { announce: true });
+  };
+  document.getElementById('link-home')?.addEventListener('click', goHomeAndDescription);
+  document.getElementById('admin-link-home')?.addEventListener('click', goHomeAndDescription);
 
   document.getElementById('btn-go-offer')?.addEventListener('click', () => {
     carouselController?.goToSlide(1, { announce: true });
@@ -1055,11 +1079,15 @@ function setupEventListeners() {
     carouselController?.goToSlide(0, { announce: true });
   });
 
-  if (location.pathname === '/admin' || location.hash === '#admin') {
-    showView('admin');
+  if (hasAdminUrlParam()) {
+    showView('admin', { syncUrl: false });
   } else {
-    syncHeaderAndNavigation();
+    showView('public', { syncUrl: false });
   }
+
+  window.addEventListener('popstate', () => {
+    showView(hasAdminUrlParam() ? 'admin' : 'public', { syncUrl: false });
+  });
 
   // Botones de navegación del Panel Admin en el encabezado
   document.querySelectorAll('.admin-tab-nav').forEach((btn) => {
