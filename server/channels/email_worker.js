@@ -16,7 +16,40 @@ function logEmailEvent(type, detail) {
   if (emailLogs.length > 30) emailLogs.pop();
 }
 
+async function sendGraphMailReply(accessToken, { to, subject, text }) {
+  const cleanSubject = subject?.toLowerCase().startsWith('re:') ? subject : `Re: ${subject || 'Consulta Servi-Bot'}`;
+  const resp = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      message: {
+        subject: cleanSubject,
+        body: {
+          contentType: 'Text',
+          content: String(text || '')
+        },
+        toRecipients: [{ emailAddress: { address: to } }]
+      },
+      saveToSentItems: true
+    }),
+    signal: AbortSignal.timeout(12000)
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Microsoft Graph sendMail HTTP ${resp.status}: ${errText.slice(0, 160)}`);
+  }
+  logEmailEvent('graph_sent', `Correo Outlook Graph enviado a ${to}`);
+  return { ok: true, provider: 'microsoft_graph' };
+}
+
 async function sendSmtpReply(cfg, { to, subject, text, inReplyTo }) {
+  if (cfg.auth_mode === 'microsoft_oauth2' && cfg.access_token) {
+    return sendGraphMailReply(cfg.access_token, { to, subject, text });
+  }
+
   const transporter = nodemailer.createTransport({
     host: cfg.smtp_host,
     port: Number(cfg.smtp_port || 465),
@@ -155,10 +188,14 @@ async function simulateIncomingEmail(runPythonSalesAgent, { fromEmail, fromName,
     message: `Asunto: ${subj}\nContenido del correo: ${msgBody}`
   });
 
-  // If SMTP is enabled and configured, also attempt real send if requested
+  // If SMTP or Microsoft Graph OAuth2 is enabled and configured, also attempt real send
   const cfg = getSetting('email_config', {});
   let smtpSent = false;
-  if (cfg.enabled && cfg.user && cfg.pass && cfg.smtp_host && agentResponse?.reply) {
+  const canSendReal =
+    cfg.enabled &&
+    ((cfg.auth_mode === 'microsoft_oauth2' && Boolean(cfg.access_token)) ||
+      Boolean(cfg.user && cfg.pass && cfg.smtp_host));
+  if (canSendReal && agentResponse?.reply) {
     try {
       await sendSmtpReply(cfg, {
         to: emailAddr,
@@ -183,7 +220,13 @@ function getEmailWorkerStatus() {
   const cfg = getSetting('email_config', {});
   return {
     enabled: Boolean(cfg.enabled),
-    configured: Boolean(cfg.user && cfg.pass && cfg.imap_host && cfg.smtp_host),
+    configured: Boolean(
+      cfg.user &&
+        (cfg.pass || cfg.auth_mode === 'microsoft_oauth2') &&
+        cfg.imap_host &&
+        cfg.smtp_host
+    ),
+    auth_mode: cfg.auth_mode || 'password',
     imap_host: cfg.imap_host,
     smtp_host: cfg.smtp_host,
     user: cfg.user ? `${cfg.user.slice(0, 3)}***@${cfg.user.split('@')[1] || ''}` : '',

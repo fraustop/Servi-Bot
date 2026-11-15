@@ -700,6 +700,7 @@ function switchAdminTab(tabId) {
     loadAdminAccounts();
   } else if (activeAdminTab === 'tab-channels' && currentUser) {
     loadWhatsAppStatus();
+    loadMicrosoftChannelStatus();
     refreshHealth();
   } else if (activeAdminTab === 'tab-orders' && currentUser) {
     loadAdminOrders();
@@ -1632,7 +1633,7 @@ function syncAdminRoleUI(meData) {
   const switcher = document.getElementById('admin-instance-switcher');
   const accInstSelect = document.getElementById('account-instance-select');
 
-  ['email-config-form', 'teams-config-form', 'tunnel-token-input', 'admin-api-override'].forEach((id) => {
+  ['tunnel-token-input', 'admin-api-override'].forEach((id) => {
     const card = document.getElementById(id)?.closest('.panel-card');
     if (card) {
       const hideCard = !isSuper;
@@ -1779,6 +1780,7 @@ async function loadAllAdminData() {
     loadAdminOrders(),
     loadAdminSettings(),
     loadWhatsAppStatus(),
+    loadMicrosoftChannelStatus(),
     loadAdminConversations(),
     refreshHealth()
   ];
@@ -2127,27 +2129,99 @@ async function loadWhatsAppStatus() {
   }
 }
 
+async function loadMicrosoftChannelStatus() {
+  const statusBox = document.getElementById('ms-connection-status');
+  const badge = document.getElementById('ms-state-badge');
+  const loginBtn = document.getElementById('btn-ms-oauth-login');
+  const loginLabel = document.getElementById('btn-ms-oauth-label');
+  const logoutBtn = document.getElementById('btn-ms-oauth-logout');
+  if (!statusBox) return;
+
+  try {
+    const data = await apiFetch(buildAdminEndpoint('/api/channels/microsoft/status'));
+    if (!data?.ok) throw new Error(data?.error || 'No se pudo consultar el estado de Microsoft.');
+
+    const isConnected = Boolean(data.connected);
+    if (badge) {
+      badge.textContent = isConnected ? 'CONECTADO' : 'SIN VINCULAR';
+      badge.className = isConnected ? 'badge-tag badge-status-dot-active' : 'badge-tag';
+    }
+
+    if (isConnected) {
+      const connDate = data.connected_at ? new Date(data.connected_at).toLocaleString('es-MX') : 'Activo';
+      statusBox.className = 'ms-connection-status is-connected';
+      statusBox.innerHTML = `
+        <div class="ms-channel-pills">
+          <span class="badge-tag badge-status-dot-active">📧 Outlook Mail: ${data.outlook_enabled ? 'Conectado' : 'Inactivo'}</span>
+          <span class="badge-tag badge-status-dot-active">👥 Microsoft Teams: ${data.teams_enabled ? 'Conectado' : 'Inactivo'}</span>
+        </div>
+        <div class="ms-connected-account">
+          <strong>✅ Cuenta Microsoft vinculada (${escapeHtml(data.instance_id || adminSelectedInstanceId || 'servibot-00')}):</strong>
+          <span>${escapeHtml(data.account_name || data.account_email)} (${escapeHtml(data.account_email)})</span>
+          <small>Vinculado: ${escapeHtml(connDate)} · OAuth 2.0 (${escapeHtml(data.provider || 'microsoft_oauth2')})</small>
+        </div>
+      `;
+      if (loginLabel) loginLabel.textContent = 'Reconectar o cambiar cuenta Microsoft';
+      if (logoutBtn) {
+        logoutBtn.classList.remove('hidden');
+        logoutBtn.removeAttribute('hidden');
+      }
+    } else {
+      statusBox.className = 'ms-connection-status';
+      statusBox.innerHTML = `
+        <div class="ms-channel-pills">
+          <span class="badge-tag">📧 Outlook Mail: Pendiente</span>
+          <span class="badge-tag">👥 Microsoft Teams: Pendiente</span>
+        </div>
+        <p style="margin:0.45rem 0 0; font-size:0.82rem; color:var(--text-muted);">
+          Autoriza tu cuenta de Microsoft (@outlook.com, @hotmail.com o Microsoft 365) en aplicación externa para activar Outlook y Teams en 1 paso.
+        </p>
+      `;
+      if (loginLabel) loginLabel.textContent = 'Iniciar sesión con Microsoft · Conectar Outlook y Teams';
+      if (logoutBtn) {
+        logoutBtn.classList.add('hidden');
+        logoutBtn.setAttribute('hidden', '');
+      }
+    }
+    if (loginBtn) loginBtn.disabled = false;
+  } catch (err) {
+    if (badge) {
+      badge.textContent = 'ERROR';
+      badge.className = 'badge-tag badge-status-dot-hidden';
+    }
+    statusBox.className = 'ms-connection-status';
+    statusBox.innerHTML = `<p style="margin:0; color:#fda4af; font-size:0.84rem;">Error consultando estado Microsoft: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
 async function loadAdminSettings() {
   try {
     const data = await apiFetch('/api/settings');
     if (!data.ok) return;
 
     const em = data.email_config || {};
-    document.getElementById('cfg-imap-host').value = em.imap_host || 'imap.gmail.com';
-    document.getElementById('cfg-smtp-host').value = em.smtp_host || 'smtp.gmail.com';
-    document.getElementById('cfg-email-user').value = em.user || '';
-    document.getElementById('cfg-email-pass').value = em.pass || '';
-    document.getElementById('cfg-email-enabled').checked = Boolean(em.enabled);
+    const imapEl = document.getElementById('cfg-imap-host');
+    const smtpEl = document.getElementById('cfg-smtp-host');
+    const userEl = document.getElementById('cfg-email-user');
+    const passEl = document.getElementById('cfg-email-pass');
+    const enabledEl = document.getElementById('cfg-email-enabled');
+    if (imapEl) imapEl.value = em.imap_host || 'outlook.office365.com';
+    if (smtpEl) smtpEl.value = em.smtp_host || 'smtp.office365.com';
+    if (userEl) userEl.value = em.user || '';
+    if (passEl) passEl.value = em.pass || '';
+    if (enabledEl) enabledEl.checked = Boolean(em.enabled);
 
     const tm = data.teams_config || {};
-    document.getElementById('cfg-teams-name').value = tm.bot_display_name || 'Servi-Bot Teams';
-    document.getElementById('cfg-teams-webhook').value = tm.incoming_webhook_url || '';
+    const teamsNameEl = document.getElementById('cfg-teams-name');
+    const teamsHookEl = document.getElementById('cfg-teams-webhook');
+    if (teamsNameEl) teamsNameEl.value = tm.bot_display_name || 'Servi-Bot Teams';
+    if (teamsHookEl) teamsHookEl.value = tm.incoming_webhook_url || '';
 
     const tun = data.tunnel_config || {};
-    if (tun.public_url) {
-      document.getElementById('tunnel-public-url').value = tun.public_url;
-    }
-    document.getElementById('tunnel-token-input').value = tun.tunnel_token || '';
+    const pubUrlEl = document.getElementById('tunnel-public-url');
+    const tokEl = document.getElementById('tunnel-token-input');
+    if (pubUrlEl && tun.public_url) pubUrlEl.value = tun.public_url;
+    if (tokEl) tokEl.value = tun.tunnel_token || '';
   } catch {
     // ignorar error de carga inicial de ajustes
   }
@@ -2595,6 +2669,7 @@ function setupEventListeners() {
       loadAdminContactRules(),
       loadAdminOrders(),
       loadWhatsAppStatus(),
+      loadMicrosoftChannelStatus(),
       loadAdminConversations(),
       refreshHealth()
     ]);
@@ -3469,19 +3544,106 @@ function setupEventListeners() {
     await refreshHealth();
   });
 
-  document.getElementById('email-config-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    await apiFetch('/api/settings/email_config', {
-      method: 'PUT',
-      body: JSON.stringify({
-        imap_host: document.getElementById('cfg-imap-host').value.trim(),
-        smtp_host: document.getElementById('cfg-smtp-host').value.trim(),
-        user: document.getElementById('cfg-email-user').value.trim(),
-        pass: document.getElementById('cfg-email-pass').value,
-        enabled: document.getElementById('cfg-email-enabled').checked
-      })
-    });
-    if (outBox) outBox.textContent = '✅ Configuración IMAP/SMTP guardada en SQLite.';
+  document.getElementById('btn-ms-oauth-login')?.addEventListener('click', async () => {
+    const loginBtn = document.getElementById('btn-ms-oauth-login');
+    const loginLabel = document.getElementById('btn-ms-oauth-label');
+    const prevLabel = loginLabel?.textContent || 'Iniciar sesión con Microsoft · Conectar Outlook y Teams';
+
+    const popup = window.open(
+      '',
+      'servibot_ms_oauth',
+      'width=520,height=700,resizable=yes,scrollbars=yes,status=yes'
+    );
+    if (popup && popup.document) {
+      try {
+        popup.document.write(
+          '<!DOCTYPE html><html><body style="margin:0;background:#0b1120;color:#e2e8f0;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;"><p>Conectando con Microsoft Identity Platform (Outlook + Teams)...</p></body></html>'
+        );
+      } catch {
+        // ignorar si otro origen tomó foco
+      }
+    }
+
+    if (loginBtn) loginBtn.disabled = true;
+    if (loginLabel) loginLabel.textContent = 'Abriendo inicio de sesión en Microsoft...';
+    if (outBox) outBox.textContent = 'Solicitando autorización externa a Microsoft 365 (Outlook + Teams)...';
+
+    try {
+      const initRes = await apiFetch(buildAdminEndpoint('/api/channels/microsoft/oauth/init'), {
+        method: 'POST',
+        body: JSON.stringify({
+          origin: window.location.origin,
+          login_hint: currentAdminMeta?.email || currentUser?.email || ''
+        })
+      });
+
+      if (!initRes?.ok || !initRes?.authUrl) {
+        if (popup && !popup.closed) popup.close();
+        if (outBox) outBox.textContent = JSON.stringify(initRes || { error: 'No se pudo iniciar OAuth de Microsoft.' }, null, 2);
+        return;
+      }
+
+      const expectedOrigin = new URL(initRes.authUrl, window.location.origin).origin;
+
+      if (popup && !popup.closed) {
+        popup.location.href = initRes.authUrl;
+        popup.focus();
+      } else {
+        window.open(initRes.authUrl, '_blank', 'noopener');
+      }
+
+      await new Promise((resolve) => {
+        let finished = false;
+        let closePoll = null;
+        let safetyTimeout = null;
+
+        const finish = async (msgPayload) => {
+          if (finished) return;
+          finished = true;
+          window.removeEventListener('message', onMsMessage);
+          if (closePoll) clearInterval(closePoll);
+          if (safetyTimeout) clearTimeout(safetyTimeout);
+          await loadMicrosoftChannelStatus();
+          if (outBox && msgPayload) {
+            outBox.textContent = JSON.stringify(msgPayload, null, 2);
+          }
+          resolve();
+        };
+
+        const onMsMessage = (ev) => {
+          if (ev.origin && ev.origin !== expectedOrigin && ev.origin !== window.location.origin) {
+            return;
+          }
+          const msgType = ev.data?.type;
+          if (msgType === 'SERVIBOT_MS_OAUTH_SUCCESS' || msgType === 'SERVIBOT_MS_OAUTH_ERROR') {
+            finish(ev.data);
+          }
+        };
+
+        window.addEventListener('message', onMsMessage);
+        closePoll = setInterval(() => {
+          if (!popup || popup.closed) {
+            finish(null);
+          }
+        }, 650);
+        safetyTimeout = setTimeout(() => finish(null), 180000);
+      });
+    } catch (err) {
+      if (popup && !popup.closed) popup.close();
+      if (outBox) outBox.textContent = `❌ Error al solicitar inicio de sesión con Microsoft: ${err.message}`;
+    } finally {
+      if (loginBtn) loginBtn.disabled = false;
+      await loadMicrosoftChannelStatus();
+      if (loginLabel && !loginLabel.textContent) {
+        loginLabel.textContent = prevLabel;
+      }
+    }
+  });
+
+  document.getElementById('btn-ms-oauth-logout')?.addEventListener('click', async () => {
+    const res = await apiFetch(buildAdminEndpoint('/api/channels/microsoft/disconnect'), { method: 'POST' });
+    if (outBox) outBox.textContent = JSON.stringify(res, null, 2);
+    await loadMicrosoftChannelStatus();
   });
 
   document.getElementById('btn-sim-email')?.addEventListener('click', async () => {
@@ -3501,18 +3663,6 @@ function setupEventListeners() {
     await loadAdminOrders();
     await loadAdminConversations();
     await refreshHealth();
-  });
-
-  document.getElementById('teams-config-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    await apiFetch('/api/settings/teams_config', {
-      method: 'PUT',
-      body: JSON.stringify({
-        bot_display_name: document.getElementById('cfg-teams-name').value.trim(),
-        incoming_webhook_url: document.getElementById('cfg-teams-webhook').value.trim()
-      })
-    });
-    if (outBox) outBox.textContent = '✅ Configuración de Microsoft Teams guardada en SQLite.';
   });
 
   document.getElementById('btn-sim-teams')?.addEventListener('click', async () => {

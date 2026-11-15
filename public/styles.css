@@ -3839,3 +3839,98 @@ dialog.product-form-modal .dialog-inner {
   text-decoration: underline;
 }
 
+/* ==================== CANAL UNIFICADO MICROSOFT 365 (OUTLOOK + TEAMS) ==================== */
+.channels-unified-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  align-items: start;
+}
+
+.ms-connection-status {
+  margin: 0.85rem 0 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.ms-connection-status.is-connected {
+  border-color: rgba(16, 185, 129, 0.48);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.ms-channel-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.ms-connected-account {
+  margin-top: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  color: #d1fae5;
+  overflow-wrap: anywhere;
+}
+
+.ms-connected-account small {
+  font-size: 0.76rem;
+  color: #a7f3d0;
+  opacity: 0.88;
+}
+
+.ms-oauth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.btn-microsoft-oauth {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  border: 1px solid #3b82f6;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 120, 212, 0.22);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.btn-microsoft-oauth:hover:not(:disabled) {
+  background: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(0, 120, 212, 0.34);
+}
+
+.btn-microsoft-oauth:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.btn-microsoft-oauth:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
+.ms-logo-svg {
+  flex: 0 0 auto;
+}
+
+.ms-simulators-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 1rem;
+}
+

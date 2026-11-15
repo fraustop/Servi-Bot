@@ -356,6 +356,12 @@ function initBotDbSchema(conn) {
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS bot_settings (
+      key TEXT PRIMARY KEY,
+      value_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
   `);
 
   ensureColumn(conn, 'catalog_items', 'sent_to_bot', 'INTEGER NOT NULL DEFAULT 1');
@@ -659,6 +665,29 @@ function setSetting(key, valueObj) {
   return valueObj;
 }
 
+function getBotSetting(rawInstanceId, key, fallback = {}) {
+  const botDb = getBotDb(rawInstanceId);
+  const row = botDb.prepare('SELECT value_json FROM bot_settings WHERE key = ?').get(key);
+  if (!row) return fallback;
+  try {
+    return JSON.parse(row.value_json);
+  } catch {
+    return fallback;
+  }
+}
+
+function setBotSetting(rawInstanceId, key, valueObj) {
+  const botDb = getBotDb(rawInstanceId);
+  botDb.prepare(`
+    INSERT INTO bot_settings (key, value_json, updated_at)
+    VALUES (?, ?, datetime('now', 'localtime'))
+    ON CONFLICT(key) DO UPDATE SET
+      value_json = excluded.value_json,
+      updated_at = datetime('now', 'localtime')
+  `).run(key, JSON.stringify(valueObj));
+  return valueObj;
+}
+
 function seedDatabase() {
   const defaultSettings = {
     bot_config: {
@@ -851,5 +880,7 @@ module.exports = {
   archiveInstanceToProspects,
   restoreProspectIntoBot,
   getSetting,
-  setSetting
+  setSetting,
+  getBotSetting,
+  setBotSetting
 };

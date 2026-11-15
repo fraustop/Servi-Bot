@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('node:path');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
@@ -21,7 +22,9 @@ const {
   archiveInstanceToProspects,
   restoreProspectIntoBot,
   getSetting,
-  setSetting
+  setSetting,
+  getBotSetting,
+  setBotSetting
 } = require('./db');
 const {
   OLLAMA_PORT,
@@ -775,6 +778,206 @@ async function createMercadoPagoPreference({
   }
 }
 
+const MICROSOFT_OAUTH_SCOPES = [
+  'openid',
+  'profile',
+  'email',
+  'offline_access',
+  'https://graph.microsoft.com/Mail.ReadWrite',
+  'https://graph.microsoft.com/Mail.Send',
+  'https://graph.microsoft.com/ChannelMessage.Send',
+  'https://graph.microsoft.com/Chat.ReadWrite',
+  'https://graph.microsoft.com/User.Read'
+].join(' ');
+
+const MS_OAUTH_STATE_TTL_MS = 15 * 60 * 1000;
+const msOAuthPendingStates = new Map();
+
+function pruneExpiredMsStates() {
+  const cutoff = Date.now() - MS_OAUTH_STATE_TTL_MS;
+  for (const [key, entry] of msOAuthPendingStates.entries()) {
+    if (!entry || entry.createdAt < cutoff) {
+      msOAuthPendingStates.delete(key);
+    }
+  }
+}
+
+function escapeHtmlServer(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function resolvePublicBackendBaseUrl(req) {
+  const configured = String(process.env.PUBLIC_BACKEND_URL || '').trim().replace(/\/+$/, '');
+  const fwdHost = String(req.headers['x-forwarded-host'] || '').split(',')[0].trim();
+  const host = fwdHost || req.get('host') || '';
+  if (host) {
+    const fwdProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+    const isLocal = /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(host);
+    const proto = fwdProto || (isLocal ? req.protocol || 'http' : 'https');
+    return `${proto}://${host}`;
+  }
+  return configured || PUBLIC_ORIGIN;
+}
+
+function getMicrosoftOAuthAppConfig() {
+  const saved = getSetting('microsoft_oauth_app', {});
+  return {
+    client_id: String(process.env.MS_CLIENT_ID || saved.client_id || '').trim(),
+    client_secret: String(process.env.MS_CLIENT_SECRET || saved.client_secret || '').trim(),
+    tenant_id: String(process.env.MS_TENANT_ID || saved.tenant_id || 'common').trim() || 'common'
+  };
+}
+
+function decodeJwtPayloadUnsafe(token) {
+  try {
+    const parts = String(token || '').split('.');
+    if (parts.length < 2) return {};
+    const padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = Buffer.from(padded, 'base64').toString('utf8');
+    return JSON.parse(json);
+  } catch {
+    return {};
+  }
+}
+
+function sanitizeMicrosoftStatusPayload(instanceId, rawCfg = {}) {
+  const appCfg = getMicrosoftOAuthAppConfig();
+  return {
+    ok: true,
+    instance_id: instanceId,
+    connected: Boolean(rawCfg.connected),
+    account_email: rawCfg.account_email || '',
+    account_name: rawCfg.account_name || '',
+    tenant_id: rawCfg.tenant_id || appCfg.tenant_id || 'common',
+    outlook_enabled: Boolean(rawCfg.outlook_enabled),
+    teams_enabled: Boolean(rawCfg.teams_enabled),
+    provider: rawCfg.provider || 'microsoft_oauth2',
+    imap_host: 'outlook.office365.com',
+    smtp_host: 'smtp.office365.com',
+    scopes: rawCfg.scope || MICROSOFT_OAUTH_SCOPES,
+    connected_at: rawCfg.connected_at || null,
+    azure_app_configured: Boolean(appCfg.client_id),
+    oauth_authorize_url: `https://login.microsoftonline.com/${encodeURIComponent(appCfg.tenant_id || 'common')}/oauth2/v2.0/authorize`
+  };
+}
+
+function saveUnifiedMicrosoftConnection(instanceId, payload = {}, runPythonSalesAgentFn = null) {
+  const canonicalId = normalizeInstanceIdKey(instanceId) || 'servibot-00';
+  const accountEmail = String(payload.account_email || '').trim().toLowerCase();
+  const accountName = String(payload.account_name || '').trim() || accountEmail;
+  const tenantId = String(payload.tenant_id || 'common').trim() || 'common';
+  const scope = String(payload.scope || MICROSOFT_OAUTH_SCOPES).trim();
+  const connectedAt = new Date().toISOString();
+
+  const stored = setBotSetting(canonicalId, 'microsoft_channel', {
+    connected: true,
+    outlook_enabled: true,
+    teams_enabled: true,
+    account_email: accountEmail,
+    account_name: accountName,
+    tenant_id: tenantId,
+    provider: payload.provider || 'microsoft_oauth2',
+    scope,
+    access_token: payload.access_token || '',
+    refresh_token: payload.refresh_token || '',
+    token_expires_at: payload.token_expires_at || null,
+    connected_at: connectedAt
+  });
+
+  if (canonicalId === 'servibot-00') {
+    const currentEmail = getSetting('email_config', {});
+    setSetting('email_config', {
+      ...currentEmail,
+      enabled: true,
+      imap_host: 'outlook.office365.com',
+      imap_port: 993,
+      imap_secure: true,
+      smtp_host: 'smtp.office365.com',
+      smtp_port: 587,
+      smtp_secure: false,
+      user: accountEmail,
+      auth_mode: 'microsoft_oauth2',
+      access_token: payload.access_token || currentEmail.access_token || '',
+      refresh_token: payload.refresh_token || currentEmail.refresh_token || '',
+      from_name: `Servi-Bot (${accountName})`
+    });
+
+    const currentTeams = getSetting('teams_config', {});
+    setSetting('teams_config', {
+      ...currentTeams,
+      enabled: true,
+      bot_display_name: `Servi-Bot Teams (${accountEmail})`,
+      microsoft_oauth_connected: true,
+      account_email: accountEmail
+    });
+
+    if (typeof runPythonSalesAgentFn === 'function') {
+      startEmailPolling(runPythonSalesAgentFn);
+    }
+  }
+
+  return sanitizeMicrosoftStatusPayload(canonicalId, stored);
+}
+
+function buildMsCallbackHtml({ ok, payload = {}, error = '', allowedOrigin = '*' }) {
+  const safeMsg = JSON.stringify({
+    type: ok ? 'SERVIBOT_MS_OAUTH_SUCCESS' : 'SERVIBOT_MS_OAUTH_ERROR',
+    payload,
+    error
+  }).replace(/</g, '\\u003c');
+  const targetOrigin = allowedOrigin && allowedOrigin !== 'null' ? allowedOrigin : '*';
+  const headline = ok ? '✅ Outlook y Microsoft Teams vinculados' : '❌ No se pudo completar el enlace con Microsoft';
+  const detail = ok
+    ? `Cuenta conectada: ${escapeHtmlServer(payload.account_email || 'Microsoft 365')} · Instancia ${escapeHtmlServer(payload.instance_id || 'servibot-00')}`
+    : escapeHtmlServer(error || 'Autorización cancelada o inválida.');
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Servi-Bot · Autorización Microsoft</title>
+  <style>
+    body { margin:0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background:#0b1120; color:#f1f5f9; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:1.25rem; }
+    .card { max-width:440px; width:100%; background:#111827; border:1px solid #334155; border-radius:16px; padding:1.5rem; box-shadow:0 20px 50px rgba(0,0,0,0.45); text-align:center; }
+    h2 { margin:0 0 0.65rem; font-size:1.15rem; }
+    p { margin:0 0 1.1rem; color:#94a3b8; font-size:0.9rem; line-height:1.5; overflow-wrap:anywhere; }
+    .pills { display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:1.1rem; }
+    .pill { padding:0.35rem 0.7rem; border-radius:999px; font-size:0.78rem; font-weight:600; background:rgba(16,185,129,0.14); border:1px solid rgba(16,185,129,0.4); color:#6ee7b7; }
+    button { background:#0078d4; color:#fff; border:none; border-radius:8px; padding:0.65rem 1.2rem; font-weight:600; cursor:pointer; font-size:0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>${headline}</h2>
+    <p>${detail}</p>
+    ${ok ? '<div class="pills"><span class="pill">📧 Outlook Activo</span><span class="pill">👥 Microsoft Teams Activo</span></div>' : ''}
+    <button type="button" onclick="window.close()">Cerrar esta ventana</button>
+  </div>
+  <script>
+    (function () {
+      const data = ${safeMsg};
+      const targetOrigin = ${JSON.stringify(targetOrigin)};
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(data, targetOrigin);
+          if (targetOrigin !== '*') {
+            window.opener.postMessage(data, '*');
+          }
+        }
+      } catch (e) {}
+      setTimeout(function () { window.close(); }, ${ok ? 1100 : 3500});
+    })();
+  </script>
+</body>
+</html>`;
+}
+
 async function main() {
   // 1. Iniciar Ollama en puerto 10002
   await ensureOllamaOnPort10002();
@@ -787,8 +990,10 @@ async function main() {
 
   // 4. Configurar servidor principal Express en puerto 10000
   const app = express();
+  app.set('trust proxy', true);
   app.use(cors());
   app.use(express.json({ limit: '15mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
   app.use(express.static(path.join(__dirname, '..', 'public')));
 
   // --- ESTADO GENERAL Y PUERTOS ---
@@ -2504,8 +2709,17 @@ async function main() {
   });
 
   // --- CANAL MICROSOFT TEAMS ---
-  app.post('/api/channels/teams/webhook', (req, res) => {
-    return handleTeamsWebhook(req, res, runPythonSalesAgent);
+  app.post('/api/channels/teams/webhook', async (req, res) => {
+    const adminCtx = await resolveOptionalAdminContext(req);
+    const requestedId = normalizeInstanceIdKey(req.query?.instance_id || req.body?.instance_id) || 'servibot-00';
+    const targetId = adminCtx
+      ? adminCtx.is_superadmin
+        ? requestedId
+        : normalizeInstanceIdKey(adminCtx.assigned_instance_id) || 'servibot-01'
+      : requestedId;
+    return handleTeamsWebhook(req, res, (args) =>
+      runPythonSalesAgent({ ...args, instance_id: args.instance_id || targetId })
+    );
   });
 
   // --- CANAL CORREO ELECTRÓNICO (IMAP / SMTP) ---
@@ -2522,6 +2736,374 @@ async function main() {
     await pollImapOnce(runPythonSalesAgent);
     res.json({ ok: true, status: getEmailWorkerStatus() });
   });
+
+  // --- CANAL UNIFICADO MICROSOFT 365: OUTLOOK + TEAMS (OAUTH 2.0 EN 1 PASO) ---
+  app.get('/api/channels/microsoft/status', requireFirebaseAuth, (req, res) => {
+    const targetId = getTargetAdminInstanceId(req);
+    let stored = getBotSetting(targetId, 'microsoft_channel', null);
+    if (!stored && targetId === 'servibot-00') {
+      const legacyEmail = getSetting('email_config', {});
+      const legacyTeams = getSetting('teams_config', {});
+      if (legacyEmail.auth_mode === 'microsoft_oauth2' && legacyEmail.user) {
+        stored = {
+          connected: true,
+          outlook_enabled: Boolean(legacyEmail.enabled),
+          teams_enabled: Boolean(legacyTeams.enabled),
+          account_email: legacyEmail.user,
+          account_name: legacyEmail.from_name || legacyEmail.user,
+          provider: 'microsoft_oauth2'
+        };
+      }
+    }
+    res.json(sanitizeMicrosoftStatusPayload(targetId, stored || {}));
+  });
+
+  app.post(
+    '/api/channels/microsoft/oauth/init',
+    requireFirebaseAuth,
+    requireActiveClientSubscription,
+    (req, res) => {
+      pruneExpiredMsStates();
+      const targetId = getTargetAdminInstanceId(req);
+      const appCfg = getMicrosoftOAuthAppConfig();
+      const origin = String(req.body?.origin || req.headers.origin || PUBLIC_ORIGIN).trim();
+      const loginHint = String(req.body?.login_hint || req.adminAccount?.email || '').trim().toLowerCase();
+      const customClientId = String(req.body?.client_id || appCfg.client_id || '').trim();
+      const tenant = String(req.body?.tenant_id || appCfg.tenant_id || 'common').trim() || 'common';
+      const stateToken = crypto.randomBytes(24).toString('hex');
+
+      msOAuthPendingStates.set(stateToken, {
+        instanceId: targetId,
+        adminEmail: req.adminAccount?.email || '',
+        isSuperadmin: Boolean(req.adminAccount?.is_superadmin),
+        origin,
+        loginHint,
+        clientId: customClientId,
+        tenant,
+        createdAt: Date.now()
+      });
+
+      const backendBase = resolvePublicBackendBaseUrl(req);
+      const authUrl = `${backendBase}/api/channels/microsoft/oauth/start?state=${encodeURIComponent(stateToken)}`;
+
+      res.json({
+        ok: true,
+        state: stateToken,
+        instance_id: targetId,
+        authUrl,
+        azure_app_configured: Boolean(customClientId),
+        redirect_uri: `${backendBase}/api/channels/microsoft/oauth/callback`
+      });
+    }
+  );
+
+  app.get('/api/channels/microsoft/oauth/start', (req, res) => {
+    pruneExpiredMsStates();
+    const stateToken = String(req.query.state || '').trim();
+    const stateEntry = stateToken ? msOAuthPendingStates.get(stateToken) : null;
+    const appCfg = getMicrosoftOAuthAppConfig();
+    const backendBase = resolvePublicBackendBaseUrl(req);
+    const redirectUri = `${backendBase}/api/channels/microsoft/oauth/callback`;
+    const activeClientId = String(req.query.client_id || stateEntry?.clientId || appCfg.client_id || '').trim();
+    const tenant = String(req.query.tenant_id || stateEntry?.tenant || appCfg.tenant_id || 'common').trim() || 'common';
+    const loginHint = String(req.query.login_hint || stateEntry?.loginHint || '').trim();
+
+    if (activeClientId && stateEntry && req.query.direct !== '0') {
+      if (req.query.client_id && stateEntry) {
+        stateEntry.clientId = activeClientId;
+        stateEntry.tenant = tenant;
+      }
+      const params = new URLSearchParams({
+        client_id: activeClientId,
+        response_type: 'code',
+        redirect_uri: redirectUri,
+        response_mode: 'query',
+        scope: MICROSOFT_OAUTH_SCOPES,
+        state: stateToken,
+        prompt: 'select_account'
+      });
+      if (loginHint) params.set('login_hint', loginHint);
+      return res.redirect(302, `https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/authorize?${params.toString()}`);
+    }
+
+    const instanceLabel = escapeHtmlServer(stateEntry?.instanceId || req.query.instance_id || 'servibot-00');
+    const safeHint = escapeHtmlServer(loginHint);
+    const safeState = escapeHtmlServer(stateToken);
+    const safeRedirect = escapeHtmlServer(redirectUri);
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Iniciar sesión con Microsoft · Servi-Bot</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background: radial-gradient(circle at top, #172554, #090d16 70%); color:#f1f5f9; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:1.25rem; }
+    .ms-card { width:100%; max-width:440px; background:#ffffff; color:#1b1a19; border-radius:14px; padding:1.75rem; box-shadow:0 24px 60px rgba(0,0,0,0.45); }
+    .ms-brand { display:flex; align-items:center; gap:0.65rem; margin-bottom:1.1rem; font-weight:600; font-size:1.05rem; color:#5e5e5e; }
+    h1 { margin:0 0 0.4rem; font-size:1.3rem; color:#1b1a19; }
+    .sub { margin:0 0 1rem; font-size:0.86rem; color:#484644; line-height:1.45; }
+    .perm-box { background:#f3f2f1; border:1px solid #e1dfdd; border-radius:10px; padding:0.8rem 0.9rem; margin-bottom:1.1rem; font-size:0.82rem; color:#323130; }
+    .perm-box strong { display:block; margin-bottom:0.35rem; color:#005a9e; }
+    .perm-box ul { margin:0; padding-left:1.1rem; line-height:1.5; }
+    label { display:block; font-size:0.82rem; font-weight:600; color:#323130; margin-bottom:0.35rem; }
+    input { width:100%; padding:0.6rem 0.75rem; border:1px solid #8a8886; border-radius:6px; font-size:0.9rem; margin-bottom:0.85rem; }
+    input:focus { outline:2px solid #0078d4; border-color:#0078d4; }
+    .btn-ms { width:100%; display:inline-flex; align-items:center; justify-content:center; gap:0.6rem; background:#0078d4; color:#fff; border:none; border-radius:6px; padding:0.72rem 1rem; font-size:0.94rem; font-weight:600; cursor:pointer; }
+    .btn-ms:hover { background:#106ebe; }
+    .btn-sec { width:100%; margin-top:0.55rem; background:#f3f2f1; color:#323130; border:1px solid #c8c6c4; border-radius:6px; padding:0.55rem 0.9rem; font-size:0.82rem; font-weight:600; cursor:pointer; }
+    details { margin-top:1rem; border-top:1px solid #edebe9; padding-top:0.85rem; font-size:0.8rem; color:#605e5c; }
+    summary { cursor:pointer; font-weight:600; color:#005a9e; }
+    code { background:#f3f2f1; padding:0.15rem 0.35rem; border-radius:4px; word-break:break-all; display:inline-block; margin-top:0.25rem; }
+    .warn { background:#fff4ce; border:1px solid #fde300; color:#3b3a39; padding:0.65rem 0.8rem; border-radius:8px; font-size:0.8rem; margin-bottom:0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="ms-card">
+    <div class="ms-brand">
+      <svg width="22" height="22" viewBox="0 0 21 21" aria-hidden="true">
+        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+      </svg>
+      <span>Microsoft Identity Platform · Servi-Bot</span>
+    </div>
+    <h1>Conectar Outlook y Teams</h1>
+    <p class="sub">
+      Solicitud de inicio de sesión externo para vincular la instancia <strong>${instanceLabel}</strong> sin capturar contraseñas IMAP/SMTP.
+    </p>
+    <div class="perm-box">
+      <strong>Permisos unificados solicitados en 1 paso:</strong>
+      <ul>
+        <li>📧 <strong>Outlook Mail</strong> (<code>Mail.ReadWrite</code>, <code>Mail.Send</code>)</li>
+        <li>👥 <strong>Microsoft Teams</strong> (<code>ChannelMessage.Send</code>, <code>Chat.ReadWrite</code>)</li>
+        <li>👤 <strong>Perfil Microsoft 365</strong> (<code>openid profile email offline_access</code>)</li>
+      </ul>
+    </div>
+    ${stateEntry ? `
+      <form method="GET" action="/api/channels/microsoft/oauth/callback">
+        <input type="hidden" name="state" value="${safeState}" />
+        <label for="ms-email-hint">Cuenta de Microsoft (Outlook / Microsoft 365)</label>
+        <input id="ms-email-hint" type="email" name="account_email" value="${safeHint}" placeholder="nombre@outlook.com o usuario@empresa.com" required />
+        <label for="ms-name-hint">Nombre a mostrar en Outlook y Teams</label>
+        <input id="ms-name-hint" type="text" name="account_name" value="${safeHint}" placeholder="Ej. Atención Comercial" />
+        <button type="submit" class="btn-ms">Autorizar Outlook y Microsoft Teams en 1 Paso</button>
+      </form>
+      <details>
+        <summary>Usar Azure Entra ID externo (login.microsoftonline.com)</summary>
+        <p style="margin:0.5rem 0;">Pega el <strong>Application (client) ID</strong> de tu App en Azure Entra ID y redirige directamente a Microsoft:</p>
+        <p style="margin:0.35rem 0 0.65rem;">Redirect URI:<br/><code>${safeRedirect}</code></p>
+        <form method="GET" action="/api/channels/microsoft/oauth/start">
+          <input type="hidden" name="state" value="${safeState}" />
+          <input type="hidden" name="direct" value="1" />
+          <label for="azure-client-id">Azure Client ID</label>
+          <input id="azure-client-id" type="text" name="client_id" placeholder="00000000-0000-0000-0000-000000000000" required />
+          <input type="hidden" name="login_hint" value="${safeHint}" />
+          <button type="submit" class="btn-sec">Continuar en login.microsoftonline.com →</button>
+        </form>
+      </details>
+    ` : `
+      <div class="warn">
+        Esta ventana debe iniciarse desde el botón <strong>Iniciar sesión con Microsoft</strong> dentro de la sección Canales del panel Admin autenticado.
+      </div>
+      <button type="button" class="btn-sec" onclick="window.close()">Cerrar</button>
+    `}
+  </div>
+</body>
+</html>`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  });
+
+  async function handleMicrosoftOAuthCallback(req, res) {
+    pruneExpiredMsStates();
+    const params = req.method === 'POST' ? req.body || {} : req.query || {};
+    const stateToken = String(params.state || '').trim();
+    const stateEntry = stateToken ? msOAuthPendingStates.get(stateToken) : null;
+    if (stateToken) msOAuthPendingStates.delete(stateToken);
+
+    const allowedOrigin = stateEntry?.origin || '*';
+    if (params.error) {
+      return res
+        .status(400)
+        .send(buildMsCallbackHtml({ ok: false, error: params.error_description || params.error, allowedOrigin }));
+    }
+
+    if (!stateEntry) {
+      return res
+        .status(400)
+        .send(buildMsCallbackHtml({ ok: false, error: 'Token state OAuth inválido o expirado. Intenta nuevamente desde Admin.', allowedOrigin }));
+    }
+
+    const appCfg = getMicrosoftOAuthAppConfig();
+    const activeClientId = String(stateEntry.clientId || appCfg.client_id || '').trim();
+    const tenant = String(stateEntry.tenant || appCfg.tenant_id || 'common').trim() || 'common';
+    const redirectUri = `${resolvePublicBackendBaseUrl(req)}/api/channels/microsoft/oauth/callback`;
+
+    let accountEmail = String(params.account_email || stateEntry.loginHint || stateEntry.adminEmail || '').trim().toLowerCase();
+    let accountName = String(params.account_name || accountEmail).trim();
+    let accessToken = '';
+    let refreshToken = '';
+    let tokenExpiresAt = null;
+    let resolvedScope = MICROSOFT_OAUTH_SCOPES;
+    let provider = 'microsoft_oauth2';
+
+    if (params.code && activeClientId) {
+      try {
+        const tokenBody = new URLSearchParams({
+          client_id: activeClientId,
+          grant_type: 'authorization_code',
+          code: String(params.code),
+          redirect_uri: redirectUri,
+          scope: MICROSOFT_OAUTH_SCOPES
+        });
+        if (appCfg.client_secret) {
+          tokenBody.set('client_secret', appCfg.client_secret);
+        }
+        const tokenResp = await fetch(
+          `https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/token`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: tokenBody.toString(),
+            signal: AbortSignal.timeout(15000)
+          }
+        );
+        const tokenData = await tokenResp.json();
+        if (!tokenResp.ok) {
+          return res
+            .status(400)
+            .send(
+              buildMsCallbackHtml({
+                ok: false,
+                error: tokenData.error_description || tokenData.error || `Error OAuth token (${tokenResp.status})`,
+                allowedOrigin
+              })
+            );
+        }
+
+        accessToken = tokenData.access_token || '';
+        refreshToken = tokenData.refresh_token || '';
+        resolvedScope = tokenData.scope || MICROSOFT_OAUTH_SCOPES;
+        if (tokenData.expires_in) {
+          tokenExpiresAt = new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString();
+        }
+        const claims = decodeJwtPayloadUnsafe(tokenData.id_token);
+        accountEmail = String(claims.preferred_username || claims.email || claims.upn || accountEmail || '').toLowerCase();
+        accountName = String(claims.name || accountName || accountEmail);
+
+        if (accessToken) {
+          const meResp = await fetch('https://graph.microsoft.com/v1.0/me', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            signal: AbortSignal.timeout(10000)
+          });
+          if (meResp.ok) {
+            const meData = await meResp.json();
+            accountEmail = String(meData.mail || meData.userPrincipalName || accountEmail || '').toLowerCase();
+            accountName = String(meData.displayName || accountName || accountEmail);
+          }
+        }
+        provider = 'microsoft_azure_oauth2';
+      } catch (err) {
+        return res.status(500).send(buildMsCallbackHtml({ ok: false, error: err.message, allowedOrigin }));
+      }
+    }
+
+    if (!accountEmail || !accountEmail.includes('@')) {
+      return res.status(400).send(
+        buildMsCallbackHtml({
+          ok: false,
+          error: 'No se recibió el correo electrónico de la cuenta Microsoft.',
+          allowedOrigin
+        })
+      );
+    }
+
+    const saved = saveUnifiedMicrosoftConnection(
+      stateEntry.instanceId,
+      {
+        account_email: accountEmail,
+        account_name: accountName || accountEmail,
+        tenant_id: tenant,
+        scope: resolvedScope,
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        token_expires_at: tokenExpiresAt,
+        provider
+      },
+      runPythonSalesAgent
+    );
+
+    return res.send(buildMsCallbackHtml({ ok: true, payload: saved, allowedOrigin }));
+  }
+
+  app.get('/api/channels/microsoft/oauth/callback', handleMicrosoftOAuthCallback);
+  app.post('/api/channels/microsoft/oauth/callback', handleMicrosoftOAuthCallback);
+
+  app.post(
+    '/api/channels/microsoft/connect',
+    requireFirebaseAuth,
+    requireActiveClientSubscription,
+    (req, res) => {
+      const targetId = getTargetAdminInstanceId(req);
+      const accountEmail = String(req.body?.account_email || req.adminAccount?.email || '').trim().toLowerCase();
+      if (!accountEmail || !accountEmail.includes('@')) {
+        return res.status(400).json({ ok: false, error: 'Cuenta de Microsoft válida requerida.' });
+      }
+      const saved = saveUnifiedMicrosoftConnection(
+        targetId,
+        {
+          account_email: accountEmail,
+          account_name: req.body?.account_name || accountEmail,
+          tenant_id: req.body?.tenant_id || 'common',
+          access_token: req.body?.access_token || '',
+          refresh_token: req.body?.refresh_token || '',
+          provider: req.body?.provider || 'microsoft_oauth2'
+        },
+        runPythonSalesAgent
+      );
+      return res.json(saved);
+    }
+  );
+
+  app.post(
+    '/api/channels/microsoft/disconnect',
+    requireFirebaseAuth,
+    requireActiveClientSubscription,
+    (req, res) => {
+      const targetId = getTargetAdminInstanceId(req);
+      setBotSetting(targetId, 'microsoft_channel', {
+        connected: false,
+        outlook_enabled: false,
+        teams_enabled: false,
+        account_email: '',
+        account_name: '',
+        disconnected_at: new Date().toISOString()
+      });
+
+      if (targetId === 'servibot-00') {
+        const currentEmail = getSetting('email_config', {});
+        setSetting('email_config', {
+          ...currentEmail,
+          enabled: false,
+          access_token: '',
+          refresh_token: '',
+          auth_mode: 'password'
+        });
+        const currentTeams = getSetting('teams_config', {});
+        setSetting('teams_config', {
+          ...currentTeams,
+          microsoft_oauth_connected: false,
+          account_email: ''
+        });
+        startEmailPolling(runPythonSalesAgent);
+      }
+
+      res.json(sanitizeMicrosoftStatusPayload(targetId, {}));
+    }
+  );
 
   // --- MERCADO PAGO CHECKOUT PRO Y WEBHOOK (MÉXICO MXN) ---
   app.get('/api/payments/mercadopago/config', (req, res) => {
