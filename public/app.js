@@ -104,11 +104,11 @@ let autoSaveTimer = null;
 let isAutoSaving = false;
 
 function initTheme() {
-  const savedTheme = localStorage.getItem('servibot_theme') || 'dark';
+  const savedTheme = localStorage.getItem('servibot_theme') || 'light';
   applyTheme(savedTheme);
 
   document.getElementById('btn-topbar-theme')?.addEventListener('click', () => {
-    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
     const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
     applyTheme(nextTheme);
   });
@@ -145,7 +145,7 @@ function applyTheme(theme) {
 
 // Aplicar tema inmediatamente al cargar el módulo
 try {
-  const earlyTheme = localStorage.getItem('servibot_theme') || 'dark';
+  const earlyTheme = localStorage.getItem('servibot_theme') || 'light';
   document.documentElement.setAttribute('data-theme', earlyTheme);
 } catch {}
 

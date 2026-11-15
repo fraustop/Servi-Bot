@@ -1152,9 +1152,9 @@ body.is-admin-session .container {
   margin: 0;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid rgba(88, 166, 255, 0.35);
-  background: linear-gradient(160deg, #131822, #090c12);
-  box-shadow: var(--shadow-metallic), 0 0 36px -14px rgba(0, 120, 212, 0.35);
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 .desc-visual-card img {
@@ -1163,7 +1163,7 @@ body.is-admin-session .container {
   block-size: auto;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-bottom: 1px solid var(--metal-border);
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .desc-visual-caption {
@@ -1173,8 +1173,8 @@ body.is-admin-session .container {
   padding: 0.72rem 1rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-secondary);
-  background: rgba(8, 11, 16, 0.94);
+  color: #1e293b;
+  background: #f8fafc;
 }
 
 .carousel-slide.slide-configurator {
@@ -4928,9 +4928,13 @@ dialog.product-form-modal .dialog-inner {
   background: transparent !important;
 }
 
+.desc-story-grid,
 [data-theme="light"] .desc-story-grid {
   background: #ffffff !important;
-  border: 1px solid #cbd5e1 !important;
+  background-image:
+    radial-gradient(ellipse 55% 45% at 95% 10%, rgba(2, 132, 199, 0.06), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 5% 90%, rgba(37, 211, 102, 0.06), transparent 70%) !important;
+  border: 1.5px solid #cbd5e1 !important;
   border-radius: 20px !important;
   padding: clamp(1.2rem, 2.8vw, 2.25rem) !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.04) !important;
@@ -5013,15 +5017,20 @@ dialog.product-form-modal .dialog-inner {
   color: #b45309 !important;
 }
 
+.desc-visual-card,
 [data-theme="light"] .desc-visual-card {
   background: #ffffff !important;
-  border: 1px solid #cbd5e1 !important;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08) !important;
+  border: 1.5px solid #cbd5e1 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+  overflow: hidden !important;
 }
 
+.desc-visual-caption,
 [data-theme="light"] .desc-visual-caption {
   background: #f8fafc !important;
-  color: #334155 !important;
+  color: #1e293b !important;
+  font-weight: 600 !important;
   border-top: 1px solid #e2e8f0 !important;
 }
 
