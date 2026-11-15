@@ -718,7 +718,7 @@ function goToWizardStep(stepNum, { focusHeading = false } = {}) {
   const titles = {
     1: 'Paso 1 de 3 · Tu Negocio',
     2: 'Paso 2 de 3 · Alma e IA',
-    3: 'Paso 3 de 3 · WhatsApp y Prueba'
+    3: 'Paso 3 de 3 · Simulador y Costo'
   };
 
   const progressEl = document.getElementById('wizard-progress-bar');
@@ -808,51 +808,58 @@ function renderWizardSummary(inst) {
   }
 }
 
-function renderInstanceWaPanel(inst) {
-  if (!inst) return;
-  const slotLabel = document.getElementById('cfg-wa-slot-label');
-  const badge = document.getElementById('cfg-wa-state-badge');
-  const qrBox = document.getElementById('cfg-wa-qr-container');
-  const connectBtn = document.getElementById('btn-cfg-wa-connect');
+function toggleCheckoutPanel(showCheckout) {
+  const overview = document.getElementById('wizard-cost-overview');
+  const checkout = document.getElementById('wizard-checkout-panel');
+  if (!overview || !checkout) return;
 
-  const meta = getInstanceStateMeta(inst);
-  if (slotLabel) {
-    slotLabel.textContent = `WhatsApp · ${inst.business_name || 'Tu ServiBot'}`;
-  }
-  if (badge) {
-    badge.textContent = meta.label.toUpperCase();
-    badge.className = `badge-tag ${inst.state === 'open' ? 'badge-tag-accent' : ''}`;
-  }
-  if (connectBtn) {
-    connectBtn.disabled = inst.state === 'open';
-    connectBtn.textContent =
-      inst.state === 'open' ? 'WhatsApp Vinculado ✓' : 'Generar QR de WhatsApp';
-  }
-
-  if (!qrBox) return;
-  if (inst.state === 'open') {
-    qrBox.innerHTML = `
-      <div class="cfg-wa-connected">
-        <strong>✅ WhatsApp Conectado para ${escapeHtml(inst.business_name || inst.display_name || 'tu ServiBot')}</strong><br />
-        <span>Número: ${escapeHtml(inst.connectedPhone || 'Vinculado')}</span>
-      </div>
-    `;
-  } else if (inst.qrBase64 || inst.base64) {
-    const src = inst.qrBase64 || inst.base64;
-    qrBox.innerHTML = `
-      <div class="qr-box">
-        <img src="${src}" alt="Código QR WhatsApp para ${escapeHtml(inst.business_name || 'tu ServiBot')}" />
-      </div>
-      <p class="cfg-wa-placeholder">
-        Abre WhatsApp ➔ Dispositivos vinculados ➔ Vincular un dispositivo y escanea este código para activar tu bot.
-      </p>
-    `;
+  const show = Boolean(showCheckout);
+  overview.classList.toggle('hidden', show);
+  checkout.classList.toggle('hidden', !show);
+  if (show) {
+    overview.setAttribute('hidden', '');
+    checkout.removeAttribute('hidden');
+    updateCheckoutPricing();
+    const title = document.getElementById('wizard-checkout-title');
+    if (title) requestAnimationFrame(() => title.focus({ preventScroll: true }));
   } else {
-    const infoMsg = inst.lastError
-      ? escapeHtml(inst.lastError)
-      : 'Tu ServiBot ya tiene su espacio dedicado. Haz clic en el botón verde para generar su código QR de WhatsApp.';
-    qrBox.innerHTML = `<p class="cfg-wa-placeholder">${infoMsg}</p>`;
+    checkout.setAttribute('hidden', '');
+    overview.removeAttribute('hidden');
   }
+}
+
+function updateCheckoutPricing() {
+  const BASE_BOT_PRICE = 1500;
+  const checks = Array.from(document.querySelectorAll('.checkout-addon-check'));
+  const selectedAddons = checks
+    .filter((chk) => chk.checked)
+    .map((chk) => ({
+      slug: chk.dataset.slug || chk.id,
+      label: chk.dataset.label || 'Servicio adicional',
+      price: Number(chk.value || 0)
+    }));
+
+  const addonsTotal = selectedAddons.reduce((sum, item) => sum + item.price, 0);
+  const grandTotal = BASE_BOT_PRICE + addonsTotal;
+  const formattedTotal = `$${grandTotal.toLocaleString('es-MX')}`;
+
+  const totalEl = document.getElementById('checkout-total-amount');
+  const breakdownEl = document.getElementById('checkout-total-breakdown');
+  const confirmBtn = document.getElementById('btn-confirm-checkout');
+
+  if (totalEl) {
+    totalEl.textContent = `${formattedTotal} pesos más impuestos`;
+  }
+  if (breakdownEl) {
+    breakdownEl.textContent = selectedAddons.length
+      ? `Bot configurado ($1,500) + ${selectedAddons.map((a) => `${a.label} ($${a.price})`).join(' + ')}. Si desmarcas los opcionales pagarás solo $1,500 pesos más impuestos.`
+      : 'Incluye únicamente tu bot ServiBot ya configurado ($1,500 MXN). Sin servicios opcionales.';
+  }
+  if (confirmBtn && !confirmBtn.disabled) {
+    confirmBtn.textContent = `Confirmar Pedido (${formattedTotal} MXN + imp.) →`;
+  }
+
+  return { basePrice: BASE_BOT_PRICE, selectedAddons, addonsTotal, grandTotal };
 }
 
 function validateWizardStep1() {
@@ -919,9 +926,15 @@ function resetWizardForNewBot() {
     chip.setAttribute('aria-pressed', 'false');
   });
 
+  document.querySelectorAll('.checkout-addon-check').forEach((chk) => {
+    chk.checked = true;
+  });
+
   setFeedback('wizard-step-1-error', '');
   setFeedback('instance-save-status', '');
-  setFeedback('instance-wa-feedback', '');
+  setFeedback('checkout-feedback', '');
+  toggleCheckoutPanel(false);
+  updateCheckoutPricing();
   syncSimulatorHeaderLabel(null);
   updateWizardLivePreview();
   goToWizardStep(1, { focusHeading: true });
@@ -933,6 +946,7 @@ async function loadClientProvisionedInstance({ populateForm = true } = {}) {
     syncSimulatorHeaderLabel(null);
     if (populateForm) {
       updateWizardLivePreview();
+      updateCheckoutPricing();
       goToWizardStep(wizardCurrentStep || 1);
     }
     return;
@@ -958,7 +972,7 @@ async function loadClientProvisionedInstance({ populateForm = true } = {}) {
     activeChatInstanceId = inst.instance_id;
     syncSimulatorHeaderLabel(inst);
     renderWizardSummary(inst);
-    renderInstanceWaPanel(inst);
+    updateCheckoutPricing();
 
     if (populateForm) {
       populateWizardForm(inst);
@@ -969,18 +983,6 @@ async function loadClientProvisionedInstance({ populateForm = true } = {}) {
     localStorage.removeItem('servibot_client_instance_id');
     activeChatInstanceId = 'servibot-01';
     syncSimulatorHeaderLabel(null);
-  }
-}
-
-async function refreshProvisionedInstanceWaOnly() {
-  if (!clientInstanceId) return;
-  try {
-    const data = await apiFetch(`/api/instances/${encodeURIComponent(clientInstanceId)}`);
-    if (!data.ok || !data.instance) return;
-    provisionedInstance = data.instance;
-    renderInstanceWaPanel(data.instance);
-  } catch {
-    // ignore transient polling failure
   }
 }
 
@@ -1781,7 +1783,8 @@ function setupEventListeners() {
 
       syncSimulatorHeaderLabel(inst);
       renderWizardSummary(inst);
-      renderInstanceWaPanel(inst);
+      toggleCheckoutPanel(false);
+      updateCheckoutPricing();
 
       const box = document.getElementById('chat-messages');
       if (box) {
@@ -1791,14 +1794,14 @@ function setupEventListeners() {
         box.innerHTML = `<div class="chat-bubble assistant"><strong>${escapeHtml(inst.display_name)} · ${escapeHtml(inst.business_name)}</strong><br />${escapeHtml(greeting)}</div>`;
       }
 
-      setFeedback('instance-wa-feedback', '');
+      setFeedback('checkout-feedback', '');
       goToWizardStep(3, { focusHeading: true });
     } catch (err) {
       setFeedback('instance-save-status', `Error de conexión: ${err.message}`, false);
     } finally {
       if (saveBtn) {
         saveBtn.disabled = false;
-        saveBtn.textContent = 'Crear mi ServiBot y Conectar WhatsApp →';
+        saveBtn.textContent = 'Crear mi ServiBot y Probar en el Simulador →';
       }
     }
   });
@@ -1826,75 +1829,111 @@ function setupEventListeners() {
     }
   });
 
-  document.getElementById('btn-cfg-wa-connect')?.addEventListener('click', async () => {
-    if (!clientInstanceId) {
-      setFeedback('instance-wa-feedback', 'Primero completa el Paso 2 para crear tu ServiBot.', false);
-      return;
-    }
-    const btn = document.getElementById('btn-cfg-wa-connect');
-    setFeedback('instance-wa-feedback', '');
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = 'Generando QR WhatsApp...';
-    }
-    try {
-      const data = await apiFetch(`/api/instances/${encodeURIComponent(clientInstanceId)}/connect`, {
-        method: 'POST'
-      });
-      if (!data.ok) {
-        setFeedback('instance-wa-feedback', data.error || 'No se pudo iniciar la sesión WhatsApp.', false);
-      } else {
-        provisionedInstance = {
-          ...(provisionedInstance || { instance_id: clientInstanceId }),
-          state: data.state,
-          connectedPhone: data.connectedPhone,
-          qrBase64: data.qrBase64 || data.base64,
-          hasQr: Boolean(data.qrBase64 || data.base64),
-          lastError: data.lastError || null
-        };
-        renderInstanceWaPanel(provisionedInstance);
-        if (data.lastError) {
-          setFeedback('instance-wa-feedback', data.lastError, false);
-        }
-      }
-    } catch (err) {
-      setFeedback('instance-wa-feedback', `Error conectando con WhatsApp: ${err.message}`, false);
-    } finally {
-      if (btn) {
-        btn.disabled = provisionedInstance?.state === 'open';
-        btn.textContent =
-          provisionedInstance?.state === 'open' ? 'WhatsApp Vinculado ✓' : 'Generar QR de WhatsApp';
-      }
-    }
+  document.getElementById('btn-go-checkout')?.addEventListener('click', () => {
+    setFeedback('checkout-feedback', '');
+    toggleCheckoutPanel(true);
   });
 
-  document.getElementById('btn-cfg-wa-logout')?.addEventListener('click', async () => {
-    if (!clientInstanceId) return;
-    const btn = document.getElementById('btn-cfg-wa-logout');
-    setFeedback('instance-wa-feedback', '');
+  document.getElementById('btn-back-from-checkout')?.addEventListener('click', () => {
+    setFeedback('checkout-feedback', '');
+    toggleCheckoutPanel(false);
+  });
+
+  document.querySelectorAll('.checkout-addon-check').forEach((chk) => {
+    chk.addEventListener('change', () => {
+      updateCheckoutPricing();
+    });
+  });
+
+  document.getElementById('btn-confirm-checkout')?.addEventListener('click', async () => {
+    if (!provisionedInstance) {
+      setFeedback('checkout-feedback', 'Primero completa el Paso 2 para crear tu ServiBot.', false);
+      return;
+    }
+
+    const btn = document.getElementById('btn-confirm-checkout');
+    setFeedback('checkout-feedback', '');
+
+    const customItems = [
+      {
+        slug: 'servibot-configurado',
+        name: `ServiBot Configurado (${provisionedInstance.display_name || provisionedInstance.instance_id})`,
+        price: 1500,
+        currency: 'MXN',
+        billing_cycle: 'único'
+      }
+    ];
+
+    document.querySelectorAll('.checkout-addon-check').forEach((chk) => {
+      if (chk.checked) {
+        customItems.push({
+          slug: chk.dataset.slug || chk.id,
+          name: chk.dataset.label || chk.dataset.name || 'Servicio opcional',
+          price: Number(chk.value || chk.dataset.price || 0),
+          currency: 'MXN',
+          billing_cycle: 'único'
+        });
+      }
+    });
+
+    const totalPesos = customItems.reduce((acc, it) => acc + Number(it.price || 0), 0);
+    const addonLabels = customItems
+      .slice(1)
+      .map((it) => `${it.name} ($${it.price})`)
+      .join(', ');
+
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Reiniciando sesión...';
+      btn.textContent = 'Registrando pedido...';
     }
+
     try {
-      const data = await apiFetch(`/api/instances/${encodeURIComponent(clientInstanceId)}/logout`, {
-        method: 'POST'
+      const data = await apiFetch('/api/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          customer_name:
+            provisionedInstance.client_name ||
+            document.getElementById('cfg-client-name')?.value?.trim() ||
+            'Cliente Web',
+          customer_contact:
+            provisionedInstance.client_contact ||
+            document.getElementById('cfg-client-contact')?.value?.trim() ||
+            'Sin contacto',
+          customer_company: provisionedInstance.business_name || '',
+          channel: 'web',
+          custom_items: customItems,
+          notes: `Configuración ServiBot (${provisionedInstance.instance_id}). Adicionales: ${addonLabels || 'Ninguno'}. Total $${totalPesos} MXN más impuestos.`
+        })
       });
-      provisionedInstance = {
-        ...(provisionedInstance || { instance_id: clientInstanceId }),
-        state: data.state || 'close',
-        connectedPhone: null,
-        qrBase64: data.qrBase64 || data.base64 || null,
-        hasQr: Boolean(data.qrBase64 || data.base64)
-      };
-      renderInstanceWaPanel(provisionedInstance);
-      setFeedback('instance-wa-feedback', 'Sesión de WhatsApp reiniciada correctamente.', true);
+
+      if (!data.ok || !data.order) {
+        setFeedback('checkout-feedback', data.error || 'No se pudo confirmar tu pedido.', false);
+        return;
+      }
+
+      const orderCode = data.order.order_code;
+      setFeedback(
+        'checkout-feedback',
+        `¡Pedido ${orderCode} registrado! Total: $${Number(data.order.total_amount).toLocaleString('es-MX')} pesos más impuestos. Te contactaremos para activar tu ServiBot.`,
+        true
+      );
+
+      const box = document.getElementById('chat-messages');
+      if (box) {
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble assistant';
+        bubble.innerHTML = `<strong>${escapeHtml(provisionedInstance.display_name || 'ServiBot')} · Pedido ${escapeHtml(orderCode)}</strong><br />¡Gracias! Tu solicitud por <strong>$${Number(data.order.total_amount).toLocaleString('es-MX')} pesos más impuestos</strong> quedó registrada (${addonLabels || 'solo ServiBot configurado'}). Puedes seguir probando aquí mismo cómo atiendo a tus clientes.`;
+        box.appendChild(bubble);
+        box.scrollTop = box.scrollHeight;
+      }
+
+      await refreshHealth();
     } catch (err) {
-      setFeedback('instance-wa-feedback', `Error reiniciando sesión: ${err.message}`, false);
+      setFeedback('checkout-feedback', `Error al registrar el pedido: ${err.message}`, false);
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.textContent = 'Reiniciar Sesión WA';
+        updateCheckoutPricing();
       }
     }
   });
@@ -2162,10 +2201,6 @@ function setupEventListeners() {
     const chTab = document.getElementById('tab-channels');
     if (currentUser && activeView === 'admin' && chTab && !chTab.classList.contains('hidden')) {
       loadWhatsAppStatus();
-    } else if (activeView === 'public' && clientInstanceId && provisionedInstance) {
-      if (provisionedInstance.state === 'connecting' || provisionedInstance.state === 'qr_ready') {
-        refreshProvisionedInstanceWaOnly();
-      }
     }
   }, 4000);
 })();

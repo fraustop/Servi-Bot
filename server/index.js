@@ -408,6 +408,7 @@ async function main() {
         customer_company = '',
         channel = 'web',
         item_ids = [],
+        custom_items = [],
         notes = ''
       } = req.body || {};
 
@@ -415,26 +416,50 @@ async function main() {
         return res.status(400).json({ ok: false, error: 'Nombre y dato de contacto son requeridos.' });
       }
 
-      const allItems = db.prepare('SELECT * FROM catalog_items WHERE active = 1').all();
-      const selected = item_ids.length
-        ? allItems.filter((i) => item_ids.includes(i.id) || item_ids.includes(i.slug))
-        : [allItems[0]].filter(Boolean);
-
       let totalAmount = 0;
       let currency = 'MXN';
-      const orderItems = selected.map((item) => {
-        totalAmount += Number(item.price || 0);
-        currency = item.currency || 'MXN';
-        return {
-          id: item.id,
-          slug: item.slug,
-          name: item.name,
-          price: Number(item.price || 0),
-          setup_fee: Number(item.setup_fee || 0),
-          billing_cycle: item.billing_cycle,
-          currency
-        };
-      });
+      let orderItems = [];
+
+      if (Array.isArray(custom_items) && custom_items.length > 0) {
+        orderItems = custom_items
+          .filter((item) => item && item.name)
+          .map((item) => {
+            const unitPrice = Math.max(0, Number(item.price || 0));
+            const itemCurrency = String(item.currency || 'MXN');
+            totalAmount += unitPrice;
+            currency = itemCurrency;
+            return {
+              id: null,
+              slug: String(item.slug || 'servibot-custom'),
+              name: String(item.name).trim(),
+              price: unitPrice,
+              setup_fee: 0,
+              billing_cycle: String(item.billing_cycle || 'Más impuestos'),
+              currency: itemCurrency
+            };
+          });
+      }
+
+      if (!orderItems.length) {
+        const allItems = db.prepare('SELECT * FROM catalog_items WHERE active = 1').all();
+        const selected = item_ids.length
+          ? allItems.filter((i) => item_ids.includes(i.id) || item_ids.includes(i.slug))
+          : [allItems[0]].filter(Boolean);
+
+        orderItems = selected.map((item) => {
+          totalAmount += Number(item.price || 0);
+          currency = item.currency || 'MXN';
+          return {
+            id: item.id,
+            slug: item.slug,
+            name: item.name,
+            price: Number(item.price || 0),
+            setup_fee: Number(item.setup_fee || 0),
+            billing_cycle: item.billing_cycle,
+            currency
+          };
+        });
+      }
 
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const orderCode = `SB-${dateStr}-${Math.floor(1000 + Math.random() * 9000)}`;

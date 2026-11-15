@@ -312,7 +312,7 @@
                   <span class="hero-badge">Asistente Interactivo · Tu ServiBot a la Medida</span>
                   <h2 id="configurator-heading">Crea tu Primer ServiBot</h2>
                   <p>
-                    Cuéntanos sobre tu negocio y define la personalidad de tu asistente en 3 pasos. Preparamos su entorno al instante para que lo pruebes aquí mismo y lo conectes a tu WhatsApp.
+                    Cuéntanos sobre tu negocio y define la personalidad de tu asistente en 3 pasos. Preparamos su entorno al instante para que pruebes en el simulador cómo se comportará con tus clientes.
                   </p>
                 </div>
                 <button type="button" class="btn btn-outline btn-sm" id="btn-go-description">
@@ -342,7 +342,7 @@
                     <li class="wizard-step-item" data-step="3">
                       <button type="button" class="wizard-step-btn" data-step="3" disabled>
                         <span class="wizard-step-num" aria-hidden="true">3</span>
-                        <span class="wizard-step-text">WhatsApp y Prueba</span>
+                        <span class="wizard-step-text">Simulador y Costo</span>
                       </button>
                     </li>
                   </ol>
@@ -525,17 +525,24 @@
                         ← Atrás
                       </button>
                       <button type="submit" class="btn btn-primary" id="btn-save-instance">
-                        Crear mi ServiBot y Conectar WhatsApp →
+                        Crear mi ServiBot y Probar en el Simulador →
                       </button>
                     </div>
                   </div>
 
-                  <!-- PASO 3: CONFIRMACIÓN, SIMULADOR Y VINCULACIÓN WHATSAPP -->
+                  <!-- PASO 3: CONFIRMACIÓN EN SIMULADOR, COSTO BASE ($1,500) Y CHECKOUT -->
                   <div class="wizard-pane hidden" id="wizard-step-3" data-step="3" hidden>
                     <header class="wizard-pane-head">
-                      <h3 id="wizard-step-3-title" tabindex="-1" class="wizard-pane-title">3. ¡Tu ServiBot está creado y listo!</h3>
-                      <p class="wizard-pane-sub">Pruébalo ahora mismo en el simulador de la derecha o escanea tu QR para activarlo en WhatsApp.</p>
+                      <h3 id="wizard-step-3-title" tabindex="-1" class="wizard-pane-title">3. Prueba tu ServiBot en el Simulador</h3>
+                      <p class="wizard-pane-sub">Tu asistente ya tiene la personalidad y reglas de tu negocio listas para evaluarse antes de contratar.</p>
                     </header>
+
+                    <div class="simulator-highlight-banner" role="note">
+                      <span class="sim-banner-badge">Simulador Activo →</span>
+                      <p>
+                        <strong>En el panel de la derecha puedes ver cómo se comportará tu bot en tiempo real.</strong> Escríbele como si fueras uno de tus clientes y comprueba sus respuestas antes de decidir tu contratación.
+                      </p>
+                    </div>
 
                     <div class="wizard-step3-grid">
                       <div class="wizard-summary-box" id="wizard-created-card">
@@ -546,10 +553,10 @@
 
                         <div class="wizard-summary-actions">
                           <button type="button" class="btn btn-primary btn-sm" id="btn-test-instance-sim">
-                            Probar en el Simulador →
+                            Probar cómo se comporta en el Simulador →
                           </button>
                           <button type="button" class="btn btn-outline btn-sm" id="btn-wizard-edit">
-                            Editar datos
+                            Editar configuración
                           </button>
                           <button type="button" class="btn btn-outline btn-sm" id="btn-wizard-new">
                             Crear otro ServiBot
@@ -557,32 +564,108 @@
                         </div>
                       </div>
 
-                      <aside class="configurator-wa-card" id="instance-wa-panel" aria-labelledby="cfg-wa-title">
-                        <header class="cfg-card-head">
-                          <div>
-                            <span class="badge-tag badge-tag-accent" id="cfg-wa-slot-label">WhatsApp Multi-Dispositivo</span>
-                            <h4 id="cfg-wa-title">Sesión de WhatsApp</h4>
+                      <aside class="wizard-pricing-card" id="wizard-pricing-card" aria-labelledby="wizard-pricing-title">
+                        <!-- Vista inicial de costo base -->
+                        <div id="wizard-cost-overview">
+                          <span class="badge-tag badge-tag-accent">Costo del Servicio</span>
+                          <h4 id="wizard-pricing-title" style="margin: 0.45rem 0 0.25rem; font-family: var(--font-serif); font-size: 1.18rem;">
+                            Activa tu ServiBot
+                          </h4>
+
+                          <div class="base-price-callout">
+                            <div class="base-price-figure">
+                              <strong>$1,500 pesos</strong>
+                              <span>más impuestos</span>
+                            </div>
+                            <p class="base-price-note">
+                              Únicamente por tu bot ServiBot ya configurado con la esencia y reglas de tu empresa.
+                            </p>
                           </div>
-                          <span class="badge-tag" id="cfg-wa-state-badge">DISPONIBLE</span>
-                        </header>
 
-                        <p class="cfg-wa-desc">
-                          Vincula tu número comercial escaneando este QR desde WhatsApp en tu teléfono para responder en automático.
-                        </p>
+                          <p class="cfg-wa-desc">
+                            Verifica cómo atiende en el simulador de la derecha. Al pasar a pagar podrás elegir servicios opcionales adicionales o quedarte solo con tu bot por <strong>$1,500 pesos más impuestos</strong>.
+                          </p>
 
-                        <div class="cfg-wa-qr-box" id="cfg-wa-qr-container">
-                          <p class="cfg-wa-placeholder">Haz clic en el botón verde para generar tu código QR de WhatsApp.</p>
+                          <button type="button" class="btn btn-emerald" id="btn-go-checkout" style="inline-size: 100%; justify-content: center;">
+                            Pasar a Pagar →
+                          </button>
                         </div>
 
-                        <div id="instance-wa-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
+                        <!-- Vista de checkout con servicios opcionales desmarcables -->
+                        <div id="wizard-checkout-panel" class="hidden" hidden>
+                          <header class="cfg-card-head" style="margin-bottom: 0.55rem;">
+                            <div>
+                              <span class="badge-tag badge-tag-accent">Configuración de Pago</span>
+                              <h4 id="wizard-checkout-title" tabindex="-1" style="margin: 0.35rem 0 0; font-family: var(--font-serif); font-size: 1.15rem;">
+                                Personaliza tu Paquete
+                              </h4>
+                            </div>
+                          </header>
 
-                        <div class="cfg-wa-actions">
-                          <button type="button" class="btn btn-emerald btn-sm" id="btn-cfg-wa-connect">
-                            Generar QR de WhatsApp
-                          </button>
-                          <button type="button" class="btn btn-outline btn-sm" id="btn-cfg-wa-logout">
-                            Reiniciar Sesión WA
-                          </button>
+                          <div class="checkout-base-row">
+                            <span><strong>ServiBot ya configurado</strong> (Base)</span>
+                            <span class="checkout-addon-price">$1,500 pesos</span>
+                          </div>
+
+                          <p class="wizard-pane-sub" style="margin-bottom: 0.55rem; font-size: 0.78rem;">
+                            Servicios opcionales incluidos ($2,500 más impuestos en paquete completo). Si no los deseas, desmárcalos para pagar solo $1,500 pesos más impuestos:
+                          </p>
+
+                          <div class="checkout-addons-list">
+                            <label class="checkout-addon-item" for="chk-addon-catalogo">
+                              <span class="checkout-addon-left">
+                                <input type="checkbox" id="chk-addon-catalogo" class="checkout-addon-check" data-slug="addon-catalogo-virtual" data-label="Catálogo Virtual" value="500" checked />
+                                <span>
+                                  <span class="checkout-addon-title">Catálogo Virtual</span>
+                                  <span class="checkout-addon-desc">Muestra tus productos, servicios y precios al instante</span>
+                                </span>
+                              </span>
+                              <span class="checkout-addon-price">+$500 pesos</span>
+                            </label>
+
+                            <label class="checkout-addon-item" for="chk-addon-web">
+                              <span class="checkout-addon-left">
+                                <input type="checkbox" id="chk-addon-web" class="checkout-addon-check" data-slug="addon-pagina-web" data-label="Página Web" value="300" checked />
+                                <span>
+                                  <span class="checkout-addon-title">Página Web</span>
+                                  <span class="checkout-addon-desc">Sitio profesional listo para recibir clientes y prospectos</span>
+                                </span>
+                              </span>
+                              <span class="checkout-addon-price">+$300 pesos</span>
+                            </label>
+
+                            <label class="checkout-addon-item" for="chk-addon-soporte">
+                              <span class="checkout-addon-left">
+                                <input type="checkbox" id="chk-addon-soporte" class="checkout-addon-check" data-slug="addon-soporte-tecnico" data-label="Soporte Técnico" value="200" checked />
+                                <span>
+                                  <span class="checkout-addon-title">Soporte Técnico</span>
+                                  <span class="checkout-addon-desc">Asistencia prioritaria, ajustes y mantenimiento continuo</span>
+                                </span>
+                              </span>
+                              <span class="checkout-addon-price">+$200 pesos</span>
+                            </label>
+                          </div>
+
+                          <div class="checkout-total-box" aria-live="polite">
+                            <div class="checkout-total-row">
+                              <span>Total a pagar:</span>
+                              <strong id="checkout-total-amount">$2,500 pesos más impuestos</strong>
+                            </div>
+                            <p class="checkout-total-breakdown" id="checkout-total-breakdown">
+                              Bot configurado ($1,500) + Catálogo Virtual ($500) + Página Web ($300) + Soporte Técnico ($200).
+                            </p>
+                          </div>
+
+                          <div id="checkout-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
+
+                          <div class="checkout-actions-row">
+                            <button type="button" class="btn btn-outline btn-sm" id="btn-back-from-checkout">
+                              ← Volver
+                            </button>
+                            <button type="button" class="btn btn-emerald btn-sm" id="btn-confirm-checkout">
+                              Confirmar Pedido ($2,500 MXN + imp.) →
+                            </button>
+                          </div>
                         </div>
                       </aside>
                     </div>

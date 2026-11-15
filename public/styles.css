@@ -1467,6 +1467,205 @@ body.is-admin-session .container {
   gap: 0.5rem;
 }
 
+.simulator-highlight-banner {
+  margin-bottom: 0.9rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(16, 40, 29, 0.85), rgba(14, 24, 38, 0.95));
+  border: 1px solid rgba(37, 211, 102, 0.52);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+
+.simulator-highlight-banner .sim-banner-badge {
+  flex-shrink: 0;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(37, 211, 102, 0.16);
+  border: 1px solid rgba(37, 211, 102, 0.55);
+  color: #86efac;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.simulator-highlight-banner p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.48;
+  color: var(--text-main);
+}
+
+.wizard-pricing-card {
+  background: linear-gradient(160deg, #161d2b 0%, #0d1118 75%, #121823 100%);
+  border: 1px solid rgba(88, 166, 255, 0.45);
+  box-shadow: var(--shadow-metallic);
+  border-radius: 14px;
+  padding: 1.1rem 1.2rem;
+}
+
+.base-price-callout {
+  margin: 0.75rem 0;
+  padding: 0.85rem 0.95rem;
+  border-radius: 12px;
+  background: rgba(7, 10, 16, 0.78);
+  border: 1px solid rgba(37, 211, 102, 0.35);
+}
+
+.base-price-figure {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.25rem;
+}
+
+.base-price-figure strong {
+  font-family: var(--font-serif);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--wa-green-bright);
+  line-height: 1.1;
+}
+
+.base-price-figure span {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.base-price-note {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.checkout-base-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(14, 22, 34, 0.88);
+  border: 1px solid var(--metal-border-strong);
+  margin-bottom: 0.65rem;
+  font-size: 0.84rem;
+}
+
+.checkout-addons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.checkout-addon-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.62rem 0.78rem;
+  border-radius: 10px;
+  border: 1px solid var(--metal-border);
+  background: rgba(10, 14, 20, 0.75);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.checkout-addon-item:hover {
+  border-color: rgba(88, 166, 255, 0.55);
+}
+
+.checkout-addon-item:has(input:checked) {
+  border-color: rgba(37, 211, 102, 0.6);
+  background: rgba(16, 36, 26, 0.58);
+}
+
+.checkout-addon-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  min-inline-size: 0;
+}
+
+.checkout-addon-left input[type='checkbox'] {
+  margin-top: 0.18rem;
+  inline-size: 1.05rem;
+  block-size: 1.05rem;
+  accent-color: var(--wa-green);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.checkout-addon-title {
+  display: block;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.checkout-addon-desc {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.checkout-addon-price {
+  flex-shrink: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #8cc8ff;
+  white-space: nowrap;
+}
+
+.checkout-total-box {
+  padding: 0.75rem 0.9rem;
+  border-radius: 11px;
+  background: rgba(7, 10, 15, 0.9);
+  border: 1px solid rgba(88, 166, 255, 0.45);
+  margin-bottom: 0.75rem;
+}
+
+.checkout-total-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.checkout-total-row span {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.checkout-total-row strong {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  color: var(--wa-green-bright);
+}
+
+.checkout-total-breakdown {
+  margin: 0.25rem 0 0;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  line-height: 1.38;
+}
+
+.checkout-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
 @media (max-width: 600px) {
   .wizard-shell {
     padding: 0.95rem 0.88rem;
