@@ -74,7 +74,7 @@ async function isBackendReachable(baseUrl, timeoutMs = 2200) {
 }
 
 async function resolveInitialApiBase() {
-  if (location.port === '10000') {
+  if (location.port === '10000' || location.hostname.endsWith('.cloudfront.net')) {
     API_BASE = window.location.origin;
     syncApiOverrideInput();
     return;
@@ -352,13 +352,60 @@ function initPublicCarousel() {
   ];
 
   const stepPills = Array.from(carousel.querySelectorAll('.desc-step-pill[data-goto-slide]'));
+  const autoplayBtns = Array.from(carousel.querySelectorAll('[data-autoplay-toggle]'));
+  const AUTOPLAY_INTERVAL_MS = 5000;
 
   let pendingTarget = null;
+  let pendingAnnounce = false;
   let scrollGeneration = 0;
   let lastSettledIndex = 0;
   let liveMarkerIndex = 0;
   let rafScheduled = false;
   let settleTimer = null;
+  let autoplayPaused = prefersReducedMotion();
+  let autoplayTimer = null;
+
+  function syncAutoplayButtons() {
+    autoplayBtns.forEach((btn) => {
+      btn.dataset.paused = String(autoplayPaused);
+      btn.setAttribute(
+        'aria-label',
+        autoplayPaused ? 'Reanudar carrusel automático' : 'Pausar carrusel automático'
+      );
+      const iconEl = btn.querySelector('[data-autoplay-icon]');
+      const textEl = btn.querySelector('[data-autoplay-text]');
+      if (iconEl) iconEl.textContent = autoplayPaused ? '▶' : '⏸';
+      if (textEl) textEl.textContent = autoplayPaused ? 'Reanudar' : 'Pausar';
+    });
+  }
+
+  function canAutoplayAdvance() {
+    if (autoplayPaused || document.hidden || activeView !== 'public') return false;
+    if (carousel.dataset.activeSection === 'offer') return false;
+    const panel = document.getElementById('simulator-panel');
+    if (panel?.classList.contains('is-mobile-open')) return false;
+    return true;
+  }
+
+  function stopAutoplay() {
+    if (autoplayTimer !== null) {
+      clearInterval(autoplayTimer);
+      autoplayTimer = null;
+    }
+  }
+
+  function scheduleAutoplay() {
+    stopAutoplay();
+    if (autoplayPaused) return;
+    autoplayTimer = setInterval(() => {
+      if (!canAutoplayAdvance()) return;
+      const maxDescIndex = offerSlideIndex > 0 ? offerSlideIndex - 1 : slides.length - 1;
+      const currentIndex = pendingTarget ?? getNearestSlideIndex();
+      if (currentIndex > maxDescIndex) return;
+      const nextIndex = currentIndex >= maxDescIndex ? 0 : currentIndex + 1;
+      goToSlide(nextIndex, { announce: false, fromAutoplay: true });
+    }, AUTOPLAY_INTERVAL_MS);
+  }
 
   // Generar botones marcadores principales de sección (01 · Descripción, 02 · La Oferta)
   markersNav.innerHTML = '';
@@ -448,7 +495,10 @@ function initPublicCarousel() {
     }
   }
 
-  function goToSlide(targetIndex, { announce = true, instant = false } = {}) {
+  function goToSlide(targetIndex, { announce = true, instant = false, fromAutoplay = false } = {}) {
+    if (!fromAutoplay) {
+      scheduleAutoplay();
+    }
     const clamped = Math.max(0, Math.min(slides.length - 1, targetIndex));
     const currentIndex = pendingTarget ?? getNearestSlideIndex();
     if (clamped === currentIndex && pendingTarget === null) {
@@ -457,6 +507,7 @@ function initPublicCarousel() {
     }
 
     pendingTarget = clamped;
+    pendingAnnounce = Boolean(announce);
     scrollGeneration += 1;
     const gen = scrollGeneration;
     clearTimeout(settleTimer);
@@ -480,7 +531,6 @@ function initPublicCarousel() {
       instant
       || prefersReducedMotion()
       || currentSection !== targetSection
-      || Math.abs(clamped - currentIndex) > 1
     );
 
     if (useInstant) {
@@ -530,15 +580,40 @@ function initPublicCarousel() {
     if (!('onscrollend' in window)) {
       const gen = scrollGeneration;
       clearTimeout(settleTimer);
-      settleTimer = setTimeout(() => settleNavigation(gen, true), 140);
+      settleTimer = setTimeout(
+        () => settleNavigation(gen, pendingTarget !== null ? pendingAnnounce : true),
+        140
+      );
     }
   }, { passive: true });
 
   if ('onscrollend' in window) {
     track.addEventListener('scrollend', () => {
-      settleNavigation(scrollGeneration, true);
+      const shouldAnnounce = pendingTarget !== null ? pendingAnnounce : true;
+      settleNavigation(scrollGeneration, shouldAnnounce);
     });
   }
+
+  autoplayBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      autoplayPaused = !autoplayPaused;
+      syncAutoplayButtons();
+      scheduleAutoplay();
+    });
+  });
+
+  carousel.addEventListener(
+    'pointerdown',
+    () => {
+      if (!autoplayPaused) scheduleAutoplay();
+    },
+    { passive: true }
+  );
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopAutoplay();
+    else scheduleAutoplay();
+  });
 
   function syncActiveSlideInstant() {
     const targetSlide = slides[lastSettledIndex];
@@ -566,10 +641,14 @@ function initPublicCarousel() {
   // Sincronización silenciosa inicial sin anunciar en la región aria-live
   applyMarkerCurrent(0);
   updateEndControls(0);
+  syncAutoplayButtons();
+  scheduleAutoplay();
 
   return {
     goToSlide,
-    syncActiveSlideInstant
+    syncActiveSlideInstant,
+    scheduleAutoplay,
+    stopAutoplay
   };
 }
 

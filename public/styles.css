@@ -55,6 +55,7 @@
   .carousel-markers button,
   .preset-chip,
   .desc-step-pill,
+  .desc-autoplay-toggle,
   .quick-chip,
   .btn-topbar-sim,
   .sim-switch-btn,
@@ -1005,6 +1006,41 @@ body.is-admin-session .container {
 }
 
 .desc-step-pill:focus-visible {
+  outline: 2px solid var(--wa-green-bright);
+  outline-offset: 2px;
+}
+
+.desc-autoplay-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  min-block-size: 2.05rem;
+  padding: 0.3rem 0.78rem;
+  border-radius: 999px;
+  border: 1px solid rgba(88, 166, 255, 0.42);
+  background: rgba(0, 120, 212, 0.14);
+  color: #bfdbfe;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+}
+
+.desc-autoplay-toggle:hover {
+  border-color: var(--outlook-blue-bright);
+  color: #ffffff;
+  background: rgba(0, 120, 212, 0.26);
+}
+
+.desc-autoplay-toggle[data-paused="true"] {
+  border-color: rgba(245, 158, 11, 0.65);
+  background: rgba(245, 158, 11, 0.16);
+  color: #fde68a;
+}
+
+.desc-autoplay-toggle:focus-visible {
   outline: 2px solid var(--wa-green-bright);
   outline-offset: 2px;
 }
