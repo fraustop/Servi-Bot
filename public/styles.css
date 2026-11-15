@@ -1190,10 +1190,24 @@ body.is-admin-session .container {
   justify-content: flex-start;
 }
 
-.slide-inner-configurator .configurator-form-card {
-  max-inline-size: 1080px;
-  inline-size: calc(100% - clamp(1.2rem, 3.5vw, 4rem));
-  margin-inline: auto;
+.slide-inner-configurator {
+  max-inline-size: 100% !important;
+  inline-size: 100% !important;
+  gap: 0;
+  justify-content: flex-start;
+  padding: 0 !important;
+}
+
+.slide-inner-configurator .configurator-form-card,
+.configurator-form-card {
+  max-inline-size: 100% !important;
+  inline-size: 100% !important;
+  margin-inline: 0 !important;
+  border-radius: 0 !important;
+  border-left: none !important;
+  border-right: none !important;
+  padding: 1.5rem clamp(1rem, 3.2vw, 3rem) !important;
+  box-sizing: border-box !important;
 }
 
 .instances-bar-section {
@@ -4985,39 +4999,41 @@ dialog.product-form-modal .dialog-inner {
 }
 
 /* ==========================================================================
-   CONFIGURADOR: HEADER, RIBBON Y PESTAÑAS CUADRADAS
+   CONFIGURADOR: RIBBON CON CONTRASTE DISTINTIVO RESPECTO AL ENCABEZADO
    ========================================================================== */
 [data-theme="light"] .configurator-sticky-header {
-  background: linear-gradient(180deg, #242c38 0%, #151b23 100%) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(180deg, #f8fafc 0%, #edf2f7 100%) !important;
+  border-top: 1.5px solid rgba(2, 132, 199, 0.35) !important;
+  border-bottom: 1.5px solid #cbd5e1 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05) !important;
 }
 
 [data-theme="light"] .configurator-heading-left {
-  color: #ffffff !important;
-  font-weight: 700 !important;
+  color: #0f172a !important;
+  font-weight: 800 !important;
 }
 
-/* Pestañas inactivas del ribbon en encabezado grafito */
+/* Pestañas del ribbon con contraste nítido y separación visual */
 [data-theme="light"] .wizard-tab-square,
 [data-theme="light"] .wizard-step-btn {
-  background: rgba(255, 255, 255, 0.09) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  color: #cbd5e1 !important;
+  background: #ffffff !important;
+  border: 1.5px solid #cbd5e1 !important;
+  color: #334155 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
 }
 
 [data-theme="light"] .wizard-tab-square:hover:not(:disabled),
 [data-theme="light"] .wizard-step-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.18) !important;
-  border-color: rgba(255, 255, 255, 0.35) !important;
-  color: #ffffff !important;
+  background: #e0f2fe !important;
+  border-color: #0284c7 !important;
+  color: #0369a1 !important;
 }
 
 [data-theme="light"] .wizard-tab-square .wizard-step-num,
 [data-theme="light"] .wizard-step-btn .wizard-step-num {
-  background: rgba(255, 255, 255, 0.15) !important;
-  border: 1px solid rgba(255, 255, 255, 0.25) !important;
-  color: #ffffff !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #475569 !important;
 }
 
 /* Pestaña ACTIVA / SELECCIONADA en el ribbon */
@@ -5764,10 +5780,11 @@ dialog.product-form-modal .dialog-inner {
 
 .soul-master-detail {
   display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 1.25rem;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 1.5rem;
   align-items: start;
   margin-top: 1.15rem;
+  inline-size: 100%;
 }
 
 .soul-sidebar {
@@ -5993,23 +6010,67 @@ dialog.product-form-modal .dialog-inner {
 }
 
 /* Subsección 3: Horarios y Citas */
+.schedule-scroll-hint {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-bottom: 0.45rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+[data-theme="light"] .schedule-scroll-hint {
+  color: #0284c7 !important;
+}
+
 .schedule-days-container {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
   margin-bottom: 1.15rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-inline-size: 100%;
+  padding-bottom: 0.5rem;
 }
 
 .schedule-day-row {
   display: grid;
-  grid-template-columns: 130px 1.2fr 1.3fr 1.4fr;
-  gap: 0.75rem;
+  grid-template-columns: 145px minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(230px, 1.3fr);
+  gap: 0.85rem;
   align-items: center;
   padding: 0.65rem 0.85rem;
   background: rgba(0, 0, 0, 0.22);
   border: 1px solid var(--metal-border);
   border-radius: 8px;
+  min-inline-size: 780px;
+  position: relative;
   transition: all 0.2s ease;
+}
+
+.schedule-day-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.86rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  background: #111827;
+  border: 1px solid var(--metal-border);
+  box-shadow: 3px 0 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+[data-theme="light"] .schedule-day-label {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 3px 0 8px rgba(0, 0, 0, 0.08) !important;
 }
 
 .schedule-day-row.is-closed {
@@ -6084,11 +6145,35 @@ dialog.product-form-modal .dialog-inner {
   margin-bottom: 1.25rem;
 }
 
+.catalog-add-card {
+  max-inline-size: 100%;
+  box-sizing: border-box;
+}
+
 .catalog-add-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1.1fr 1.3fr;
-  gap: 0.65rem;
-  margin-bottom: 0.65rem;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  max-inline-size: 100%;
+  box-sizing: border-box;
+}
+
+.catalog-add-grid .field,
+.catalog-add-card .field {
+  min-inline-size: 0;
+  inline-size: 100%;
+}
+
+.catalog-add-grid input,
+.catalog-add-grid select,
+.catalog-add-card input,
+.catalog-add-card select,
+.catalog-add-card textarea {
+  inline-size: 100%;
+  max-inline-size: 100%;
+  box-sizing: border-box;
+  min-inline-size: 0;
 }
 
 .field-cat-desc {
@@ -6294,4 +6379,149 @@ dialog.product-form-modal .dialog-inner {
   .catalog-add-grid {
     grid-template-columns: 1fr;
   }
+}
+
+
+/* ==================== SECCIÓN 6: APLICACIONES E INTEGRACIONES ==================== */
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.app-integration-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.15rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--metal-border);
+  background: rgba(16, 22, 34, 0.75);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.app-integration-card:hover {
+  border-color: var(--metal-border-strong);
+  transform: translateY(-2px);
+}
+
+.app-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.app-icon-wrap {
+  inline-size: 42px;
+  block-size: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.app-icon-wa { background: rgba(37, 211, 102, 0.15); border: 1px solid rgba(37, 211, 102, 0.4); }
+.app-icon-outlook { background: rgba(2, 132, 199, 0.15); border: 1px solid rgba(2, 132, 199, 0.4); }
+.app-icon-teams { background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); }
+.app-icon-payments { background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); }
+
+.app-card-meta {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.app-card-title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-card-vendor {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.app-status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.app-status-badge.is-active {
+  background: rgba(37, 211, 102, 0.15);
+  color: var(--wa-green-bright);
+  border: 1px solid rgba(37, 211, 102, 0.4);
+}
+
+.app-status-badge.is-ready {
+  background: rgba(2, 132, 199, 0.15);
+  color: var(--outlook-blue-bright);
+  border: 1px solid rgba(2, 132, 199, 0.4);
+}
+
+.app-status-badge.is-pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.app-card-desc {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin: 0 0 1rem 0;
+  flex: 1;
+}
+
+.app-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.app-feature-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Modo Claro para Aplicaciones */
+[data-theme="light"] .app-integration-card {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .app-card-title {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .app-card-vendor {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .app-card-desc {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .app-card-footer {
+  border-top-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .app-feature-tag {
+  color: #475569 !important;
 }
