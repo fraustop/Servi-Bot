@@ -4723,7 +4723,9 @@ dialog.product-form-modal .dialog-inner {
   outline-offset: 2px;
 }
 
-/* Reglas Globales de Modo Claro de Alto Contraste */
+/* ==========================================================================
+   REGLAS GLOBALES DE MODO CLARO DE ALTO CONTRASTE (WCAG AAA)
+   ========================================================================== */
 [data-theme="light"] {
   color-scheme: light;
   --bg-void: #f8fafc;
@@ -4760,12 +4762,18 @@ dialog.product-form-modal .dialog-inner {
   --shadow-metallic: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
 }
 
+/* Fondo principal de la aplicación en modo claro */
+[data-theme="light"],
 [data-theme="light"] body {
-  background-color: var(--bg-void);
-  color: var(--text-main);
+  background-color: #f8fafc !important;
+  background-image:
+    radial-gradient(ellipse 70% 45% at 15% 0%, rgba(2, 132, 199, 0.05), transparent 58%),
+    radial-gradient(ellipse 65% 45% at 88% 100%, rgba(37, 211, 102, 0.04), transparent 58%),
+    linear-gradient(165deg, #f8fafc 0%, #ffffff 54%, #f1f5f9 100%) !important;
+  color: #0f172a !important;
 }
 
-/* Header superior y barra sticky */
+/* Encabezado superior del carrusel */
 [data-theme="light"] .carousel-topbar {
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
   border-bottom: 1px solid #cbd5e1 !important;
@@ -4780,35 +4788,25 @@ dialog.product-form-modal .dialog-inner {
   color: #0369a1 !important;
 }
 
-[data-theme="light"] .configurator-sticky-header {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
-  border-bottom: 1px solid #cbd5e1 !important;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
-}
-
-[data-theme="light"] .configurator-heading-left {
-  color: #0f172a !important;
-}
-
-/* Controles de navegación en topbar */
+/* Botones de navegación y utilidades en topbar */
 [data-theme="light"] .carousel-markers button {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #475569;
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #475569 !important;
 }
 
 [data-theme="light"] .carousel-markers button:hover {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
 }
 
 [data-theme="light"] .carousel-markers button.is-active,
 [data-theme="light"] .carousel-markers button[aria-current="true"] {
-  background: #ffffff;
-  border-color: #0284c7;
-  color: #0f172a;
-  font-weight: 700;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  background: #ffffff !important;
+  border-color: #0284c7 !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1) !important;
 }
 
 [data-theme="light"] .btn-topbar-theme,
@@ -4840,37 +4838,7 @@ dialog.product-form-modal .dialog-inner {
   color: #6b21a8 !important;
 }
 
-/* Botones ribbon en configurador */
-[data-theme="light"] .wizard-tab-square {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #334155;
-}
-
-[data-theme="light"] .wizard-tab-square:hover {
-  background: #e2e8f0;
-  color: #0f172a;
-}
-
-[data-theme="light"] .wizard-tab-square.is-active {
-  background: #ffffff;
-  border-color: #16a34a;
-  color: #0f172a;
-  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.15);
-}
-
-[data-theme="light"] .wizard-step-item.is-done .wizard-tab-square {
-  background: rgba(37, 211, 102, 0.08);
-  border-color: rgba(37, 211, 102, 0.4);
-  color: #15803d;
-}
-
-[data-theme="light"] .wizard-step-item.is-done .wizard-tab-square .wizard-step-num {
-  background: #16a34a;
-  color: #ffffff;
-}
-
-/* Flechas de carrusel */
+/* Flechas laterales del carrusel */
 [data-theme="light"] .carousel-arrow {
   background: #ffffff !important;
   border-color: #cbd5e1 !important;
@@ -4883,7 +4851,29 @@ dialog.product-form-modal .dialog-inner {
   color: #15803d !important;
 }
 
-/* Tipografía de diapositivas de descripción */
+/* ==========================================================================
+   SECCIÓN DE DESCRIPCIÓN (DIAPOSITIVAS 1, 2 Y 3 EN MODO CLARO)
+   ========================================================================== */
+[data-theme="light"] .carousel-section,
+[data-theme="light"] .carousel-viewport,
+[data-theme="light"] .carousel-track,
+[data-theme="light"] .carousel-slide {
+  background: transparent !important;
+}
+
+[data-theme="light"] .carousel-slide.slide-description {
+  background: transparent !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .slide-inner-hero {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .desc-story-grid {
+  color: #0f172a !important;
+}
+
 [data-theme="light"] .desc-hero-title {
   color: #0f172a !important;
 }
@@ -4908,32 +4898,36 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .hero-badge {
   background: rgba(2, 132, 199, 0.1) !important;
-  border-color: rgba(2, 132, 199, 0.35) !important;
+  border: 1px solid rgba(2, 132, 199, 0.35) !important;
   color: #0369a1 !important;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] .desc-step-pill {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #475569;
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #475569 !important;
+  font-weight: 600 !important;
 }
 
 [data-theme="light"] .desc-step-pill:hover {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
 }
 
 [data-theme="light"] .desc-step-pill[aria-current="true"] {
   background: linear-gradient(135deg, rgba(37, 211, 102, 0.18), rgba(0, 120, 212, 0.18)) !important;
   border-color: #16a34a !important;
   color: #0f172a !important;
-  font-weight: 700;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] .desc-autoplay-toggle {
   background: rgba(2, 132, 199, 0.1) !important;
-  border-color: rgba(2, 132, 199, 0.35) !important;
+  border: 1px solid rgba(2, 132, 199, 0.35) !important;
   color: #0369a1 !important;
+  font-weight: 600 !important;
 }
 
 [data-theme="light"] .desc-autoplay-toggle[data-paused="true"] {
@@ -4944,7 +4938,7 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .desc-visual-card {
   background: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important;
 }
 
@@ -4954,106 +4948,98 @@ dialog.product-form-modal .dialog-inner {
   border-top: 1px solid #e2e8f0 !important;
 }
 
-[data-theme="light"] .channel-mini-card {
-  background: #ffffff !important;
-  border-color: #cbd5e1 !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05) !important;
+/* ==========================================================================
+   CONFIGURADOR: HEADER, RIBBON Y PESTAÑAS CUADRADAS
+   ========================================================================== */
+[data-theme="light"] .configurator-sticky-header {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
 }
 
-[data-theme="light"] .channel-mini-card strong {
+[data-theme="light"] .configurator-heading-left {
   color: #0f172a !important;
+  font-weight: 700 !important;
 }
 
-[data-theme="light"] .channel-mini-card span {
-  color: #475569 !important;
-}
-
-[data-theme="light"] .channel-card-wa {
-  background: linear-gradient(155deg, rgba(37, 211, 102, 0.08), #ffffff) !important;
-  border-block-start: 2px solid #16a34a !important;
-}
-
-[data-theme="light"] .channel-card-outlook {
-  background: linear-gradient(155deg, rgba(0, 120, 212, 0.08), #ffffff) !important;
-  border-block-start: 2px solid #0284c7 !important;
-}
-
-[data-theme="light"] .channel-card-teams {
-  background: linear-gradient(155deg, rgba(99, 102, 241, 0.08), #ffffff) !important;
-  border-block-start: 2px solid #6366f1 !important;
-}
-
-/* Tarjetas de ofertas y catálogo público */
-[data-theme="light"] article.card {
-  background: #ffffff !important;
-  border-color: #cbd5e1 !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06) !important;
-}
-
-[data-theme="light"] article.card > img {
-  background: #f8fafc !important;
-  border-bottom: 1px solid #e2e8f0 !important;
-}
-
-[data-theme="light"] article.card > header h3 {
-  color: #0f172a !important;
-}
-
-[data-theme="light"] article.card > header .tagline {
-  color: #0284c7 !important;
-}
-
-[data-theme="light"] .badge-tag {
-  background: rgba(2, 132, 199, 0.1) !important;
-  border-color: rgba(2, 132, 199, 0.3) !important;
-  color: #0369a1 !important;
-}
-
-[data-theme="light"] .badge-tag-accent {
-  background: rgba(37, 211, 102, 0.12) !important;
-  border-color: rgba(37, 211, 102, 0.4) !important;
-  color: #15803d !important;
-}
-
-[data-theme="light"] .price-box {
-  background: #f8fafc !important;
-  border-color: #e2e8f0 !important;
-}
-
-[data-theme="light"] .price-amount {
-  color: #16a34a !important;
-}
-
-[data-theme="light"] .price-cycle {
-  color: #64748b !important;
-}
-
-[data-theme="light"] .feature-list {
+/* Pestañas inactivas del ribbon del configurador */
+[data-theme="light"] .wizard-tab-square,
+[data-theme="light"] .wizard-step-btn {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
   color: #334155 !important;
 }
 
-[data-theme="light"] article.card > footer {
-  border-top: 1px solid #e2e8f0 !important;
-}
-
-[data-theme="light"] .section-head h2 {
+[data-theme="light"] .wizard-tab-square:hover:not(:disabled),
+[data-theme="light"] .wizard-step-btn:hover:not(:disabled) {
+  background: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
   color: #0f172a !important;
 }
 
-[data-theme="light"] .section-head p {
+[data-theme="light"] .wizard-tab-square .wizard-step-num,
+[data-theme="light"] .wizard-step-btn .wizard-step-num {
+  background: #e2e8f0 !important;
+  border: 1px solid #cbd5e1 !important;
   color: #475569 !important;
 }
 
-/* Formulario del configurador */
+/* Pestaña ACTIVA / SELECCIONADA en el ribbon */
+[data-theme="light"] .wizard-step-item.is-active .wizard-tab-square,
+[data-theme="light"] .wizard-step-item.is-active .wizard-step-btn,
+[data-theme="light"] .wizard-step-btn[aria-current="step"],
+[data-theme="light"] .wizard-tab-square[aria-current="step"],
+[data-theme="light"] .wizard-tab-square.is-active {
+  background: #ffffff !important;
+  border-color: #0284c7 !important;
+  color: #0284c7 !important;
+  box-shadow: inset 0 2px 0 0 #0284c7, 0 4px 12px rgba(2, 132, 199, 0.15) !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .wizard-step-item.is-active .wizard-tab-square .wizard-step-num,
+[data-theme="light"] .wizard-step-item.is-active .wizard-step-btn .wizard-step-num,
+[data-theme="light"] .wizard-step-btn[aria-current="step"] .wizard-step-num,
+[data-theme="light"] .wizard-tab-square[aria-current="step"] .wizard-step-num,
+[data-theme="light"] .wizard-tab-square.is-active .wizard-step-num {
+  background: #0284c7 !important;
+  border-color: #0284c7 !important;
+  color: #ffffff !important;
+}
+
+/* Pestaña COMPLETADA / DONE en el ribbon */
+[data-theme="light"] .wizard-step-item.is-done .wizard-tab-square,
+[data-theme="light"] .wizard-step-item.is-done .wizard-step-btn {
+  background: rgba(37, 211, 102, 0.1) !important;
+  border-color: #16a34a !important;
+  color: #15803d !important;
+  box-shadow: none !important;
+}
+
+[data-theme="light"] .wizard-step-item.is-done .wizard-tab-square .wizard-step-num,
+[data-theme="light"] .wizard-step-item.is-done .wizard-step-btn .wizard-step-num {
+  background: #16a34a !important;
+  border-color: #16a34a !important;
+  color: #ffffff !important;
+}
+
+/* ==========================================================================
+   CONFIGURADOR: FORMULARIO, CAMPOS E INPUTS
+   ========================================================================== */
 [data-theme="light"] .configurator-form-card {
   background: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] .prospect-gate-card {
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 [data-theme="light"] .instances-bar-section {
   background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 [data-theme="light"] .instance-slot-id {
@@ -5087,12 +5073,13 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .preset-chip {
   background: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   color: #334155 !important;
 }
 
 [data-theme="light"] .preset-chip:hover {
   background: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
   color: #0f172a !important;
 }
 
@@ -5101,7 +5088,7 @@ dialog.product-form-modal .dialog-inner {
   background: rgba(37, 211, 102, 0.15) !important;
   border-color: #16a34a !important;
   color: #15803d !important;
-  font-weight: 700;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] input,
@@ -5127,7 +5114,7 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .wizard-recover-box {
   background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 [data-theme="light"] .wizard-recover-info strong {
@@ -5158,23 +5145,31 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .wizard-summary-card {
   background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 [data-theme="light"] .wizard-summary-meta {
   color: #b45309 !important;
 }
 
+[data-theme="light"] .wizard-pricing-card {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important;
+}
+
 [data-theme="light"] .simulator-highlight-banner {
   background: rgba(37, 211, 102, 0.1) !important;
-  border-color: rgba(37, 211, 102, 0.35) !important;
+  border: 1px solid rgba(37, 211, 102, 0.35) !important;
 }
 
 [data-theme="light"] .sim-banner-badge {
   color: #15803d !important;
 }
 
-/* Master-detail de Alma e IA */
+/* ==========================================================================
+   ALMA E IA: MASTER-DETAIL EN MODO CLARO
+   ========================================================================== */
 [data-theme="light"] .soul-sidebar {
   background: #f8fafc !important;
   border-color: #cbd5e1 !important;
@@ -5319,34 +5314,56 @@ dialog.product-form-modal .dialog-inner {
   color: #334155 !important;
 }
 
-/* SIMULADOR EN MODO CLARO (Máximo contraste y fondos claros) */
+/* ==========================================================================
+   SIMULADOR DE CHAT EN MODO CLARO (PANEL, ENCABEZADO Y BURBUJAS)
+   ========================================================================== */
 [data-theme="light"] .simulator-panel,
 [data-theme="light"] .bot-widget-panel,
 [data-theme="light"] .chat-card,
+[data-theme="light"] #simulator-panel,
 [data-theme="light"] #simulator-panel[data-bot-mode='custom'],
 [data-theme="light"] #simulator-panel[data-bot-mode='official'] {
-  background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12) !important;
 }
 
-[data-theme="light"] .sim-header {
-  background: #ffffff !important;
+/* ENCABEZADO DEL SIMULADOR - MÁXIMO CONTRASTE */
+[data-theme="light"] .bot-widget-header,
+[data-theme="light"] #simulator-panel .bot-widget-header,
+[data-theme="light"] #simulator-panel[data-bot-mode='custom'] .bot-widget-header,
+[data-theme="light"] #simulator-panel[data-bot-mode='official'] .bot-widget-header {
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%) !important;
   border-bottom: 1px solid #cbd5e1 !important;
 }
 
-[data-theme="light"] .sim-title {
+[data-theme="light"] .sim-title,
+[data-theme="light"] #sim-header-title {
   color: #0f172a !important;
+  font-weight: 700 !important;
 }
 
-[data-theme="light"] .sim-icon-btn {
+[data-theme="light"] .sim-icon-btn,
+[data-theme="light"] #sim-reset-chat-btn,
+[data-theme="light"] #sim-close-btn {
   background: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
-  color: #334155 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
 }
 
-[data-theme="light"] .sim-icon-btn:hover {
+[data-theme="light"] .sim-icon-btn:hover,
+[data-theme="light"] #sim-reset-chat-btn:hover,
+[data-theme="light"] #sim-close-btn:hover {
   background: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
   color: #0f172a !important;
+}
+
+[data-theme="light"] .sim-mode-badge {
+  background: rgba(2, 132, 199, 0.12) !important;
+  border: 1px solid rgba(2, 132, 199, 0.3) !important;
+  color: #0369a1 !important;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] .sim-instance-bar {
@@ -5356,11 +5373,13 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .sim-instance-bar label {
   color: #475569 !important;
+  font-weight: 600 !important;
 }
 
-[data-theme="light"] .sim-instance-bar select {
+[data-theme="light"] .sim-instance-bar select,
+[data-theme="light"] .sim-instance-select {
   background: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   color: #0f172a !important;
 }
 
@@ -5371,8 +5390,14 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .sim-switch-btn {
   background: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   color: #475569 !important;
+}
+
+[data-theme="light"] .sim-switch-btn:hover:not(:disabled) {
+  background: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
 }
 
 [data-theme="light"] #btn-switch-official-bot.is-active,
@@ -5380,7 +5405,7 @@ dialog.product-form-modal .dialog-inner {
   background: rgba(2, 132, 199, 0.12) !important;
   border-color: #0284c7 !important;
   color: #0369a1 !important;
-  font-weight: 700;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] #btn-switch-custom-bot.is-active,
@@ -5388,7 +5413,7 @@ dialog.product-form-modal .dialog-inner {
   background: rgba(126, 34, 206, 0.12) !important;
   border-color: #7e22ce !important;
   color: #6b21a8 !important;
-  font-weight: 700;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] .bot-messages {
@@ -5414,12 +5439,12 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .bubble-identity-official {
   color: #0369a1 !important;
-  font-weight: 700;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] .bubble-identity-custom {
   color: #6b21a8 !important;
-  font-weight: 700;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] .chat-bubble.user {
@@ -5435,9 +5460,9 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .quick-chip {
   background: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   color: #1e293b !important;
-  font-weight: 600;
+  font-weight: 600 !important;
 }
 
 [data-theme="light"] .quick-chip:hover {
@@ -5453,15 +5478,28 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .bot-input-bar input {
   background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   color: #0f172a !important;
 }
 
-/* Modales y Checkout */
+[data-theme="light"] .bot-input-bar input::placeholder {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .bot-widget-toggle-btn {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* ==========================================================================
+   MODALES, CHECKOUT Y PANEL ADMINISTRATIVO EN MODO CLARO
+   ========================================================================== */
 [data-theme="light"] .product-form-modal,
 [data-theme="light"] dialog {
   background: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   color: #0f172a !important;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15) !important;
 }
@@ -5488,7 +5526,7 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .checkout-addon-item {
   background: #f8fafc !important;
-  border-color: #e2e8f0 !important;
+  border: 1px solid #e2e8f0 !important;
 }
 
 [data-theme="light"] .checkout-addon-price {
@@ -5497,7 +5535,7 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .checkout-pricing-summary {
   background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 [data-theme="light"] .checkout-total-price {
@@ -5506,7 +5544,7 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .wizard-locked-banner {
   background: rgba(217, 119, 6, 0.1) !important;
-  border-color: rgba(217, 119, 6, 0.35) !important;
+  border: 1px solid rgba(217, 119, 6, 0.35) !important;
 }
 
 [data-theme="light"] .wizard-locked-body strong {
@@ -5515,6 +5553,44 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .wizard-locked-body p {
   color: #475569 !important;
+}
+
+[data-theme="light"] .panel-card,
+[data-theme="light"] .auth-card,
+[data-theme="light"] .product-showcase-card {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .panel-card h3,
+[data-theme="light"] .panel-card h4,
+[data-theme="light"] .auth-card-head h2 {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .table-wrapper,
+[data-theme="light"] table {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] th {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] td {
+  background: #ffffff !important;
+  color: #334155 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+[data-theme="light"] .badge-status {
+  border: 1px solid #cbd5e1 !important;
 }
 
 /* ==================== ALMA E IA: MASTER-DETAIL LAYOUT ==================== */
