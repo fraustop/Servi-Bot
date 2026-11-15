@@ -8,6 +8,10 @@
     ],
     "rewrites": [
       {
+        "source": "/terminos",
+        "destination": "/terminos.html"
+      },
+      {
         "source": "/admin",
         "destination": "/index.html"
       },
