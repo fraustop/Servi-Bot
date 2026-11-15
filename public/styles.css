@@ -692,6 +692,40 @@ body.is-admin-session .container {
   color: #f3e8ff;
 }
 
+.btn-topbar-admin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-block-size: 44px;
+  min-inline-size: 44px;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-main);
+  text-decoration: none;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.16s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.btn-topbar-admin:hover {
+  border-color: var(--wa-green-bright);
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.topbar-admin-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
 .topbar-sim-icon {
   inline-size: 22px;
   block-size: 22px;

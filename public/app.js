@@ -287,9 +287,12 @@ async function resolveInitialApiBase() {
     if (rt.ok) {
       const cfg = await rt.json();
       if (cfg.tunnelUrl) {
-        API_BASE = cfg.tunnelUrl.trim().replace(/\/+$/, '');
-        syncApiOverrideInput();
-        return;
+        const candidate = cfg.tunnelUrl.trim().replace(/\/+$/, '');
+        if (candidate.endsWith('.cloudfront.net') || (await isBackendReachable(candidate, 2500))) {
+          API_BASE = candidate;
+          syncApiOverrideInput();
+          return;
+        }
       }
     }
   } catch {
@@ -331,20 +334,29 @@ async function apiFetch(endpoint, options = {}) {
       // continuar si el endpoint es público
     }
   }
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers
-  });
-
-  const text = await res.text();
   try {
-    const parsed = JSON.parse(text);
-    if (parsed && typeof parsed === 'object' && parsed.statusCode == null) {
-      parsed.statusCode = res.status;
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers
+    });
+
+    const text = await res.text();
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === 'object' && parsed.statusCode == null) {
+        parsed.statusCode = res.status;
+      }
+      return parsed;
+    } catch {
+      return { ok: false, statusCode: res.status, error: text || `Error HTTP ${res.status}` };
     }
-    return parsed;
-  } catch {
-    return { ok: false, statusCode: res.status, error: text || `Error HTTP ${res.status}` };
+  } catch (err) {
+    console.warn(`[apiFetch] Falló la petición a ${API_BASE}${endpoint}:`, err);
+    return {
+      ok: false,
+      statusCode: 0,
+      error: `Error de conexión con el servidor (${err.message || 'sin conexión'}).`
+    };
   }
 }
 
@@ -459,11 +471,19 @@ function syncHeaderAndNavigation() {
 
   document.body.classList.toggle('is-public-view', isPublic);
   document.body.classList.toggle('is-admin-session', isAuthenticatedAdmin);
-  siteHeader?.classList.toggle('hidden', !isAuthenticatedAdmin);
+  siteHeader?.classList.remove('hidden');
 
   document.querySelectorAll('.admin-nav-item').forEach((el) => {
     el.classList.toggle('hidden', !isAuthenticatedAdmin);
   });
+  document.querySelectorAll('.public-nav-item').forEach((el) => {
+    el.classList.toggle('hidden', isAuthenticatedAdmin);
+  });
+
+  const navLoginLabel = document.getElementById('btn-nav-login-label');
+  if (navLoginLabel) {
+    navLoginLabel.textContent = currentUser ? 'Mi Panel Admin' : 'Iniciar Sesión / Admin';
+  }
 
   if (isAuthenticatedAdmin) {
     if (brandSubtitle) brandSubtitle.textContent = 'Panel Administrativo';
@@ -505,23 +525,30 @@ function showView(which, { syncUrl = true } = {}) {
     viewAdmin?.classList.remove('hidden');
     syncHeaderAndNavigation();
     if (currentUser) {
-      apiFetch('/api/admin/me').then((me) => {
-        const gate = document.getElementById('auth-gate');
-        const dash = document.getElementById('admin-dashboard');
-        if (me?.ok) {
-          gate?.classList.add('hidden');
-          dash?.classList.remove('hidden');
-          setFeedback('auth-status-msg', '');
-          syncAdminRoleUI(me);
-          syncHeaderAndNavigation();
-          switchAdminTab(activeAdminTab);
-          loadAllAdminData();
-        } else {
+      const gate = document.getElementById('auth-gate');
+      const dash = document.getElementById('admin-dashboard');
+      setFeedback('auth-status-msg', 'Verificando sesión administrativa...', true);
+      apiFetch('/api/admin/me')
+        .then((me) => {
+          if (me?.ok) {
+            gate?.classList.add('hidden');
+            dash?.classList.remove('hidden');
+            setFeedback('auth-status-msg', '');
+            syncAdminRoleUI(me);
+            syncHeaderAndNavigation();
+            switchAdminTab(activeAdminTab);
+            loadAllAdminData();
+          } else {
+            gate?.classList.remove('hidden');
+            dash?.classList.add('hidden');
+            setFeedback('auth-status-msg', me?.error || 'Tu cuenta no tiene rol de Administrador. Si eres cliente, regresa al inicio.', false);
+          }
+        })
+        .catch((err) => {
           gate?.classList.remove('hidden');
           dash?.classList.add('hidden');
-          setFeedback('auth-status-msg', me?.error || 'Tu cuenta no tiene rol de Administrador. Si eres cliente, regresa al inicio.', false);
-        }
-      });
+          setFeedback('auth-status-msg', `No se pudo conectar con el servidor: ${err.message}`, false);
+        });
     } else {
       setFeedback('auth-status-msg', '');
       requestAnimationFrame(() => document.getElementById('auth-email')?.focus());
@@ -1946,29 +1973,56 @@ onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   const gate = document.getElementById('auth-gate');
   const dash = document.getElementById('admin-dashboard');
+  const submitBtn = document.getElementById('btn-login-email');
 
   if (user) {
+    const isSuper = user.email?.toLowerCase() === 'fraustop@outlook.com';
+
+    // Si el usuario es el Administrador Principal y está en la portada, dirigirlo a la consola de administración
+    if (activeView === 'public' && isSuper) {
+      showView('admin');
+      return;
+    }
+
     if (activeView === 'admin') {
-      const me = await apiFetch('/api/admin/me');
-      if (!me?.ok || me?.statusCode === 403) {
-        currentAdminMeta = null;
-        adminSelectedInstanceId = '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Verificando permisos...';
+      }
+      setFeedback('auth-status-msg', 'Autenticado. Verificando rol en el servidor...', true);
+
+      try {
+        const me = await apiFetch('/api/admin/me');
+        if (!me?.ok || me?.statusCode === 403) {
+          currentAdminMeta = null;
+          adminSelectedInstanceId = '';
+          gate?.classList.remove('hidden');
+          dash?.classList.add('hidden');
+          setFeedback(
+            'auth-status-msg',
+            me?.error || 'Esta cuenta está registrada pero no tiene rol de Administrador. Si deseas crear o configurar tu bot, regresa al inicio.',
+            false
+          );
+          syncHeaderAndNavigation();
+        } else {
+          gate?.classList.add('hidden');
+          dash?.classList.remove('hidden');
+          setFeedback('auth-status-msg', '');
+          syncAdminRoleUI(me);
+          syncHeaderAndNavigation();
+          switchAdminTab(activeAdminTab);
+          await loadAllAdminData();
+        }
+      } catch (err) {
         gate?.classList.remove('hidden');
         dash?.classList.add('hidden');
-        setFeedback(
-          'auth-status-msg',
-          me?.error || 'Esta cuenta está registrada pero no tiene rol de Administrador. Si deseas crear o configurar tu bot, regresa al inicio.',
-          false
-        );
+        setFeedback('auth-status-msg', `Error de conexión al validar permisos: ${err?.message || 'Servidor inaccesible'}`, false);
         syncHeaderAndNavigation();
-      } else {
-        gate?.classList.add('hidden');
-        dash?.classList.remove('hidden');
-        setFeedback('auth-status-msg', '');
-        syncAdminRoleUI(me);
-        syncHeaderAndNavigation();
-        switchAdminTab(activeAdminTab);
-        await loadAllAdminData();
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Iniciar sesión';
+        }
       }
     } else {
       syncHeaderAndNavigation();
@@ -1980,6 +2034,10 @@ onAuthStateChanged(auth, async (user) => {
     syncAdminRoleUI(null);
     gate?.classList.remove('hidden');
     dash?.classList.add('hidden');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Iniciar sesión';
+    }
     syncHeaderAndNavigation();
     syncProspectGateUI();
   }
@@ -2879,15 +2937,22 @@ function setupEventListeners() {
     carouselController?.goToSlide(0, { announce: true, instant: true });
   });
 
+  document.getElementById('btn-topbar-admin')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    showView('admin');
+  });
+
   if (hasAdminUrlParam()) {
     showView('admin', { syncUrl: false });
   } else {
     showView('public', { syncUrl: false });
   }
 
-  window.addEventListener('popstate', () => {
+  const handleRouteSync = () => {
     showView(hasAdminUrlParam() ? 'admin' : 'public', { syncUrl: false });
-  });
+  };
+  window.addEventListener('popstate', handleRouteSync);
+  window.addEventListener('hashchange', handleRouteSync);
 
   // Botones de navegación del Panel Admin en el encabezado
   document.querySelectorAll('.admin-tab-nav').forEach((btn) => {
@@ -2907,7 +2972,7 @@ function setupEventListeners() {
     const pass = document.getElementById('auth-password').value;
     const submitBtn = document.getElementById('btn-login-email');
 
-    setFeedback('auth-status-msg', '');
+    setFeedback('auth-status-msg', 'Conectando con Firebase Auth...', true);
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.textContent = 'Verificando...';
@@ -2915,9 +2980,9 @@ function setupEventListeners() {
 
     try {
       await signInWithEmailAndPassword(auth, email, pass);
+      setFeedback('auth-status-msg', 'Autenticado. Verificando rol de administración...', true);
     } catch (err) {
       setFeedback('auth-status-msg', mapFirebaseAuthError(err), false);
-    } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Iniciar sesión';
@@ -3165,6 +3230,15 @@ function setupEventListeners() {
         }
       } else {
         await signInWithEmailAndPassword(auth, email, pass);
+        if (email.toLowerCase() === 'fraustop@outlook.com') {
+          showView('admin');
+          return;
+        }
+        const me = await apiFetch('/api/admin/me');
+        if (me?.ok) {
+          showView('admin');
+          return;
+        }
       }
       syncProspectGateUI();
     } catch (err) {
@@ -3172,6 +3246,26 @@ function setupEventListeners() {
     } finally {
       if (submitBtn) submitBtn.disabled = false;
     }
+  });
+
+  document.getElementById('btn-skip-auth-wizard')?.addEventListener('click', () => {
+    document.getElementById('prospect-gate-shell')?.classList.add('hidden');
+    document.getElementById('prospect-gate-shell')?.setAttribute('hidden', '');
+    document.getElementById('wizard-unlocked-content')?.classList.remove('hidden');
+    document.getElementById('wizard-unlocked-content')?.removeAttribute('hidden');
+    goToWizardStep(2, { focusHeading: true });
+  });
+
+  document.getElementById('btn-nav-login')?.addEventListener('click', () => {
+    closeMenuPopoverIfOpen();
+    showView('admin');
+  });
+
+  document.getElementById('nav-btn-goto-wizard')?.addEventListener('click', () => {
+    closeMenuPopoverIfOpen();
+    showView('public');
+    const wizardEl = document.getElementById('servibot-wizard-card') || document.getElementById('wizard-pane');
+    wizardEl?.scrollIntoView({ behavior: 'smooth' });
   });
 
   document.getElementById('form-prospect-contact')?.addEventListener('submit', async (e) => {

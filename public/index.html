@@ -53,6 +53,26 @@
         </button>
 
         <ul id="site-menu" class="site-menu" popover="auto">
+          <!-- Navegación Sección Pública (visible en modo público) -->
+          <li class="public-nav-item">
+            <a href="#inicio" class="nav-btn">
+              <span class="nav-icon" aria-hidden="true">🏠</span>
+              <span>Inicio</span>
+            </a>
+          </li>
+          <li class="public-nav-item">
+            <button type="button" class="nav-btn" id="nav-btn-goto-wizard">
+              <span class="nav-icon" aria-hidden="true">⚙️</span>
+              <span>Diseña tu Bot</span>
+            </button>
+          </li>
+          <li class="public-nav-item">
+            <button type="button" class="nav-btn nav-btn-primary" id="btn-nav-login" style="background: var(--metal-accent); color: #000; font-weight: 600;">
+              <span class="nav-icon" aria-hidden="true">🔐</span>
+              <span id="btn-nav-login-label">Iniciar Sesión / Admin</span>
+            </button>
+          </li>
+
           <!-- Navegación Sección Admin (ocupa todo el ancho disponible) -->
           <li class="admin-nav-item hidden">
             <button type="button" class="nav-btn admin-tab-nav" data-tab="tab-catalog" aria-current="page">
@@ -164,6 +184,15 @@
               <span class="topbar-sim-emoji hidden" id="topbar-sim-icon-emoji" aria-hidden="true">🤖</span>
               <span id="topbar-sim-label">Abrir Bot</span>
             </button>
+            <a
+              href="#admin"
+              class="btn-topbar-admin"
+              id="btn-topbar-admin"
+              title="Acceso al Panel Administrativo"
+            >
+              <span class="topbar-admin-icon" aria-hidden="true">🔐</span>
+              <span>Admin</span>
+            </a>
           </div>
         </div>
 
@@ -436,6 +465,15 @@
                         Crear Cuenta y Continuar →
                       </button>
                     </form>
+
+                    <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed var(--metal-border); text-align: center;">
+                      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                        ¿Prefieres diseñar tu bot antes de registrarte?
+                      </p>
+                      <button type="button" class="btn btn-outline btn-sm" id="btn-skip-auth-wizard" style="width: 100%;">
+                        ⚙️ Explorar y diseñar mi bot sin registrarme →
+                      </button>
+                    </div>
                   </div>
 
                   <!-- SUB-PASO B: CONFIRMACIÓN DE DATOS DE CONTACTO -->
