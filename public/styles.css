@@ -2715,12 +2715,7 @@ article.card > footer {
 
 /* Barra conmutadora: Nuestro Bot (Icono + Azul/Verde) vs Bot Creado (Emoji 🤖 + Violeta/Ámbar) */
 .sim-bot-switcher {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.4rem;
-  padding: 0.48rem 0.85rem;
-  background: rgba(7, 10, 16, 0.94);
-  border-bottom: 1px solid var(--metal-border);
+  display: none !important;
 }
 
 .sim-switch-btn {
@@ -6884,5 +6879,10 @@ dialog.product-form-modal .dialog-inner {
 
 /* Ocultar subsección de aplicaciones temporalmente */
 #soul-tab-apps, #soul-pane-apps {
+  display: none !important;
+}
+
+/* Ocultar pestañas de cambio de bot en el chat */
+.sim-bot-switcher {
   display: none !important;
 }
