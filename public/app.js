@@ -227,13 +227,15 @@ function syncProspectGateUI() {
 }
 
 function buildAdminEndpoint(endpoint) {
-  if (!currentAdminMeta?.is_superadmin || !adminSelectedInstanceId) return endpoint;
+  const isSuper = Boolean(currentAdminMeta?.is_superadmin || currentUser?.email?.toLowerCase() === 'fraustop@outlook.com');
+  if (!isSuper || !adminSelectedInstanceId) return endpoint;
   const sep = endpoint.includes('?') ? '&' : '?';
   return `${endpoint}${sep}instance_id=${encodeURIComponent(adminSelectedInstanceId)}`;
 }
 
 function getSelectedAdminInstanceId() {
-  if (currentAdminMeta?.is_superadmin) return adminSelectedInstanceId || 'servibot-00';
+  const isSuper = Boolean(currentAdminMeta?.is_superadmin || currentUser?.email?.toLowerCase() === 'fraustop@outlook.com');
+  if (isSuper) return adminSelectedInstanceId || 'servibot-00';
   return currentAdminMeta?.assigned_instance_id || 'servibot-01';
 }
 
@@ -1802,8 +1804,34 @@ function mapFirebaseAuthError(err) {
 
 // ==================== FIREBASE AUTH & PANEL ADMIN ====================
 function syncAdminRoleUI(meData) {
-  currentAdminMeta = meData || null;
-  const isSuper = Boolean(meData?.is_superadmin);
+  if (!meData) {
+    currentAdminMeta = null;
+    const banner = document.getElementById('admin-role-banner');
+    if (banner) {
+      banner.classList.add('hidden');
+      banner.setAttribute('hidden', '');
+    }
+    return;
+  }
+
+  const acct = meData.account || meData;
+  const userEmail = String(acct.email || meData.email || currentUser?.email || '').trim().toLowerCase();
+  const isSuper = Boolean(
+    meData.is_superadmin ||
+    acct.is_superadmin ||
+    acct.role === 'superadmin' ||
+    userEmail === 'fraustop@outlook.com'
+  );
+  const assignedInstance = isSuper ? 'servibot-00' : (acct.assigned_instance_id || meData.assigned_instance_id || 'servibot-01');
+
+  currentAdminMeta = {
+    ...meData,
+    ...acct,
+    is_superadmin: isSuper,
+    email: userEmail,
+    assigned_instance_id: assignedInstance,
+    instances: meData.instances || meData.available_instances || acct.instances || []
+  };
 
   document.querySelectorAll('[data-superadmin-only="1"]').forEach((el) => {
     const hide = !isSuper;
@@ -1834,31 +1862,23 @@ function syncAdminRoleUI(meData) {
     }
   });
 
-  if (!meData) {
-    if (banner) {
-      banner.classList.add('hidden');
-      banner.setAttribute('hidden', '');
-    }
-    return;
-  }
-
   if (banner) {
     banner.classList.remove('hidden');
     banner.removeAttribute('hidden');
   }
 
   if (isSuper) {
-    if (!adminSelectedInstanceId) {
+    if (!adminSelectedInstanceId || adminSelectedInstanceId === 'servibot-01') {
       adminSelectedInstanceId = 'servibot-00';
     }
     if (roleBadge) {
-      roleBadge.textContent = `👑 SuperAdmin · ${meData.email || 'fraustop@outlook.com'}`;
+      roleBadge.textContent = `👑 SuperAdmin · ${userEmail || 'fraustop@outlook.com'}`;
     }
     if (superControls) {
       superControls.classList.remove('hidden');
       superControls.removeAttribute('hidden');
     }
-    const instances = Array.isArray(meData.instances) ? meData.instances : [];
+    const instances = Array.isArray(currentAdminMeta.instances) ? currentAdminMeta.instances : [];
     const optionsHtml = instances.length
       ? instances
           .map((inst) => {
@@ -1871,7 +1891,7 @@ function syncAdminRoleUI(meData) {
             }>${escapeHtml(label)}</option>`;
           })
           .join('')
-      : '<option value="servibot-00">servibot-00 · Bot 0 (Principal)</option>';
+      : '<option value="servibot-00">servibot-00 · Bot 0 (Proyecto Cero Principal)</option>';
 
     if (switcher) {
       switcher.innerHTML = optionsHtml;
@@ -1888,9 +1908,9 @@ function syncAdminRoleUI(meData) {
       expiryBadge.setAttribute('hidden', '');
     }
   } else {
-    adminSelectedInstanceId = meData.assigned_instance_id || 'servibot-01';
+    adminSelectedInstanceId = assignedInstance;
     if (roleBadge) {
-      roleBadge.textContent = `🤖 Admin Estándar · ${meData.email || ''}`;
+      roleBadge.textContent = `🤖 Admin Estándar · ${userEmail || ''}`;
     }
     if (superControls) {
       superControls.classList.add('hidden');
@@ -1898,22 +1918,18 @@ function syncAdminRoleUI(meData) {
     }
     const biz = meData.instance?.business_name ? ` · ${meData.instance.business_name}` : '';
     if (instLabel) {
-      instLabel.textContent = `Instancia aislada: ${adminSelectedInstanceId}${biz}`;
+      instLabel.textContent = `Instancia Asignada: ${assignedInstance}${biz}`;
     }
     if (expiryBadge) {
-      expiryBadge.classList.remove('hidden');
-      expiryBadge.removeAttribute('hidden');
-      if (meData.subscription_expired) {
-        expiryBadge.textContent = '⛔ Suscripción de 30 días vencida (solo lectura)';
-        expiryBadge.className = 'badge-tag badge-status-dot-hidden';
-      } else if (meData.subscription_expires_at) {
-        const msLeft = new Date(meData.subscription_expires_at).getTime() - Date.now();
-        const daysLeft = Math.max(0, Math.ceil(msLeft / 86400000));
-        expiryBadge.textContent = `⏳ Vigencia: ${daysLeft} días restantes`;
-        expiryBadge.className = 'badge-tag badge-status-dot-active';
+      if (acct.subscription_expired) {
+        expiryBadge.className = 'admin-expiry-badge is-expired';
+        expiryBadge.textContent = '⛔ Suscripción Vencida';
+      } else if (acct.days_remaining !== null) {
+        expiryBadge.className = 'admin-expiry-badge is-active';
+        expiryBadge.textContent = `⏳ ${acct.days_remaining} días restantes`;
       } else {
-        expiryBadge.textContent = '⏳ Plan mensual (30 días naturales)';
-        expiryBadge.className = 'badge-tag badge-tag-accent';
+        expiryBadge.classList.add('hidden');
+        expiryBadge.setAttribute('hidden', '');
       }
     }
   }

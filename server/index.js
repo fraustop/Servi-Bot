@@ -3575,21 +3575,30 @@ async function main() {
 
     res.json({
       ok: true,
+      email: req.adminAccount.email,
+      role: req.adminAccount.role,
+      assigned_instance_id: req.adminAccount.assigned_instance_id,
+      is_superadmin: Boolean(req.adminAccount.is_superadmin),
+      can_manage_accounts: Boolean(req.adminAccount.can_manage_accounts),
+      subscription_expires_at: req.adminAccount.subscription_expires_at,
+      days_remaining: req.adminAccount.days_remaining,
+      subscription_expired: req.adminAccount.subscription_expired,
+      instances: availableInstances,
+      available_instances: availableInstances,
       user: req.firebaseUser,
       account: {
         email: req.adminAccount.email,
         display_name: req.adminAccount.display_name,
         role: req.adminAccount.role,
         assigned_instance_id: req.adminAccount.assigned_instance_id,
-        is_superadmin: req.adminAccount.is_superadmin,
-        can_manage_accounts: req.adminAccount.can_manage_accounts,
+        is_superadmin: Boolean(req.adminAccount.is_superadmin),
+        can_manage_accounts: Boolean(req.adminAccount.can_manage_accounts),
         subscription_expires_at: req.adminAccount.subscription_expires_at,
         days_remaining: req.adminAccount.days_remaining,
         subscription_expired: req.adminAccount.subscription_expired
       },
       active_instance_id: targetId,
-      instance: instanceRow ? mergeInstanceWithLiveState(instanceRow) : null,
-      available_instances: availableInstances
+      instance: instanceRow ? mergeInstanceWithLiveState(instanceRow) : null
     });
   });
 
