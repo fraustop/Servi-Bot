@@ -498,6 +498,7 @@ function showView(which, { syncUrl = true } = {}) {
   closeMenuPopoverIfOpen();
 
   if (activeView === 'admin') {
+    closeMobileSimulator();
     viewPublic?.classList.add('hidden');
     viewAdmin?.classList.remove('hidden');
     syncHeaderAndNavigation();

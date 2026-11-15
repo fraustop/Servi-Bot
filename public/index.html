@@ -580,19 +580,6 @@
                         </div>
                         <div id="wizard-recover-status" class="auth-feedback" role="status" aria-live="polite"></div>
                       </div>
-                      <div class="wizard-recover-controls">
-                        <input
-                          type="text"
-                          id="wizard-recover-input"
-                          placeholder="Ej. +5215512345678, correo o servibot-04"
-                          autocomplete="off"
-                        />
-                        <button type="button" class="btn btn-outline btn-sm" id="btn-wizard-recover">
-                          Retomar mi Bot
-                        </button>
-                      </div>
-                      <div id="wizard-recover-status" class="auth-feedback" role="status" aria-live="polite"></div>
-                    </div>
 
                     <div class="preset-group">
                       <span class="preset-label" id="giro-presets-label">Giro o industria (opcional, rellena ideas iniciales):</span>
@@ -1000,6 +987,21 @@
                 </form>
               </div>
             </section>
+
+            <!-- Footer público con enlace a Términos y Condiciones -->
+            <footer class="public-site-footer">
+              <div class="footer-inner">
+                <div class="footer-brand">
+                  <img src="/assets/servibot-logo.png" alt="Servi-Bot" width="24" height="24" />
+                  <span>Servi-Bot © 2026 · Asistentes Inteligentes y Automatización Comercial</span>
+                </div>
+                <div class="footer-links">
+                  <a href="/terminos.html" class="link-terms-modal" id="footer-terms-link" target="_blank" rel="noopener">Términos y Condiciones del Servicio</a>
+                  <span>·</span>
+                  <a href="#servibot-wizard-card" class="btn-go-offer">Configurar mi ServiBot</a>
+                </div>
+              </div>
+            </footer>
             </div>
           </article>
         </div>
@@ -1138,20 +1140,6 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
           <span class="sim-fab-emoji hidden" id="sim-fab-emoji" aria-hidden="true">🤖</span>
           <span class="sim-fab-text" id="sim-fab-text">Asesor Servi-Bot</span>
         </button>
-        <!-- Footer público con enlace a Términos y Condiciones -->
-        <footer class="public-site-footer">
-          <div class="footer-inner">
-            <div class="footer-brand">
-              <img src="/assets/servibot-logo.png" alt="Servi-Bot" width="24" height="24" />
-              <span>Servi-Bot © 2026 · Asistentes Inteligentes y Automatización Comercial</span>
-            </div>
-            <div class="footer-links">
-              <a href="/terminos.html" class="link-terms-modal" id="footer-terms-link" target="_blank" rel="noopener">Términos y Condiciones del Servicio</a>
-              <span>·</span>
-              <a href="#servibot-wizard-card" class="btn-go-offer">Configurar mi ServiBot</a>
-            </div>
-          </div>
-        </footer>
       </div>
     </section>
 

@@ -144,6 +144,19 @@ body:not(.is-admin-session) .site-header {
   display: none !important;
 }
 
+/* Ocultar simulador, drawer móvil y botones flotantes cuando no se esté en la vista pública */
+body:not(.is-public-view) #simulator-panel,
+body:not(.is-public-view) .sim-backdrop,
+body:not(.is-public-view) .mobile-floating-actions,
+body.is-admin-session #simulator-panel,
+body.is-admin-session .sim-backdrop,
+body.is-admin-session .mobile-floating-actions,
+#view-admin:not(.hidden) ~ #simulator-panel,
+#view-public.hidden #simulator-panel,
+#view-public.hidden .mobile-floating-actions {
+  display: none !important;
+}
+
 /* ==================== HEADER & RESPONSIVE NAVBAR ==================== */
 .site-header {
   position: sticky;
