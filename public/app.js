@@ -516,6 +516,12 @@ function initPublicCarousel() {
     applyMarkerCurrent(clamped);
 
     const targetSlide = slides[clamped];
+    if (targetSlide) {
+      targetSlide.scrollTop = 0;
+    }
+    if (window.scrollY !== 0 || window.scrollX !== 0) {
+      window.scrollTo(0, 0);
+    }
     const sr = targetSlide.getBoundingClientRect();
     const tr = track.getBoundingClientRect();
     const delta = sr.left + sr.width / 2 - (tr.left + tr.width / 2);

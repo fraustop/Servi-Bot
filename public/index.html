@@ -852,28 +852,39 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
         </form>
       </aside>
 
-      <!-- Botón flotante siempre accesible para abrir/alternar el Bot (especialmente en móvil) -->
-      <button
-        type="button"
-        class="sim-fab-btn"
-        id="btn-sim-fab"
-        data-bot-mode="official"
-        aria-controls="simulator-panel"
-        aria-expanded="false"
-        aria-label="Abrir chat con el bot"
-      >
-        <img
-          src="/assets/servibot-logo.png"
-          alt=""
-          class="sim-fab-img"
-          id="sim-fab-img"
-          width="28"
-          height="28"
-          decoding="async"
-        />
-        <span class="sim-fab-emoji hidden" id="sim-fab-emoji" aria-hidden="true">🤖</span>
-        <span class="sim-fab-text" id="sim-fab-text">Asesor Servi-Bot</span>
-      </button>
+      <!-- Botones flotantes en móvil (< 980px): CTA encima del acceso al bot -->
+      <div class="mobile-floating-actions" id="mobile-floating-actions">
+        <button
+          type="button"
+          class="btn btn-primary btn-go-offer mobile-go-offer-fab"
+          id="btn-mobile-go-offer"
+        >
+          <span>Configurar mi ServiBot →</span>
+        </button>
+
+        <!-- Botón flotante siempre accesible para abrir/alternar el Bot (especialmente en móvil) -->
+        <button
+          type="button"
+          class="sim-fab-btn"
+          id="btn-sim-fab"
+          data-bot-mode="official"
+          aria-controls="simulator-panel"
+          aria-expanded="false"
+          aria-label="Abrir chat con el bot"
+        >
+          <img
+            src="/assets/servibot-logo.png"
+            alt=""
+            class="sim-fab-img"
+            id="sim-fab-img"
+            width="28"
+            height="28"
+            decoding="async"
+          />
+          <span class="sim-fab-emoji hidden" id="sim-fab-emoji" aria-hidden="true">🤖</span>
+          <span class="sim-fab-text" id="sim-fab-text">Asesor Servi-Bot</span>
+        </button>
+      </div>
     </section>
 
     <!-- ==================== VISTA ADMINISTRACIÓN (FIREBASE AUTH) ==================== -->
