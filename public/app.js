@@ -1079,8 +1079,14 @@ function syncSimulatorHeaderLabel(inst = provisionedInstance) {
     isCustom
   );
 
+  const customName =
+    (hasCustom && inst && (inst.display_name || inst.business_name)) ||
+    document.getElementById('cfg-display-name')?.value.trim() ||
+    document.getElementById('cfg-business-name')?.value.trim() ||
+    'Mi Bot';
+
   if (switchCustomLbl) {
-    switchCustomLbl.textContent = hasCustom ? inst.display_name || 'Mi Bot Creado' : 'Mi Bot Creado';
+    switchCustomLbl.textContent = customName;
   }
   if (switchOfficialBtn) {
     switchOfficialBtn.classList.toggle('is-active', !isCustom);
@@ -1091,13 +1097,22 @@ function syncSimulatorHeaderLabel(inst = provisionedInstance) {
     switchCustomBtn.setAttribute('aria-pressed', String(isCustom));
   }
 
+  const lateralTabLbl = document.getElementById('sim-tab-label');
+  const lateralTabIcon = document.getElementById('sim-tab-icon');
+  if (lateralTabLbl) {
+    lateralTabLbl.textContent = isCustom ? customName : 'ServiBot';
+  }
+  if (lateralTabIcon) {
+    lateralTabIcon.textContent = isCustom ? '🤖' : '💬';
+  }
+
   if (isCustom) {
     if (badgeEl) badgeEl.textContent = '🤖 BOT CREADO · EN VIVO';
-    if (titleEl) titleEl.textContent = inst.display_name || 'Mi Bot Creado';
-    if (activeLbl) activeLbl.textContent = `Atendiendo a ${inst.business_name || 'tu negocio'}`;
-    if (fabText) fabText.textContent = inst.display_name || 'Mi Bot Creado';
-    if (topbarLbl) topbarLbl.textContent = 'Mi Bot';
-    if (chatInput) chatInput.placeholder = `Escríbele como cliente a ${inst.display_name || 'tu bot'}...`;
+    if (titleEl) titleEl.textContent = customName;
+    if (activeLbl) activeLbl.textContent = `Atendiendo a ${inst?.business_name || 'tu negocio'}`;
+    if (fabText) fabText.textContent = customName;
+    if (topbarLbl) topbarLbl.textContent = customName;
+    if (chatInput) chatInput.placeholder = `Escríbele como cliente a ${customName}...`;
   } else {
     if (badgeEl) badgeEl.textContent = 'ASESOR OFICIAL SERVI-BOT';
     if (titleEl) titleEl.textContent = 'Asesor Comercial Servi-Bot';
@@ -1106,6 +1121,8 @@ function syncSimulatorHeaderLabel(inst = provisionedInstance) {
     if (topbarLbl) topbarLbl.textContent = 'Abrir Bot';
     if (chatInput) chatInput.placeholder = 'Pregúntale al Asesor Oficial Servi-Bot...';
   }
+
+  updateQuickPrompts(isCustom, inst);
 }
 
 function setSimulatorBotMode(mode, { announceGreeting = false } = {}) {
@@ -1189,6 +1206,59 @@ function closeMobileSimulator() {
     mobileSimTriggerEl.focus({ preventScroll: true });
   }
   mobileSimTriggerEl = null;
+}
+
+function updateQuickPrompts(isCustom, inst = provisionedInstance) {
+  const container = document.querySelector('.bot-quick-prompts');
+  if (!container) return;
+
+  if (isCustom) {
+    const bizName = inst?.business_name || document.getElementById('cfg-business-name')?.value.trim() || 'tu negocio';
+    container.innerHTML = `
+      <button type="button" class="quick-chip" data-prompt="Hola, ¿qué servicios o productos ofrecen y cuáles son sus costos?">¿Qué servicios tienen?</button>
+      <button type="button" class="quick-chip" data-prompt="¿Cuáles son sus horarios de atención y su ubicación?">Horarios y Ubicación</button>
+      <button type="button" class="quick-chip" data-prompt="Hola, me gustaría agendar una cita o hacer un pedido en ${bizName}.">Agendar Cita / Pedido</button>
+    `;
+  } else {
+    container.innerHTML = `
+      <button type="button" class="quick-chip" data-prompt="Hola, ¿qué servicios ofrecen y cuáles son sus precios?">¿Qué planes tienen?</button>
+      <button type="button" class="quick-chip" data-prompt="¿Cómo funciona el bot de WhatsApp, Correo y Teams sin tokens?">¿Cómo funciona sin tokens?</button>
+      <button type="button" class="quick-chip" data-prompt="Quiero contratar el servicio de Bots Autónomos, mi nombre es Carlos Ruiz y mi correo es carlos@negocio.mx, confirma mi pedido.">¡Contratar Bots Autónomos!</button>
+    `;
+  }
+
+  container.querySelectorAll('.quick-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const promptText = chip.dataset.prompt;
+      if (promptText) sendChatMessage(promptText);
+    });
+  });
+}
+
+function toggleSimulatorMinimize(forceState) {
+  const stage = document.querySelector('.public-stage');
+  const lateralTab = document.getElementById('btn-expand-sim-tab');
+  const isMobile = window.matchMedia('(max-width: 979px)').matches;
+
+  if (isMobile) {
+    closeMobileSimulator();
+    return;
+  }
+
+  if (!stage) return;
+  const shouldMinimize = typeof forceState === 'boolean'
+    ? forceState
+    : !stage.classList.contains('sim-minimized');
+
+  stage.classList.toggle('sim-minimized', shouldMinimize);
+  if (lateralTab) {
+    lateralTab.classList.toggle('hidden', !shouldMinimize);
+    if (shouldMinimize) {
+      lateralTab.removeAttribute('hidden');
+    } else {
+      lateralTab.setAttribute('hidden', '');
+    }
+  }
 }
 
 function updateWizardLivePreview() {
@@ -3593,6 +3663,27 @@ function setupEventListeners() {
 
   document.getElementById('btn-close-sim-drawer')?.addEventListener('click', () => {
     closeMobileSimulator();
+  });
+
+  document.getElementById('btn-minimize-chat')?.addEventListener('click', () => {
+    toggleSimulatorMinimize(true);
+  });
+
+  document.getElementById('btn-expand-sim-tab')?.addEventListener('click', () => {
+    toggleSimulatorMinimize(false);
+  });
+
+  ['cfg-business-name', 'cfg-display-name'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('input', () => {
+      const customLbl = document.getElementById('sim-switch-custom-label');
+      const tabLbl = document.getElementById('sim-tab-label');
+      const name =
+        document.getElementById('cfg-display-name')?.value.trim() ||
+        document.getElementById('cfg-business-name')?.value.trim() ||
+        'Mi Bot';
+      if (customLbl) customLbl.textContent = name;
+      if (tabLbl && activeBotMode === 'custom') tabLbl.textContent = name;
+    });
   });
 
   document.getElementById('sim-backdrop')?.addEventListener('click', () => {
