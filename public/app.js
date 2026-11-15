@@ -714,9 +714,9 @@ async function autoSaveInstanceNow() {
 
     const inst = { ...res.instance, catalog: Array.isArray(res.catalog) ? res.catalog : wizardCatalogItems };
     clientInstanceId = inst.instance_id;
-    activeBotMode = 'custom';
-    activeChatInstanceId = inst.instance_id;
     provisionedInstance = inst;
+    activeBotMode = wizardCurrentStep === 3 ? 'custom' : 'official';
+    activeChatInstanceId = activeBotMode === 'custom' ? inst.instance_id : 'servibot-00';
     localStorage.setItem('servibot_client_instance_id', clientInstanceId);
 
     const idHidden = document.getElementById('cfg-instance-id');
@@ -1465,6 +1465,18 @@ function initPublicCarousel() {
     } else {
       lastSettledIndex = settledIndex;
     }
+
+    // Fuera de la sección de Simulador y Costo (Paso 3), siempre atiende ServiBot (asesor oficial)
+    const currentSection = slides[settledIndex]?.dataset.section || 'description';
+    if (currentSection === 'description') {
+      setSimulatorBotMode('official', { announceGreeting: false });
+    } else if (currentSection === 'offer') {
+      if (wizardCurrentStep === 3 && provisionedInstance) {
+        setSimulatorBotMode('custom', { announceGreeting: true });
+      } else {
+        setSimulatorBotMode('official', { announceGreeting: false });
+      }
+    }
   }
 
   function goToSlide(targetIndex, { announce = true, instant = false, fromAutoplay = false } = {}) {
@@ -2115,6 +2127,13 @@ function goToWizardStep(stepNum, { focusHeading = false } = {}) {
     if (heading) {
       requestAnimationFrame(() => heading.focus({ preventScroll: true }));
     }
+  }
+
+  // Siempre es ServiBot quien atiende en la interfaz a excepción de cuando el usuario entra al Paso 3 (Simulador y Costo)
+  if (step === 3 && provisionedInstance) {
+    setSimulatorBotMode('custom', { announceGreeting: true });
+  } else {
+    setSimulatorBotMode('official', { announceGreeting: false });
   }
 }
 

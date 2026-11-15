@@ -12,6 +12,10 @@
         "destination": "/terminos.html"
       },
       {
+        "source": "/alltime",
+        "destination": "/alltime.html"
+      },
+      {
         "source": "/admin",
         "destination": "/index.html"
       },

@@ -4954,12 +4954,14 @@ dialog.product-form-modal .dialog-inner {
   color: #0f172a !important;
 }
 
-/* Tarjeta de historia en MODO OSCURO: fondo oscuro profundo y letras perfectamente legibles */
+/* Tarjeta de historia en MODO OSCURO: fondo oscuro profundo, letras perfectamente legibles y margen simétrico idéntico al modo claro */
 [data-theme="dark"] .desc-story-grid,
 :root:not([data-theme="light"]) .desc-story-grid {
   background: linear-gradient(160deg, #131822 0%, #0d1117 75%, #101520 100%) !important;
   border: 1px solid rgba(88, 166, 255, 0.28) !important;
   border-radius: 20px !important;
+  padding: clamp(1.2rem, 2.8vw, 2.25rem) !important;
+  box-sizing: border-box !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
   color: #f0f6fc !important;
 }
@@ -6711,7 +6713,8 @@ dialog.product-form-modal .dialog-inner {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 1.15rem;
+  padding: 0;
+  overflow: hidden;
   border-radius: var(--radius-md);
   border: 1px solid var(--metal-border);
   background: rgba(16, 22, 34, 0.75);
@@ -6722,6 +6725,42 @@ dialog.product-form-modal .dialog-inner {
 .app-integration-card:hover {
   border-color: var(--metal-border-strong);
   transform: translateY(-2px);
+}
+
+.app-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.15rem;
+}
+
+.app-card-header--black {
+  background: #000000;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.app-card-header .app-card-title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.app-card-body {
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+}
+
+.app-card-action {
+  display: flex;
+  align-items: center;
+}
+
+.app-card-action .btn {
+  text-decoration: none;
 }
 
 .app-card-top {
@@ -6823,12 +6862,12 @@ dialog.product-form-modal .dialog-inner {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
 }
 
-[data-theme="light"] .app-card-title {
-  color: #0f172a !important;
+[data-theme="light"] .app-card-header--black {
+  background: #000000 !important;
 }
 
-[data-theme="light"] .app-card-vendor {
-  color: #64748b !important;
+[data-theme="light"] .app-card-header--black .app-card-title {
+  color: #ffffff !important;
 }
 
 [data-theme="light"] .app-card-desc {
