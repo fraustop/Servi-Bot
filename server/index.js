@@ -147,7 +147,8 @@ async function runPythonSalesAgent({
   sender_name = '',
   message = '',
   instance_id = 'servibot-00',
-  is_load_test = false
+  is_load_test = false,
+  client_state = {}
 }) {
   const canonicalInstance = normalizeInstanceIdKey(instance_id) || 'servibot-00';
   const botDbPath = getBotDbPath(canonicalInstance);
@@ -173,7 +174,8 @@ async function runPythonSalesAgent({
     ai_provider: botCfg.ai_provider || process.env.AI_PROVIDER || 'bedrock',
     bedrock_model: botCfg.bedrock_model || process.env.BEDROCK_MODEL_ID || 'us.amazon.nova-micro-v1:0',
     aws_region: botCfg.aws_region || process.env.AWS_REGION || 'us-east-2',
-    is_load_test: Boolean(is_load_test)
+    is_load_test: Boolean(is_load_test),
+    client_state: client_state || {}
   };
 
   const executeWorkerCall = async () => {
@@ -2891,13 +2893,15 @@ async function main() {
 
     // Si el modo entrenamiento está DESACTIVADO, bloqueo estricto de escritura en BD.
     // Se ejecuta runPythonSalesAgent de solo lectura para el cliente simulado o visitante de Bot 0.
+    const clientState = (req.body?.client_state && typeof req.body.client_state === 'object') ? req.body.client_state : {};
     const result = await runPythonSalesAgent({
       channel,
       sender_id: cleanSenderId,
       sender_name: String(sender_name || 'Visitante Web').slice(0, 60),
       message: trimmedMessage,
       instance_id: canonicalInstance,
-      is_load_test: isLoadTest
+      is_load_test: isLoadTest,
+      client_state: clientState
     });
 
     if (result?.timing) {

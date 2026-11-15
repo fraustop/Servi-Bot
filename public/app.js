@@ -2065,6 +2065,116 @@ function updateTrainingBarUI() {
   }
 }
 
+function highlightField(id) {
+  if (!id) return;
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.add('bot-field-highlight');
+  try {
+    el.focus();
+  } catch {}
+  setTimeout(() => {
+    el.classList.remove('bot-field-highlight');
+  }, 2200);
+}
+
+function executeInternalAction(actionUrl) {
+  if (!actionUrl || typeof actionUrl !== 'string') return;
+  const trimmed = actionUrl.trim();
+  if (!trimmed.startsWith('action://')) return;
+
+  try {
+    const raw = trimmed.replace(/^action:\/\//, '');
+    const [pathPart, queryPart] = raw.split('?');
+    const params = new URLSearchParams(queryPart || '');
+
+    if (pathPart === 'auth/open') {
+      showView('public');
+      const offerIdx = Math.max(0, document.querySelectorAll('#public-carousel-track .carousel-slide').length - 1);
+      carouselController?.goToSlide(offerIdx, { instant: true });
+      if (!currentUser) {
+        syncProspectGateUI();
+        const gateShell = document.getElementById('prospect-gate-shell');
+        if (gateShell) {
+          gateShell.classList.remove('hidden');
+          gateShell.removeAttribute('hidden');
+          gateShell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        const emailInput = document.getElementById('input-prospect-email') || document.getElementById('prospect-input-email');
+        if (emailInput) highlightField(emailInput.id);
+      }
+    } else if (pathPart === 'auth/skip') {
+      document.getElementById('btn-skip-auth-wizard')?.click();
+    } else if (pathPart === 'wizard/step') {
+      showView('public');
+      const offerIdx = Math.max(0, document.querySelectorAll('#public-carousel-track .carousel-slide').length - 1);
+      carouselController?.goToSlide(offerIdx, { instant: true });
+      const step = parseInt(params.get('step') || '1', 10);
+      goToWizardStep(step, { focusHeading: true });
+      const tab = params.get('tab');
+      if (tab) {
+        switchSoulPane(`soul-pane-${tab}`);
+      }
+      const focusId = params.get('focus');
+      if (focusId) {
+        highlightField(focusId);
+      }
+      const mode = params.get('mode');
+      if (mode === 'custom' || step === 3) {
+        setSimulatorBotMode('custom', { announceGreeting: true });
+        openMobileSimulator();
+      }
+    } else if (pathPart === 'form/fill') {
+      const fieldId = params.get('field');
+      const value = params.get('value');
+      if (fieldId && value !== null) {
+        const input = document.getElementById(fieldId);
+        if (input) {
+          input.value = value;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          highlightField(fieldId);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Error al ejecutar acción interna del bot:', err);
+  }
+}
+
+function renderSelectiveChatButtons(buttonsArray) {
+  const container = document.getElementById('chat-action-buttons') || document.querySelector('.bot-quick-prompts');
+  if (!container) return;
+  if (!Array.isArray(buttonsArray) || buttonsArray.length === 0) {
+    updateChatActionButtons();
+    return;
+  }
+
+  container.innerHTML = '';
+  buttonsArray.forEach((btnData) => {
+    if (!btnData || !btnData.label) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    if (btnData.action && (btnData.action.includes('step=3') || btnData.action.includes('mode=custom'))) {
+      btn.className = 'btn-action-sim';
+    } else {
+      btn.className = 'btn-action-chip';
+    }
+    btn.textContent = btnData.label;
+
+    btn.addEventListener('click', () => {
+      if (btnData.action) {
+        executeInternalAction(btnData.action);
+      }
+      if (btnData.text || btnData.prompt) {
+        sendChatMessage(btnData.text || btnData.prompt);
+      }
+    });
+
+    container.appendChild(btn);
+  });
+}
+
 function updateChatActionButtons() {
   const container = document.getElementById('chat-action-buttons') || document.querySelector('.bot-quick-prompts');
   if (!container) return;
@@ -2893,6 +3003,16 @@ async function sendChatMessage(text) {
 
   const isTrainingActive = Boolean(isTrainingModeActive && activeBotMode === 'custom');
 
+  // Estado del cliente en tiempo real para que el Asesor sepa en qué paso está
+  const clientState = {
+    has_account: Boolean(currentUser),
+    current_step: wizardCurrentStep || 1,
+    business_name: document.getElementById('cfg-business-name')?.value.trim() || '',
+    display_name: document.getElementById('cfg-display-name')?.value.trim() || '',
+    has_catalog: Boolean(wizardCatalogItems && wizardCatalogItems.length > 0),
+    has_schedule: Boolean(wizardSchedule && wizardSchedule.length > 0)
+  };
+
   try {
     const res = await apiFetch('/api/chat', {
       method: 'POST',
@@ -2902,7 +3022,8 @@ async function sendChatMessage(text) {
         sender_id: webSenderId,
         sender_name: isTrainingActive ? 'Dueño (Entrenamiento)' : 'Prospecto Web',
         message: text,
-        is_training_mode: isTrainingActive
+        is_training_mode: isTrainingActive,
+        client_state: clientState
       })
     });
 
@@ -2950,8 +3071,31 @@ async function sendChatMessage(text) {
 
     let cleanReply = res.reply || 'Gracias por tu mensaje.';
 
-    // Sincronización conversacional cuando atiende Bot 0
+    // Sincronización conversacional e interacción con interfaz cuando atiende Bot 0
     if (activeBotMode === 'official') {
+      // 1. Interceptar acciones internas [ACTION: action://...]
+      const actionMatch = cleanReply.match(/\[ACTION:\s*(action:\/\/[^\s\]]+)\s*\]/);
+      if (actionMatch) {
+        const actionUrl = actionMatch[1];
+        executeInternalAction(actionUrl);
+        cleanReply = cleanReply.replace(/\[ACTION:\s*action:\/\/[^\s\]]+\s*\]/g, '').trim();
+      }
+
+      // 2. Interceptar botones selectivos [BUTTONS: [...]]
+      const buttonsMatch = cleanReply.match(/\[BUTTONS:\s*(\[[\s\S]*?\])\s*\]/);
+      let customButtonsRendered = false;
+      if (buttonsMatch) {
+        try {
+          const btns = JSON.parse(buttonsMatch[1]);
+          renderSelectiveChatButtons(btns);
+          customButtonsRendered = true;
+        } catch (e) {
+          console.warn('Error parsing [BUTTONS]:', e);
+        }
+        cleanReply = cleanReply.replace(/\[BUTTONS:\s*\[[\s\S]*?\]\s*\]/g, '').trim();
+      }
+
+      // 3. Interceptar actualización de configuración [CONFIG_UPDATE: {...}]
       const updateMatch = cleanReply.match(/\[CONFIG_UPDATE:\s*(\{[\s\S]*?\})\s*\]/);
       if (updateMatch) {
         try {
@@ -2963,11 +3107,18 @@ async function sendChatMessage(text) {
         cleanReply = cleanReply.replace(/\[CONFIG_UPDATE:\s*\{[\s\S]*?\}\s*\]/g, '').trim();
       }
 
+      // 4. Interceptar finalización [CONFIG_COMPLETE]
       const isComplete = cleanReply.includes('[CONFIG_COMPLETE]');
       if (isComplete) {
         cleanReply = cleanReply.replace(/\[CONFIG_COMPLETE\]/g, '').trim();
         await autoProvisionFromConversation();
       }
+
+      appendChatBubble('assistant', cleanReply, activeBotMode);
+      if (!customButtonsRendered) {
+        updateChatActionButtons();
+      }
+      return;
     }
 
     appendChatBubble('assistant', cleanReply, activeBotMode);
