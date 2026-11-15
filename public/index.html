@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Servi-Bot | Bots Autónomos para WhatsApp, Correo y Teams</title>
   <link rel="icon" type="image/png" sizes="128x128" href="/assets/servibot-icon.png" />
   <link rel="apple-touch-icon" href="/assets/servibot-logo.png" />
@@ -131,7 +131,28 @@
               <span class="brand-subtitle">Automatización Comercial IA</span>
             </span>
           </a>
-          <nav class="carousel-markers" id="carousel-markers" aria-label="Seleccionar sección"></nav>
+          <div class="topbar-actions">
+            <nav class="carousel-markers" id="carousel-markers" aria-label="Seleccionar sección"></nav>
+            <button
+              type="button"
+              class="btn-topbar-sim"
+              id="btn-topbar-sim"
+              aria-controls="simulator-panel"
+              aria-expanded="false"
+            >
+              <img
+                src="/assets/servibot-logo.png"
+                alt=""
+                class="topbar-sim-icon"
+                id="topbar-sim-icon-img"
+                width="22"
+                height="22"
+                decoding="async"
+              />
+              <span class="topbar-sim-emoji hidden" id="topbar-sim-icon-emoji" aria-hidden="true">🤖</span>
+              <span id="topbar-sim-label">Abrir Bot</span>
+            </button>
+          </div>
         </div>
 
         <div class="carousel-controls">
@@ -511,10 +532,13 @@
                     </div>
 
                     <div class="wizard-live-preview" aria-live="polite">
-                      <div class="wizard-preview-label">Vista previa en tiempo real</div>
-                      <div class="wizard-preview-bubble">
-                        <strong id="wizard-preview-bot-name">Tu ServiBot</strong>
-                        <p id="wizard-preview-greeting">¡Hola! Cuéntame en qué puedo ayudar a tu negocio hoy.</p>
+                      <div class="wizard-preview-label">🤖 Vista previa en tiempo real de tu Bot Creado</div>
+                      <div class="wizard-preview-bubble-row">
+                        <span class="bot-emoji-avatar bot-emoji-sm" aria-hidden="true">🤖</span>
+                        <div class="wizard-preview-bubble">
+                          <strong id="wizard-preview-bot-name">Tu ServiBot</strong>
+                          <p id="wizard-preview-greeting">¡Hola! Cuéntame en qué puedo ayudar a tu negocio hoy.</p>
+                        </div>
                       </div>
                     </div>
 
@@ -546,8 +570,13 @@
 
                     <div class="wizard-step3-grid">
                       <div class="wizard-summary-box" id="wizard-created-card">
-                        <span class="badge-tag badge-tag-accent">ServiBot Configurado</span>
-                        <h4 id="wizard-summary-title">Asistente Listo</h4>
+                        <div class="custom-bot-card-head">
+                          <span class="bot-emoji-avatar" aria-hidden="true">🤖</span>
+                          <div>
+                            <span class="badge-tag badge-tag-custom">🤖 Tu Bot Creado</span>
+                            <h4 id="wizard-summary-title">Asistente Listo</h4>
+                          </div>
+                        </div>
                         <p id="wizard-summary-meta" class="wizard-summary-meta">Listo para conversar con tus clientes.</p>
                         <p id="wizard-summary-soul" class="wizard-summary-soul"></p>
 
@@ -700,33 +729,82 @@
         <p class="visually-hidden" id="carousel-status" role="status" aria-live="polite"></p>
       </section>
 
-      <!-- Simulador de Conversación Comercial pegado a la derecha -->
-      <aside class="bot-widget-panel simulator-dock" aria-label="Simulador de atención comercial Servi-Bot">
+      <!-- Fondo oscuro para gaveta móvil del simulador -->
+      <div class="sim-backdrop hidden" id="sim-backdrop" hidden></div>
+
+      <!-- Simulador de Conversación Comercial pegado a la derecha (escritorio) / gaveta accesible por botón (móvil) -->
+      <aside
+        class="bot-widget-panel simulator-dock"
+        id="simulator-panel"
+        data-bot-mode="official"
+        aria-label="Simulador de atención comercial Servi-Bot"
+      >
         <div class="bot-widget-header">
           <div class="sim-brand-head">
             <img
               src="/assets/servibot-logo.png"
               alt=""
               class="sim-bot-avatar"
-              width="40"
-              height="40"
+              id="sim-bot-avatar-img"
+              width="42"
+              height="42"
               decoding="async"
             />
-            <div>
-              <strong class="sim-title">Asesor Comercial Servi-Bot</strong>
+            <span class="bot-emoji-avatar sim-emoji-avatar hidden" id="sim-bot-avatar-emoji" aria-hidden="true">🤖</span>
+            <div class="sim-head-copy">
+              <span class="sim-mode-badge" id="sim-mode-badge">ASESOR OFICIAL SERVI-BOT</span>
+              <strong class="sim-title" id="sim-header-title">Asesor Comercial Servi-Bot</strong>
               <span class="sim-status">
                 <span class="sim-status-dot" aria-hidden="true"></span>
-                <span id="sim-active-instance-label">En línea · Listo para conversar</span>
+                <span id="sim-active-instance-label">En línea · Información y Contratación</span>
               </span>
             </div>
           </div>
-          <button type="button" class="btn btn-outline btn-sm" id="btn-reset-chat">Reiniciar</button>
+          <div class="sim-header-actions">
+            <button type="button" class="btn btn-outline btn-sm" id="btn-reset-chat">Reiniciar</button>
+            <button
+              type="button"
+              class="btn btn-outline btn-sm sim-close-btn"
+              id="btn-close-sim-drawer"
+              aria-label="Cerrar simulador"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div class="sim-bot-switcher" role="group" aria-label="Cambiar entre Nuestro Bot de Información y Tu Bot Creado">
+          <button
+            type="button"
+            class="sim-switch-btn is-active"
+            id="btn-switch-official-bot"
+            data-mode="official"
+            aria-pressed="true"
+          >
+            <img src="/assets/servibot-logo.png" alt="" width="18" height="18" decoding="async" />
+            <span>Nuestro Bot (Info)</span>
+          </button>
+          <button
+            type="button"
+            class="sim-switch-btn"
+            id="btn-switch-custom-bot"
+            data-mode="custom"
+            aria-pressed="false"
+          >
+            <span aria-hidden="true">🤖</span>
+            <span id="sim-switch-custom-label">Mi Bot Creado</span>
+          </button>
         </div>
 
         <div class="bot-messages" id="chat-messages">
-          <div class="chat-bubble assistant">¡Hola! Soy el asesor comercial de <strong>Servi-Bot</strong>. Conozco nuestra oferta, planes y precios en tiempo real.
+          <div class="chat-bubble assistant is-official-bot">
+            <div class="bubble-identity bubble-identity-official">
+              <img src="/assets/servibot-logo.png" alt="" width="18" height="18" decoding="async" />
+              <strong>Asesor Oficial Servi-Bot</strong>
+            </div>¡Hola! Soy el asesor comercial de <strong>Servi-Bot</strong>. Conozco nuestra oferta, planes y precios en tiempo real.
 
-Pregúntame por los <strong>Bots Autónomos</strong> o la <strong>Interfaz de Catálogo Dinámico</strong>, o dime cuál deseas contratar para registrar tu pedido ahora mismo.</div>
+Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Teams o cómo crear tu propio bot autónomo.
+          </div>
         </div>
 
         <div class="bot-quick-prompts">
@@ -739,13 +817,36 @@ Pregúntame por los <strong>Bots Autónomos</strong> o la <strong>Interfaz de Ca
           <input
             type="text"
             id="chat-input"
-            placeholder="Escribe aquí para probar al asesor..."
+            placeholder="Pregúntale al Asesor Oficial Servi-Bot..."
             autocomplete="off"
             required
           />
           <button type="submit" class="btn btn-primary" id="chat-send-btn">Enviar</button>
         </form>
       </aside>
+
+      <!-- Botón flotante siempre accesible para abrir/alternar el Bot (especialmente en móvil) -->
+      <button
+        type="button"
+        class="sim-fab-btn"
+        id="btn-sim-fab"
+        data-bot-mode="official"
+        aria-controls="simulator-panel"
+        aria-expanded="false"
+        aria-label="Abrir chat con el bot"
+      >
+        <img
+          src="/assets/servibot-logo.png"
+          alt=""
+          class="sim-fab-img"
+          id="sim-fab-img"
+          width="28"
+          height="28"
+          decoding="async"
+        />
+        <span class="sim-fab-emoji hidden" id="sim-fab-emoji" aria-hidden="true">🤖</span>
+        <span class="sim-fab-text" id="sim-fab-text">Asesor Servi-Bot</span>
+      </button>
     </section>
 
     <!-- ==================== VISTA ADMINISTRACIÓN (FIREBASE AUTH) ==================== -->

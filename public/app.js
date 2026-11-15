@@ -52,6 +52,8 @@ let catalogCache = [];
 let clientInstanceId = localStorage.getItem('servibot_client_instance_id') || '';
 let activeChatInstanceId = clientInstanceId || 'servibot-01';
 let provisionedInstance = null;
+let activeBotMode = 'official';
+let mobileSimTriggerEl = null;
 let wizardCurrentStep = 1;
 let webSenderId = localStorage.getItem('servibot_sender_id') || `web-${Math.floor(10000 + Math.random() * 90000)}`;
 localStorage.setItem('servibot_sender_id', webSenderId);
@@ -686,14 +688,177 @@ function getInstanceStateMeta(inst) {
   return { cls: 'is-close', label: 'Disponible', dotClass: '' };
 }
 
-function syncSimulatorHeaderLabel(inst = provisionedInstance) {
-  const activeLbl = document.getElementById('sim-active-instance-label');
-  if (!activeLbl) return;
-  if (inst && inst.business_name && !String(inst.business_name).startsWith('Espacio Disponible')) {
-    activeLbl.textContent = `${inst.display_name || 'ServiBot'} · ${inst.business_name}`;
-  } else {
-    activeLbl.textContent = 'En línea · Listo para conversar';
+function buildAssistantIdentityHeader(mode, inst = provisionedInstance) {
+  if (mode === 'custom' && inst) {
+    const customName = `${inst.display_name || 'Mi ServiBot'} · ${inst.business_name || 'Tu Negocio'}`;
+    return `<div class="bubble-identity bubble-identity-custom"><span class="bubble-bot-emoji" aria-hidden="true">🤖</span><strong>${escapeHtml(customName)}</strong></div>`;
   }
+  return `<div class="bubble-identity bubble-identity-official"><img src="/assets/servibot-logo.png" alt="" width="18" height="18" decoding="async" /><strong>Asesor Oficial Servi-Bot</strong></div>`;
+}
+
+function toggleVisibilityPair(imgEl, emojiEl, showCustomEmoji) {
+  if (imgEl) {
+    imgEl.classList.toggle('hidden', showCustomEmoji);
+    if (showCustomEmoji) imgEl.setAttribute('hidden', '');
+    else imgEl.removeAttribute('hidden');
+  }
+  if (emojiEl) {
+    emojiEl.classList.toggle('hidden', !showCustomEmoji);
+    if (showCustomEmoji) emojiEl.removeAttribute('hidden');
+    else emojiEl.setAttribute('hidden', '');
+  }
+}
+
+function syncSimulatorHeaderLabel(inst = provisionedInstance) {
+  const panel = document.getElementById('simulator-panel');
+  const fabBtn = document.getElementById('btn-sim-fab');
+  const topbarBtn = document.getElementById('btn-topbar-sim');
+  const badgeEl = document.getElementById('sim-mode-badge');
+  const titleEl = document.getElementById('sim-header-title');
+  const activeLbl = document.getElementById('sim-active-instance-label');
+  const switchOfficialBtn = document.getElementById('btn-switch-official-bot');
+  const switchCustomBtn = document.getElementById('btn-switch-custom-bot');
+  const switchCustomLbl = document.getElementById('sim-switch-custom-label');
+  const fabText = document.getElementById('sim-fab-text');
+  const topbarLbl = document.getElementById('topbar-sim-label');
+  const chatInput = document.getElementById('chat-input');
+
+  const hasCustom = Boolean(
+    inst && inst.instance_id && inst.business_name && !String(inst.business_name).startsWith('Espacio Disponible')
+  );
+  if (!hasCustom && activeBotMode === 'custom') {
+    activeBotMode = 'official';
+  }
+
+  const isCustom = activeBotMode === 'custom' && hasCustom;
+  activeChatInstanceId = isCustom ? inst.instance_id : 'servibot-01';
+
+  if (panel) panel.dataset.botMode = isCustom ? 'custom' : 'official';
+  if (fabBtn) fabBtn.dataset.botMode = isCustom ? 'custom' : 'official';
+  topbarBtn?.classList.toggle('is-custom-mode', isCustom);
+
+  toggleVisibilityPair(
+    document.getElementById('sim-bot-avatar-img'),
+    document.getElementById('sim-bot-avatar-emoji'),
+    isCustom
+  );
+  toggleVisibilityPair(document.getElementById('sim-fab-img'), document.getElementById('sim-fab-emoji'), isCustom);
+  toggleVisibilityPair(
+    document.getElementById('topbar-sim-icon-img'),
+    document.getElementById('topbar-sim-icon-emoji'),
+    isCustom
+  );
+
+  if (switchCustomLbl) {
+    switchCustomLbl.textContent = hasCustom ? inst.display_name || 'Mi Bot Creado' : 'Mi Bot Creado';
+  }
+  if (switchOfficialBtn) {
+    switchOfficialBtn.classList.toggle('is-active', !isCustom);
+    switchOfficialBtn.setAttribute('aria-pressed', String(!isCustom));
+  }
+  if (switchCustomBtn) {
+    switchCustomBtn.classList.toggle('is-active', isCustom);
+    switchCustomBtn.setAttribute('aria-pressed', String(isCustom));
+  }
+
+  if (isCustom) {
+    if (badgeEl) badgeEl.textContent = '🤖 BOT CREADO · EN VIVO';
+    if (titleEl) titleEl.textContent = inst.display_name || 'Mi Bot Creado';
+    if (activeLbl) activeLbl.textContent = `Atendiendo a ${inst.business_name || 'tu negocio'}`;
+    if (fabText) fabText.textContent = inst.display_name || 'Mi Bot Creado';
+    if (topbarLbl) topbarLbl.textContent = 'Mi Bot';
+    if (chatInput) chatInput.placeholder = `Escríbele como cliente a ${inst.display_name || 'tu bot'}...`;
+  } else {
+    if (badgeEl) badgeEl.textContent = 'ASESOR OFICIAL SERVI-BOT';
+    if (titleEl) titleEl.textContent = 'Asesor Comercial Servi-Bot';
+    if (activeLbl) activeLbl.textContent = 'En línea · Información y Contratación';
+    if (fabText) fabText.textContent = 'Asesor Servi-Bot';
+    if (topbarLbl) topbarLbl.textContent = 'Abrir Bot';
+    if (chatInput) chatInput.placeholder = 'Pregúntale al Asesor Oficial Servi-Bot...';
+  }
+}
+
+function setSimulatorBotMode(mode, { announceGreeting = false } = {}) {
+  const hasCustom = Boolean(
+    provisionedInstance &&
+      provisionedInstance.instance_id &&
+      provisionedInstance.business_name &&
+      !String(provisionedInstance.business_name).startsWith('Espacio Disponible')
+  );
+
+  if (mode === 'custom' && !hasCustom) {
+    activeBotMode = 'official';
+    syncSimulatorHeaderLabel(provisionedInstance);
+    closeMobileSimulator();
+    carouselController?.goToSlide?.(3, { instant: true });
+    goToWizardStep(1, { focusHeading: true });
+    return false;
+  }
+
+  activeBotMode = mode === 'custom' ? 'custom' : 'official';
+  syncSimulatorHeaderLabel(provisionedInstance);
+
+  if (announceGreeting) {
+    const box = document.getElementById('chat-messages');
+    if (box) {
+      if (activeBotMode === 'custom' && provisionedInstance) {
+        const greeting =
+          provisionedInstance.welcome_message ||
+          `¡Hola! Soy ${provisionedInstance.display_name} de ${provisionedInstance.business_name}. ¿En qué te ayudo hoy?`;
+        box.innerHTML = `<div class="chat-bubble assistant is-custom-bot">${buildAssistantIdentityHeader('custom', provisionedInstance)}${escapeHtml(greeting)}</div>`;
+      } else {
+        const officialMsg =
+          '¡Hola! Soy el Asesor Oficial de Servi-Bot. Pregúntame sobre nuestros planes, funcionamiento o cómo automatizar WhatsApp, Outlook y Teams.';
+        box.innerHTML = `<div class="chat-bubble assistant is-official-bot">${buildAssistantIdentityHeader('official', null)}${escapeHtml(officialMsg)}</div>`;
+      }
+      box.scrollTop = box.scrollHeight;
+    }
+  }
+  return true;
+}
+
+function openMobileSimulator(triggerEl = null) {
+  const panel = document.getElementById('simulator-panel');
+  const backdrop = document.getElementById('sim-backdrop');
+  const fabBtn = document.getElementById('btn-sim-fab');
+  const topbarBtn = document.getElementById('btn-topbar-sim');
+  const input = document.getElementById('chat-input');
+
+  const isMobileViewport = window.matchMedia?.('(max-width: 979px)')?.matches;
+  if (!isMobileViewport) {
+    input?.focus();
+    return;
+  }
+
+  mobileSimTriggerEl = triggerEl || document.activeElement;
+  panel?.classList.add('is-mobile-open');
+  if (backdrop) {
+    backdrop.classList.remove('hidden');
+    backdrop.removeAttribute('hidden');
+  }
+  fabBtn?.setAttribute('aria-expanded', 'true');
+  topbarBtn?.setAttribute('aria-expanded', 'true');
+  requestAnimationFrame(() => input?.focus({ preventScroll: true }));
+}
+
+function closeMobileSimulator() {
+  const panel = document.getElementById('simulator-panel');
+  const backdrop = document.getElementById('sim-backdrop');
+  const fabBtn = document.getElementById('btn-sim-fab');
+  const topbarBtn = document.getElementById('btn-topbar-sim');
+
+  const wasOpen = panel?.classList.contains('is-mobile-open');
+  panel?.classList.remove('is-mobile-open');
+  if (backdrop) {
+    backdrop.classList.add('hidden');
+    backdrop.setAttribute('hidden', '');
+  }
+  fabBtn?.setAttribute('aria-expanded', 'false');
+  topbarBtn?.setAttribute('aria-expanded', 'false');
+  if (wasOpen && mobileSimTriggerEl && typeof mobileSimTriggerEl.focus === 'function') {
+    mobileSimTriggerEl.focus({ preventScroll: true });
+  }
+  mobileSimTriggerEl = null;
 }
 
 function updateWizardLivePreview() {
@@ -963,6 +1128,7 @@ function resetWizardForNewBot() {
   resetCheckoutMpCta();
   toggleCheckoutPanel(false);
   updateCheckoutPricing();
+  activeBotMode = 'official';
   syncSimulatorHeaderLabel(null);
   updateWizardLivePreview();
   goToWizardStep(1, { focusHeading: true });
@@ -970,6 +1136,7 @@ function resetWizardForNewBot() {
 
 async function loadClientProvisionedInstance({ populateForm = true } = {}) {
   if (!clientInstanceId) {
+    activeBotMode = 'official';
     activeChatInstanceId = 'servibot-01';
     syncSimulatorHeaderLabel(null);
     if (populateForm) {
@@ -991,12 +1158,14 @@ async function loadClientProvisionedInstance({ populateForm = true } = {}) {
     if (isUnconfigured) {
       clientInstanceId = '';
       localStorage.removeItem('servibot_client_instance_id');
+      activeBotMode = 'official';
       activeChatInstanceId = 'servibot-01';
       syncSimulatorHeaderLabel(null);
       return;
     }
 
     provisionedInstance = inst;
+    activeBotMode = 'custom';
     activeChatInstanceId = inst.instance_id;
     syncSimulatorHeaderLabel(inst);
     renderWizardSummary(inst);
@@ -1009,6 +1178,7 @@ async function loadClientProvisionedInstance({ populateForm = true } = {}) {
   } catch {
     clientInstanceId = '';
     localStorage.removeItem('servibot_client_instance_id');
+    activeBotMode = 'official';
     activeChatInstanceId = 'servibot-01';
     syncSimulatorHeaderLabel(null);
   }
@@ -1081,14 +1251,13 @@ async function loadPublicCatalog() {
     grid.querySelectorAll('.btn-ask-bot').forEach((btn) => {
       btn.addEventListener('click', () => {
         const name = btn.dataset.name;
+        setSimulatorBotMode('official', { announceGreeting: false });
+        openMobileSimulator(btn);
         const input = document.getElementById('chat-input');
         if (input) {
           input.value = `Me interesa el servicio "${name}", ¿me explicas qué incluye y cómo lo contrato?`;
           input.focus();
           document.getElementById('chat-form')?.requestSubmit();
-          if (window.matchMedia?.('(max-width: 979px)')?.matches) {
-            input.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
-          }
         }
       });
     });
@@ -1098,12 +1267,18 @@ async function loadPublicCatalog() {
 }
 
 // ==================== CHAT EN VIVO CON ASESOR COMERCIAL ====================
-function appendChatBubble(role, text) {
+function appendChatBubble(role, text, botMode = activeBotMode) {
   const box = document.getElementById('chat-messages');
   if (!box) return;
   const div = document.createElement('div');
-  div.className = `chat-bubble ${role}`;
-  div.textContent = text;
+  if (role === 'assistant') {
+    const isCustom = botMode === 'custom' && Boolean(provisionedInstance);
+    div.className = `chat-bubble assistant ${isCustom ? 'is-custom-bot' : 'is-official-bot'}`;
+    div.innerHTML = `${buildAssistantIdentityHeader(isCustom ? 'custom' : 'official', provisionedInstance)}${escapeHtml(text)}`;
+  } else {
+    div.className = `chat-bubble ${role}`;
+    div.textContent = text;
+  }
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
 }
@@ -1802,6 +1977,7 @@ function setupEventListeners() {
 
       const inst = res.instance;
       clientInstanceId = inst.instance_id;
+      activeBotMode = 'custom';
       activeChatInstanceId = inst.instance_id;
       provisionedInstance = inst;
       localStorage.setItem('servibot_client_instance_id', clientInstanceId);
@@ -1819,7 +1995,7 @@ function setupEventListeners() {
         const greeting =
           inst.welcome_message ||
           `¡Hola! Soy ${inst.display_name} de ${inst.business_name}. ¿En qué te ayudo hoy?`;
-        box.innerHTML = `<div class="chat-bubble assistant"><strong>${escapeHtml(inst.display_name)} · ${escapeHtml(inst.business_name)}</strong><br />${escapeHtml(greeting)}</div>`;
+        box.innerHTML = `<div class="chat-bubble assistant is-custom-bot">${buildAssistantIdentityHeader('custom', inst)}${escapeHtml(greeting)}</div>`;
       }
 
       setFeedback('checkout-feedback', '');
@@ -1834,8 +2010,11 @@ function setupEventListeners() {
     }
   });
 
-  document.getElementById('btn-test-instance-sim')?.addEventListener('click', () => {
+  document.getElementById('btn-test-instance-sim')?.addEventListener('click', (e) => {
     const inst = provisionedInstance;
+    setSimulatorBotMode('custom', { announceGreeting: false });
+    openMobileSimulator(e.currentTarget);
+
     const input = document.getElementById('chat-input');
     const box = document.getElementById('chat-messages');
     const currentBiz = inst?.business_name || document.getElementById('cfg-business-name')?.value.trim() || 'mi negocio';
@@ -1846,15 +2025,56 @@ function setupEventListeners() {
       `¡Hola! Soy ${currentName} de ${currentBiz}.`;
 
     if (box) {
-      box.innerHTML = `<div class="chat-bubble assistant"><strong>${escapeHtml(currentName)} · ${escapeHtml(currentBiz)}</strong><br />${escapeHtml(currentWelcome)}</div>`;
+      box.innerHTML = `<div class="chat-bubble assistant is-custom-bot">${buildAssistantIdentityHeader('custom', inst || { display_name: currentName, business_name: currentBiz })}${escapeHtml(currentWelcome)}</div>`;
     }
     if (input) {
       input.value = 'Hola, ¿me puedes explicar cómo atiendes a los clientes de nuestro negocio?';
       input.focus();
-      if (window.matchMedia?.('(max-width: 979px)')?.matches) {
-        input.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    }
+  });
+
+  // Controles de apertura/cierre móvil y cambio entre Nuestro Bot vs Mi Bot Creado
+  document.getElementById('btn-sim-fab')?.addEventListener('click', (e) => {
+    const panel = document.getElementById('simulator-panel');
+    if (panel?.classList.contains('is-mobile-open')) {
+      closeMobileSimulator();
+    } else {
+      openMobileSimulator(e.currentTarget);
+    }
+  });
+
+  document.getElementById('btn-topbar-sim')?.addEventListener('click', (e) => {
+    const panel = document.getElementById('simulator-panel');
+    if (panel?.classList.contains('is-mobile-open')) {
+      closeMobileSimulator();
+    } else {
+      openMobileSimulator(e.currentTarget);
+    }
+  });
+
+  document.getElementById('btn-close-sim-drawer')?.addEventListener('click', () => {
+    closeMobileSimulator();
+  });
+
+  document.getElementById('sim-backdrop')?.addEventListener('click', () => {
+    closeMobileSimulator();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const panel = document.getElementById('simulator-panel');
+      if (panel?.classList.contains('is-mobile-open')) {
+        closeMobileSimulator();
       }
     }
+  });
+
+  document.getElementById('btn-switch-official-bot')?.addEventListener('click', () => {
+    setSimulatorBotMode('official', { announceGreeting: true });
+  });
+
+  document.getElementById('btn-switch-custom-bot')?.addEventListener('click', () => {
+    setSimulatorBotMode('custom', { announceGreeting: true });
   });
 
   document.getElementById('btn-go-checkout')?.addEventListener('click', () => {
@@ -1980,12 +2200,13 @@ function setupEventListeners() {
 
       const box = document.getElementById('chat-messages');
       if (box) {
+        const isCustom = activeBotMode === 'custom' && Boolean(provisionedInstance);
         const bubble = document.createElement('div');
-        bubble.className = 'chat-bubble assistant';
+        bubble.className = `chat-bubble assistant ${isCustom ? 'is-custom-bot' : 'is-official-bot'}`;
         const mpHtml = mpUrl
           ? `<br /><a href="${escapeHtml(mpUrl)}" target="_blank" rel="noopener noreferrer" style="color: #8cc8ff; font-weight: 700; text-decoration: underline;">Pagar $${escapeHtml(fmtTotal)} MXN en Mercado Pago ↗</a>`
           : '';
-        bubble.innerHTML = `<strong>${escapeHtml(provisionedInstance.display_name || 'ServiBot')} · Pedido ${escapeHtml(orderCode)}</strong><br />Subtotal: <strong>$${escapeHtml(fmtSub)}</strong> + IVA México (16%): <strong>$${escapeHtml(fmtTax)}</strong> = <strong>$${escapeHtml(fmtTotal)} MXN</strong> (${addonLabels || 'solo ServiBot configurado'}).${mpHtml}`;
+        bubble.innerHTML = `${buildAssistantIdentityHeader(isCustom ? 'custom' : 'official', provisionedInstance)}Pedido <strong>${escapeHtml(orderCode)}</strong> · Subtotal: <strong>$${escapeHtml(fmtSub)}</strong> + IVA México (16%): <strong>$${escapeHtml(fmtTax)}</strong> = <strong>$${escapeHtml(fmtTotal)} MXN</strong> (${addonLabels || 'solo ServiBot configurado'}).${mpHtml}`;
         box.appendChild(bubble);
         box.scrollTop = box.scrollHeight;
       }
@@ -2019,17 +2240,7 @@ function setupEventListeners() {
   document.getElementById('btn-reset-chat')?.addEventListener('click', () => {
     webSenderId = `web-${Math.floor(10000 + Math.random() * 90000)}`;
     localStorage.setItem('servibot_sender_id', webSenderId);
-    const inst = provisionedInstance;
-    const greeting =
-      inst?.welcome_message ||
-      'Sesión reiniciada. ¡Hola! Soy el asesor de Servi-Bot, ¿en qué servicio te puedo apoyar hoy?';
-    const box = document.getElementById('chat-messages');
-    if (box) {
-      const header = inst
-        ? `<strong>${escapeHtml(inst.display_name || 'ServiBot')} · ${escapeHtml(inst.business_name || '')}</strong><br />`
-        : '';
-      box.innerHTML = `<div class="chat-bubble assistant">${header}${escapeHtml(greeting)}</div>`;
-    }
+    setSimulatorBotMode(activeBotMode, { announceGreeting: true });
   });
 
   // Modal de pedido directo
