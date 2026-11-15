@@ -6881,3 +6881,8 @@ dialog.product-form-modal .dialog-inner {
 [data-theme="light"] .app-feature-tag {
   color: #475569 !important;
 }
+
+/* Ocultar subsección de aplicaciones temporalmente */
+#soul-tab-apps, #soul-pane-apps {
+  display: none !important;
+}

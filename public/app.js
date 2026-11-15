@@ -2491,15 +2491,20 @@ async function loadClientProvisionedInstance({ populateForm = true } = {}) {
     clearLockedWizardBanner();
     const enriched = { ...inst, catalog: Array.isArray(data.catalog) ? data.catalog : inst.catalog };
     provisionedInstance = enriched;
-    activeBotMode = 'custom';
-    activeChatInstanceId = inst.instance_id;
+    // Solo cuando se está explícitamente en el Paso 3 (Simulador y Costo) se muestra el bot del usuario; en el resto de la interfaz siempre es ServiBot
+    activeBotMode = (wizardCurrentStep === 3) ? 'custom' : 'official';
+    activeChatInstanceId = activeBotMode === 'custom' ? inst.instance_id : 'servibot-00';
     syncSimulatorHeaderLabel(enriched);
     renderWizardSummary(enriched);
     updateCheckoutPricing();
 
     if (populateForm) {
       populateWizardForm(enriched);
-      goToWizardStep(3);
+      if (wizardCurrentStep === 3) {
+        goToWizardStep(3);
+      } else {
+        goToWizardStep(wizardCurrentStep || 1);
+      }
     }
   } catch (err) {
     if (err?.status === 423 || err?.payload?.locked) {
@@ -4580,6 +4585,14 @@ function setupEventListeners() {
   });
 
   document.getElementById('btn-switch-custom-bot')?.addEventListener('click', () => {
+    const offerSlideIdx = Math.max(0, document.querySelectorAll('#public-carousel-track .carousel-slide').length - 1);
+    if (!provisionedInstance || !provisionedInstance.instance_id) {
+      carouselController?.goToSlide(offerSlideIdx, { instant: true });
+      goToWizardStep(1, { focusHeading: true });
+      return;
+    }
+    carouselController?.goToSlide(offerSlideIdx, { instant: true });
+    goToWizardStep(3, { focusHeading: true });
     setSimulatorBotMode('custom', { announceGreeting: true });
   });
 
