@@ -165,8 +165,8 @@ body.is-admin-session .mobile-floating-actions,
   inline-size: 100%;
   background: linear-gradient(180deg, rgba(16, 20, 29, 0.97), rgba(7, 9, 13, 0.97));
   backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--metal-border);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 8px 24px rgba(0, 0, 0, 0.5);
+  border-bottom: none !important;
+  box-shadow: none !important;
 }
 
 .header-inner {
@@ -182,13 +182,28 @@ body.is-admin-session .mobile-floating-actions,
 }
 
 body.is-admin-session .site-header {
-  border-bottom-color: rgba(0, 120, 212, 0.55);
+  border-bottom: none !important;
+  box-shadow: none !important;
 }
 
-body.is-admin-session .container {
-  max-inline-size: none;
-  inline-size: 100%;
-  padding-inline: clamp(1rem, 2.5vw, 2.25rem);
+body {
+  border-left: none !important;
+  border-right: none !important;
+}
+
+.container,
+#main-container {
+  border-left: none !important;
+  border-right: none !important;
+}
+
+body.is-admin-session .container,
+body.is-admin-session #main-container {
+  max-inline-size: 100% !important;
+  inline-size: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
 }
 
 .header-inner > * {
@@ -3210,11 +3225,211 @@ article.card > footer {
 }
 
 .admin-shell {
-  background: linear-gradient(170deg, #10141d, #090b10);
-  border: 1px solid var(--metal-border);
-  border-radius: 20px;
-  padding: 1.5rem;
-  box-shadow: var(--shadow-metallic);
+  display: flex !important;
+  flex-direction: row !important;
+  min-height: calc(100vh - 65px) !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: var(--bg-void) !important;
+}
+
+.admin-sidebar {
+  width: 270px;
+  min-width: 260px;
+  flex-shrink: 0;
+  background: #0d121c;
+  border-right: 1px solid #1e293b;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 1rem;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.admin-sidebar-header {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 1.25rem;
+}
+
+.admin-sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.admin-user-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.admin-user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.admin-user-email {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-instance-card {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-instance-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.admin-instance-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.admin-switcher-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.admin-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.admin-nav-section-title {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  margin-bottom: 0.4rem;
+  padding-left: 0.5rem;
+  display: block;
+}
+
+.admin-sidebar-menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.admin-sidebar-menu li {
+  display: flex;
+  width: 100%;
+}
+
+.admin-nav-link {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #cbd5e1;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.admin-nav-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.admin-nav-link[aria-current="page"] {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  border-color: #38bdf8;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+}
+
+.admin-nav-icon {
+  font-size: 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+}
+
+.admin-theme-toggle-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #38bdf8 !important;
+}
+
+.admin-theme-toggle-btn:hover {
+  background: rgba(56, 189, 248, 0.15) !important;
+  border-color: #38bdf8 !important;
+  color: #ffffff !important;
+}
+
+.admin-logout-btn {
+  color: #f87171 !important;
+}
+
+.admin-logout-btn:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #fca5a5 !important;
+}
+
+.admin-main-area {
+  flex: 1;
+  min-width: 0;
+  padding: 1.75rem 2rem;
+  background: #07090e;
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .admin-shell {
+    flex-direction: column !important;
+  }
+  .admin-sidebar {
+    width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid #1e293b !important;
+  }
 }
 
 /* ==================== FORMS & PANELS ==================== */
@@ -6877,12 +7092,380 @@ dialog.product-form-modal .dialog-inner {
   color: #475569 !important;
 }
 
-/* Ocultar subsección de aplicaciones temporalmente */
-#soul-tab-apps, #soul-pane-apps {
-  display: none !important;
-}
-
 /* Ocultar pestañas de cambio de bot en el chat */
 .sim-bot-switcher {
   display: none !important;
+}
+
+/* ==========================================================================
+   OPTIMIZACIÓN CRÍTICA DE CONTRASTE: SECCIÓN DE ADMINISTRADOR (MODO CLARO Y OSCURO)
+   ========================================================================== */
+
+/* --- 1. MODO OSCURO (ALTO CONTRASTE) --- */
+.admin-shell,
+#view-admin {
+  color: #f8fafc;
+}
+
+.admin-sidebar {
+  background: #0d121c !important;
+  border-right: 1px solid #1e293b !important;
+}
+
+.admin-sidebar-user {
+  color: #ffffff !important;
+}
+
+.admin-user-email {
+  color: #ffffff !important;
+}
+
+.admin-instance-card {
+  background: #111827 !important;
+  border: 1px solid #374151 !important;
+}
+
+.admin-instance-title {
+  color: #38bdf8 !important;
+}
+
+.admin-main-area {
+  background: #07090e !important;
+  color: #f8fafc !important;
+}
+
+/* Paneles en modo oscuro */
+.admin-main-area .panel-card,
+.admin-main-area .products-sidebar,
+.admin-main-area .products-detail-panel,
+.admin-main-area .bot-soul-container,
+.admin-main-area .order-card {
+  background: #111622 !important;
+  border: 1px solid #263346 !important;
+  color: #f8fafc !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+.admin-main-area h2,
+.admin-main-area h3,
+.admin-main-area h4,
+.admin-main-area .products-sidebar-title,
+.admin-main-area .product-detail-name {
+  color: #ffffff !important;
+}
+
+.admin-main-area p,
+.admin-main-area .product-detail-tagline {
+  color: #cbd5e1 !important;
+}
+
+/* Formularios e inputs en modo oscuro */
+.admin-main-area .field label {
+  color: #f1f5f9 !important;
+  font-weight: 600 !important;
+}
+
+.admin-main-area .field input,
+.admin-main-area .field select,
+.admin-main-area .field textarea,
+.admin-main-area .form-select-inline,
+.admin-sidebar .form-select-inline,
+.admin-main-area .products-search-box input {
+  background: #0f172a !important;
+  border: 1px solid #334155 !important;
+  color: #ffffff !important;
+}
+
+.admin-main-area .field input:focus,
+.admin-main-area .field select:focus,
+.admin-main-area .field textarea:focus {
+  border-color: #38bdf8 !important;
+  outline: 2px solid rgba(56, 189, 248, 0.25) !important;
+}
+
+/* Botones en modo oscuro dentro del admin */
+.admin-main-area .btn-outline,
+.admin-sidebar .btn-outline {
+  background: #1e293b !important;
+  border: 1px solid #475569 !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+.admin-main-area .btn-outline:hover,
+.admin-sidebar .btn-outline:hover {
+  background: #334155 !important;
+  border-color: #38bdf8 !important;
+  color: #ffffff !important;
+}
+
+.admin-main-area .btn-primary,
+.admin-sidebar .btn-primary {
+  background: #0284c7 !important;
+  border: 1px solid #38bdf8 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.admin-main-area .btn-primary:hover,
+.admin-sidebar .btn-primary:hover {
+  background: #0369a1 !important;
+  color: #ffffff !important;
+}
+
+/* Tarjetas de productos en lista (Modo Oscuro) */
+.admin-main-area .product-list-card {
+  background: #151c2c !important;
+  border: 1px solid #263346 !important;
+  color: #ffffff !important;
+}
+
+.admin-main-area .product-list-card:hover {
+  background: #1d273a !important;
+  border-color: #38bdf8 !important;
+}
+
+.admin-main-area .product-list-card.active {
+  background: rgba(37, 211, 102, 0.12) !important;
+  border-color: #22c55e !important;
+}
+
+.admin-main-area .product-list-card-name {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.admin-main-area .product-showcase-card {
+  background: #0c1018 !important;
+  border: 1px solid #263346 !important;
+}
+
+.admin-main-area .product-pricing-info {
+  background: #151c2c !important;
+  border: 1px solid #263346 !important;
+}
+
+.admin-main-area .product-price-val {
+  color: #4ade80 !important;
+}
+
+/* --- 2. MODO CLARO (ALTO CONTRASTE) --- */
+[data-theme="light"] .admin-shell,
+[data-theme="light"] #view-admin {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .admin-sidebar {
+  background: #ffffff !important;
+  border-right: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .admin-sidebar-header {
+  border-bottom-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .admin-user-email {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .admin-user-avatar {
+  background: rgba(2, 132, 199, 0.1) !important;
+  border-color: rgba(2, 132, 199, 0.3) !important;
+  color: #0284c7 !important;
+}
+
+[data-theme="light"] .admin-instance-card {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] .admin-instance-title {
+  color: #0284c7 !important;
+}
+
+[data-theme="light"] .admin-switcher-label {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .admin-nav-section-title {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .admin-nav-link {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .admin-nav-link:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .admin-nav-link[aria-current="page"] {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border-color: #0369a1 !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25) !important;
+}
+
+[data-theme="light"] .admin-theme-toggle-btn {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0284c7 !important;
+}
+
+[data-theme="light"] .admin-theme-toggle-btn:hover {
+  background: #e0f2fe !important;
+  border-color: #0284c7 !important;
+  color: #0369a1 !important;
+}
+
+[data-theme="light"] .admin-main-area {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Paneles en modo claro */
+[data-theme="light"] .admin-main-area .panel-card,
+[data-theme="light"] .admin-main-area .products-sidebar,
+[data-theme="light"] .admin-main-area .products-detail-panel,
+[data-theme="light"] .admin-main-area .bot-soul-container,
+[data-theme="light"] .admin-main-area .order-card {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .admin-main-area h2,
+[data-theme="light"] .admin-main-area h3,
+[data-theme="light"] .admin-main-area h4,
+[data-theme="light"] .admin-main-area .products-sidebar-title,
+[data-theme="light"] .admin-main-area .product-detail-name,
+[data-theme="light"] .admin-main-area .product-detail-empty h3 {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .admin-main-area p,
+[data-theme="light"] .admin-main-area .product-detail-tagline,
+[data-theme="light"] .admin-main-area .product-detail-empty p {
+  color: #334155 !important;
+}
+
+/* Formularios e inputs en modo claro */
+[data-theme="light"] .admin-main-area .field label {
+  color: #1e293b !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] .admin-main-area .field input,
+[data-theme="light"] .admin-main-area .field select,
+[data-theme="light"] .admin-main-area .field textarea,
+[data-theme="light"] .admin-main-area .form-select-inline,
+[data-theme="light"] .admin-sidebar .form-select-inline,
+[data-theme="light"] .admin-main-area .products-search-box input {
+  background: #ffffff !important;
+  border: 1px solid #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .admin-main-area .field input:focus,
+[data-theme="light"] .admin-main-area .field select:focus,
+[data-theme="light"] .admin-main-area .field textarea:focus {
+  border-color: #0284c7 !important;
+  outline: 2px solid rgba(2, 132, 199, 0.25) !important;
+}
+
+/* Botones en modo claro dentro del admin */
+[data-theme="light"] .admin-main-area .btn-outline,
+[data-theme="light"] .admin-sidebar .btn-outline {
+  background: #ffffff !important;
+  border: 1px solid #94a3b8 !important;
+  color: #0f172a !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] .admin-main-area .btn-outline:hover,
+[data-theme="light"] .admin-sidebar .btn-outline:hover {
+  background: #f1f5f9 !important;
+  border-color: #0284c7 !important;
+  color: #0284c7 !important;
+}
+
+[data-theme="light"] .admin-main-area .btn-primary,
+[data-theme="light"] .admin-sidebar .btn-primary {
+  background: #0284c7 !important;
+  border: 1px solid #0369a1 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .admin-main-area .btn-primary:hover,
+[data-theme="light"] .admin-sidebar .btn-primary:hover {
+  background: #0369a1 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .admin-main-area .btn-emerald {
+  background: #16a34a !important;
+  border: 1px solid #15803d !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .admin-main-area .btn-danger {
+  background: #fee2e2 !important;
+  border: 1px solid #f87171 !important;
+  color: #b91c1c !important;
+  font-weight: 700 !important;
+}
+
+/* Tarjetas de productos en lista (Modo Claro) */
+[data-theme="light"] .admin-main-area .product-list-card {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .admin-main-area .product-list-card:hover {
+  background: #f8fafc !important;
+  border-color: #0284c7 !important;
+}
+
+[data-theme="light"] .admin-main-area .product-list-card.active {
+  background: #f0fdf4 !important;
+  border-color: #16a34a !important;
+  box-shadow: inset 3px 0 0 #16a34a, 0 4px 14px rgba(22, 163, 74, 0.12) !important;
+}
+
+[data-theme="light"] .admin-main-area .product-list-card-name {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .admin-main-area .product-list-card-meta {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .admin-main-area .product-showcase-card {
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] .admin-main-area .product-pricing-info {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] .admin-main-area .product-pricing-label {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .admin-main-area .product-price-val {
+  color: #15803d !important;
+}
+
+[data-theme="light"] .admin-main-area .product-price-cycle {
+  color: #64748b !important;
 }

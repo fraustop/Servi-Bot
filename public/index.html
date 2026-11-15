@@ -32,7 +32,7 @@
           </span>
           <span>
             <span class="brand-title">Servi-Bot</span>
-            <span class="brand-subtitle" id="brand-subtitle">Automatización Comercial IA</span>
+            <span class="brand-subtitle" id="brand-subtitle">La inteligencia artificial a tu servicio</span>
           </span>
         </a>
         <span class="admin-user-pill hidden" id="admin-user-pill"></span>
@@ -73,65 +73,8 @@
             </button>
           </li>
 
-          <!-- Navegación Sección Admin (ocupa todo el ancho disponible) -->
           <li class="admin-nav-item hidden">
-            <button type="button" class="nav-btn admin-tab-nav" data-tab="tab-catalog" aria-current="page">
-              <span class="nav-icon" aria-hidden="true">📦</span>
-              <span>Productos</span>
-            </button>
-          </li>
-          <li class="admin-nav-item hidden">
-            <button type="button" class="nav-btn admin-tab-nav" data-tab="tab-bot-soul">
-              <span class="nav-icon" aria-hidden="true">🧠</span>
-              <span>Alma del Bot</span>
-            </button>
-          </li>
-          <li class="admin-nav-item hidden">
-            <button type="button" class="nav-btn admin-tab-nav" data-tab="tab-orders">
-              <span class="nav-icon" aria-hidden="true">🛒</span>
-              <span>Pedidos</span>
-              <span class="nav-count-pill" id="header-orders-count">0</span>
-            </button>
-          </li>
-          <li class="admin-nav-item hidden">
-            <button type="button" class="nav-btn admin-tab-nav" data-tab="tab-channels">
-              <span class="nav-icon" aria-hidden="true">📡</span>
-              <span>Canales</span>
-            </button>
-          </li>
-          <li class="admin-nav-item hidden">
-            <button type="button" class="nav-btn admin-tab-nav" data-tab="tab-conversations">
-              <span class="nav-icon" aria-hidden="true">💬</span>
-              <span>Conversaciones</span>
-            </button>
-          </li>
-          <li class="admin-nav-item hidden">
-            <button type="button" class="nav-btn admin-tab-nav" data-tab="tab-lists">
-              <span class="nav-icon" aria-hidden="true">🛡️</span>
-              <span>Listas</span>
-            </button>
-          </li>
-          <li class="admin-nav-item hidden" id="nav-item-accounts" data-superadmin-only="1">
-            <button type="button" class="nav-btn admin-tab-nav" data-tab="tab-accounts">
-              <span class="nav-icon" aria-hidden="true">👤</span>
-              <span>Cuentas y VIP</span>
-            </button>
-          </li>
-          <li class="admin-nav-item nav-divider hidden" aria-hidden="true"></li>
-          <li class="admin-nav-item hidden">
-            <button type="button" class="nav-btn nav-btn-utility" id="btn-view-store">
-              <span class="nav-icon" aria-hidden="true">🌐</span>
-              <span>Sitio Público</span>
-            </button>
-          </li>
-          <li class="admin-nav-item hidden">
-            <button type="button" class="nav-btn nav-btn-utility" id="btn-refresh-admin">
-              <span class="nav-icon" aria-hidden="true">🔄</span>
-              <span>Actualizar</span>
-            </button>
-          </li>
-          <li class="admin-nav-item hidden">
-            <button type="button" class="nav-btn nav-btn-logout" id="btn-logout">
+            <button type="button" class="nav-btn nav-btn-logout" id="btn-header-logout">
               <span class="nav-icon" aria-hidden="true">🚪</span>
               <span>Cerrar Sesión</span>
             </button>
@@ -160,7 +103,7 @@
           </span>
             <span>
               <span class="brand-title">Servi-Bot</span>
-              <span class="brand-subtitle">Automatización Comercial IA</span>
+              <span class="brand-subtitle">La inteligencia artificial a tu servicio</span>
             </span>
           </a>
           <div class="topbar-actions">
@@ -1350,8 +1293,8 @@
             />
             <span class="bot-emoji-avatar sim-emoji-avatar hidden" id="sim-bot-avatar-emoji" aria-hidden="true">🤖</span>
             <div class="sim-head-copy">
-              <span class="sim-mode-badge" id="sim-mode-badge">ASESOR OFICIAL SERVI-BOT</span>
-              <strong class="sim-title" id="sim-header-title">Asesor Comercial Servi-Bot</strong>
+              <span class="sim-mode-badge" id="sim-mode-badge">ASESOR</span>
+              <strong class="sim-title" id="sim-header-title">Asesor</strong>
               <span class="sim-status">
                 <span class="sim-status-dot" aria-hidden="true"></span>
                 <span id="sim-active-instance-label">En línea · Información y Contratación</span>
@@ -1421,9 +1364,7 @@
             <div class="bubble-identity bubble-identity-official">
               <img src="/assets/servibot-logo.png" alt="" width="18" height="18" decoding="async" />
               <strong>Asesor Oficial Servi-Bot</strong>
-            </div>¡Hola! Soy el asesor comercial de <strong>Servi-Bot</strong>. Conozco nuestra oferta, planes y precios en tiempo real.
-
-Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Teams o cómo crear tu propio bot autónomo.
+            </div>Hola, soy ServiBot, ¿cómo puedo facilitar tu día?
           </div>
         </div>
 
@@ -1555,22 +1496,114 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
         </form>
       </div>
 
-      <!-- Panel de Administración Completo (navegación en encabezado full-width) -->
+      <!-- Panel de Administración Completo con Navegación Lateral -->
       <div id="admin-dashboard" class="admin-shell hidden">
-        <!-- TAB 1: GESTIÓN DE PRODUCTOS Y SERVICIOS (MASTER-DETAIL) -->
-        <div id="admin-role-banner" class="admin-role-banner hidden">
-          <div class="admin-role-info">
-            <span class="badge-tag" id="admin-role-badge">Cargando rol...</span>
-            <strong id="admin-instance-label">Instancia: —</strong>
-            <span id="admin-expiry-badge" class="admin-expiry-badge"></span>
-          </div>
-          <div id="admin-super-controls" class="admin-super-controls hidden">
-            <label for="admin-instance-switcher" style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap;">Administrar Bot:</label>
-            <select id="admin-instance-switcher" class="form-select-inline"></select>
-          </div>
-        </div>
+        <!-- PANEL LATERAL DE NAVEGACIÓN A LA IZQUIERDA (ADMIN SIDEBAR) -->
+        <aside class="admin-sidebar" id="admin-sidebar" aria-label="Navegación de Administrador">
+          <div class="admin-sidebar-header">
+            <div class="admin-sidebar-user">
+              <span class="admin-user-avatar" aria-hidden="true">👤</span>
+              <div class="admin-user-details">
+                <span class="admin-user-email" id="admin-sidebar-email">Administrador</span>
+                <span class="badge-tag" id="admin-role-badge">Cargando rol...</span>
+              </div>
+            </div>
 
-        <div id="tab-catalog" class="admin-tab-pane">
+            <div id="admin-role-banner" class="admin-instance-card">
+              <div class="admin-instance-meta">
+                <span class="admin-instance-title" id="admin-instance-label">Instancia: —</span>
+                <span id="admin-expiry-badge" class="admin-expiry-badge"></span>
+              </div>
+              <div id="admin-super-controls" class="admin-super-controls hidden">
+                <label for="admin-instance-switcher" class="admin-switcher-label">Cambiar Bot:</label>
+                <select id="admin-instance-switcher" class="form-select-inline"></select>
+              </div>
+            </div>
+          </div>
+
+          <!-- MENÚ DE NAVEGACIÓN LATERAL -->
+          <nav class="admin-sidebar-nav">
+            <span class="admin-nav-section-title">MENÚ PRINCIPAL</span>
+            <ul class="admin-sidebar-menu">
+              <li class="admin-nav-item">
+                <button type="button" class="admin-nav-link admin-tab-nav" data-tab="tab-catalog" aria-current="page">
+                  <span class="admin-nav-icon" aria-hidden="true">📦</span>
+                  <span>Productos</span>
+                </button>
+              </li>
+              <li class="admin-nav-item">
+                <button type="button" class="admin-nav-link admin-tab-nav" data-tab="tab-bot-soul">
+                  <span class="admin-nav-icon" aria-hidden="true">🧠</span>
+                  <span>Alma del Bot</span>
+                </button>
+              </li>
+              <li class="admin-nav-item">
+                <button type="button" class="admin-nav-link admin-tab-nav" data-tab="tab-orders">
+                  <span class="admin-nav-icon" aria-hidden="true">🛒</span>
+                  <span>Pedidos</span>
+                  <span class="nav-count-pill" id="header-orders-count">0</span>
+                </button>
+              </li>
+              <li class="admin-nav-item">
+                <button type="button" class="admin-nav-link admin-tab-nav" data-tab="tab-channels">
+                  <span class="admin-nav-icon" aria-hidden="true">📡</span>
+                  <span>Canales</span>
+                </button>
+              </li>
+              <li class="admin-nav-item">
+                <button type="button" class="admin-nav-link admin-tab-nav" data-tab="tab-conversations">
+                  <span class="admin-nav-icon" aria-hidden="true">💬</span>
+                  <span>Conversaciones</span>
+                </button>
+              </li>
+              <li class="admin-nav-item">
+                <button type="button" class="admin-nav-link admin-tab-nav" data-tab="tab-lists">
+                  <span class="admin-nav-icon" aria-hidden="true">🛡️</span>
+                  <span>Listas</span>
+                </button>
+              </li>
+              <li class="admin-nav-item hidden" id="nav-item-accounts" data-superadmin-only="1">
+                <button type="button" class="admin-nav-link admin-tab-nav" data-tab="tab-accounts">
+                  <span class="admin-nav-icon" aria-hidden="true">👤</span>
+                  <span>Cuentas y VIP</span>
+                </button>
+              </li>
+            </ul>
+
+            <span class="admin-nav-section-title" style="margin-top: 1.25rem;">AJUSTES Y ACCIONES</span>
+            <ul class="admin-sidebar-menu">
+              <li>
+                <!-- BOTÓN PARA ALTERNAR MODO CLARO / OSCURO DENTRO DEL ADMIN -->
+                <button type="button" class="admin-nav-link admin-theme-toggle-btn" id="btn-admin-theme" title="Alternar Modo Claro / Modo Oscuro">
+                  <span class="admin-nav-icon" id="admin-theme-icon">🌓</span>
+                  <span id="admin-theme-text">Modo Claro / Oscuro</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="admin-nav-link" id="btn-view-store">
+                  <span class="admin-nav-icon" aria-hidden="true">🌐</span>
+                  <span>Sitio Público</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="admin-nav-link" id="btn-refresh-admin">
+                  <span class="admin-nav-icon" aria-hidden="true">🔄</span>
+                  <span>Actualizar</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" class="admin-nav-link admin-logout-btn" id="btn-logout">
+                  <span class="admin-nav-icon" aria-hidden="true">🚪</span>
+                  <span>Cerrar Sesión</span>
+                </button>
+              </li>
+            </ul>
+          </nav>
+        </aside>
+
+        <!-- ÁREA PRINCIPAL DERECHA DE PESTAÑAS -->
+        <div class="admin-main-area" id="admin-main-area">
+          <div id="tab-catalog" class="admin-tab-pane">
           <div class="products-master-detail">
             <!-- PANEL IZQUIERDO: LISTADO DE PRODUCTOS -->
             <aside class="products-sidebar" aria-label="Catálogo de productos y servicios">
@@ -2459,6 +2492,7 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
               </div>
             </form>
           </div>
+        </div>
         </div>
       </div>
     </section>

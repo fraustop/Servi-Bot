@@ -241,8 +241,14 @@ ensureColumn(db, 'bot_instances', 'paid_at', 'TEXT DEFAULT NULL');
 ensureColumn(db, 'bot_instances', 'subscription_expires_at', 'TEXT DEFAULT NULL');
 ensureColumn(db, 'bot_instances', 'locked_for_public', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn(db, 'bot_instances', 'quick_options_json', "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn(db, 'bot_instances', 'faq_json', "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn(db, 'bot_instances', 'schedule_json', "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn(db, 'bot_instances', 'raw_rules', "TEXT NOT NULL DEFAULT ''");
 
 ensureColumn(prospectsDb, 'prospects', 'quick_options_json', "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn(prospectsDb, 'prospects', 'faq_json', "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn(prospectsDb, 'prospects', 'schedule_json', "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn(prospectsDb, 'prospects', 'raw_rules', "TEXT NOT NULL DEFAULT ''");
 
 ensureColumn(db, 'admin_accounts', 'assigned_instance_id', "TEXT NOT NULL DEFAULT 'servibot-01'");
 ensureColumn(db, 'admin_accounts', 'subscription_expires_at', 'TEXT DEFAULT NULL');
@@ -538,6 +544,10 @@ function archiveInstanceToProspects(instanceRow) {
           previous_slot_number = ?,
           catalog_snapshot_json = ?,
           promotions_snapshot_json = ?,
+          quick_options_json = ?,
+          faq_json = ?,
+          schedule_json = ?,
+          raw_rules = ?,
           archived_at = datetime('now', 'localtime'),
           updated_at = datetime('now', 'localtime')
         WHERE id = ?
@@ -555,6 +565,10 @@ function archiveInstanceToProspects(instanceRow) {
         Number(instanceRow.slot_number || 0),
         JSON.stringify(catalogSnapshot),
         JSON.stringify(promotionsSnapshot),
+        instanceRow.quick_options_json || '[]',
+        instanceRow.faq_json || '[]',
+        instanceRow.schedule_json || '[]',
+        instanceRow.raw_rules || '',
         existing.id
       );
     return existing.id;
@@ -566,8 +580,9 @@ function archiveInstanceToProspects(instanceRow) {
         contact_key, client_name, client_contact, business_name, display_name,
         tone, ai_soul, system_prompt, welcome_message,
         previous_instance_id, previous_slot_number,
-        catalog_snapshot_json, promotions_snapshot_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        catalog_snapshot_json, promotions_snapshot_json,
+        quick_options_json, faq_json, schedule_json, raw_rules
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     .run(
       contactKey,
@@ -582,7 +597,11 @@ function archiveInstanceToProspects(instanceRow) {
       instanceRow.instance_id,
       Number(instanceRow.slot_number || 0),
       JSON.stringify(catalogSnapshot),
-      JSON.stringify(promotionsSnapshot)
+      JSON.stringify(promotionsSnapshot),
+      instanceRow.quick_options_json || '[]',
+      instanceRow.faq_json || '[]',
+      instanceRow.schedule_json || '[]',
+      instanceRow.raw_rules || ''
     );
   return res.lastInsertRowid;
 }
@@ -697,6 +716,9 @@ function seedDatabase() {
       business_name: 'Proyecto Cero · Servi-Bot',
       bot_name: 'ServiBot #00 · Proyecto Cero',
       tone: 'Consultivo, ejecutivo, claro y estricto con la información oficial',
+      ai_provider: 'bedrock',
+      bedrock_model: 'us.amazon.nova-micro-v1:0',
+      aws_region: 'us-east-2',
       ollama_host: 'http://127.0.0.1:10002',
       ollama_model: 'llama3.2:3b',
       evolution_url: 'http://127.0.0.1:10001',

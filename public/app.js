@@ -107,11 +107,14 @@ function initTheme() {
   const savedTheme = localStorage.getItem('servibot_theme') || 'light';
   applyTheme(savedTheme);
 
-  document.getElementById('btn-topbar-theme')?.addEventListener('click', () => {
+  const toggleThemeAction = () => {
     const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
     const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
     applyTheme(nextTheme);
-  });
+  };
+
+  document.getElementById('btn-topbar-theme')?.addEventListener('click', toggleThemeAction);
+  document.getElementById('btn-admin-theme')?.addEventListener('click', toggleThemeAction);
 }
 
 function applyTheme(theme) {
@@ -140,6 +143,20 @@ function applyTheme(theme) {
   if (btn) {
     btn.title = isLight ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro';
     btn.setAttribute('aria-label', isLight ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro');
+  }
+
+  // Actualizar botón de tema del panel de administración lateral
+  const adminThemeText = document.getElementById('admin-theme-text');
+  const adminThemeIcon = document.getElementById('admin-theme-icon');
+  const adminThemeBtn = document.getElementById('btn-admin-theme');
+  if (adminThemeText) {
+    adminThemeText.textContent = isLight ? 'Modo Oscuro' : 'Modo Claro';
+  }
+  if (adminThemeIcon) {
+    adminThemeIcon.textContent = isLight ? '🌙' : '☀️';
+  }
+  if (adminThemeBtn) {
+    adminThemeBtn.title = isLight ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro';
   }
 }
 
@@ -654,16 +671,12 @@ async function autoSaveInstanceNow() {
 
   const displayInput = document.getElementById('cfg-display-name');
   const soulInput = document.getElementById('cfg-ai-soul');
-  const displayName = displayInput?.value.trim() || '';
-  const aiSoul = soulInput?.value.trim() || '';
-  const businessName = document.getElementById('cfg-business-name')?.value.trim() || '';
+  const displayName = displayInput?.value.trim() || 'ServiBot';
+  const aiSoul = soulInput?.value.trim() || 'Asistente comercial y de atención inteligente.';
+  const businessName = document.getElementById('cfg-business-name')?.value.trim() || 'Mi Negocio';
+  const rawRules = document.getElementById('cfg-system-prompt')?.value.trim() || '';
 
   updateWizardLivePreview();
-
-  if (!displayName || !aiSoul) {
-    setSyncIndicator('draft');
-    return;
-  }
 
   const compiledSystemPrompt = buildFullSystemPrompt();
 
@@ -675,24 +688,23 @@ async function autoSaveInstanceNow() {
     admin_email: prospectProfile?.email || currentUser?.email || '',
     firebase_uid: currentUser?.uid || prospectProfile?.uid || '',
     display_name: displayName,
-    tone: document.getElementById('cfg-tone')?.value.trim() || '',
+    tone: document.getElementById('cfg-tone')?.value.trim() || 'Profesional, cálido y orientado a resultados',
     ai_soul: aiSoul,
     system_prompt: compiledSystemPrompt,
+    raw_rules: rawRules,
+    raw_system_prompt: rawRules,
     welcome_message: document.getElementById('cfg-welcome-message')?.value.trim() || '',
     initial_products: document.getElementById('cfg-initial-products')?.value.trim() || '',
     catalog_items: wizardCatalogItems,
     replace_catalog: true,
-    quick_options: wizardQuickOptions
+    quick_options: wizardQuickOptions,
+    faq_items: wizardFaqItems,
+    schedule: wizardSchedule
   };
 
   try {
     localStorage.setItem('servibot_draft_config', JSON.stringify(payload));
   } catch {}
-
-  if (!currentUser && !prospectProfile && !payload.client_contact) {
-    setSyncIndicator('draft');
-    return;
-  }
 
   isAutoSaving = true;
   try {
@@ -1225,6 +1237,10 @@ function syncHeaderAndNavigation() {
       userPill.textContent = currentUser.email || 'Administrador';
       userPill.classList.remove('hidden');
     }
+    const sidebarEmail = document.getElementById('admin-sidebar-email');
+    if (sidebarEmail) {
+      sidebarEmail.textContent = currentUser.email || 'Administrador';
+    }
     document.querySelectorAll('.admin-tab-nav').forEach((btn) => {
       if (btn.dataset.tab === activeAdminTab) {
         btn.setAttribute('aria-current', 'page');
@@ -1234,7 +1250,7 @@ function syncHeaderAndNavigation() {
     });
     updateNavbarLayout();
   } else {
-    if (brandSubtitle) brandSubtitle.textContent = 'Automatización Comercial IA';
+    if (brandSubtitle) brandSubtitle.textContent = 'La inteligencia artificial a tu servicio';
     if (userPill) {
       userPill.textContent = '';
       userPill.classList.add('hidden');
@@ -1807,7 +1823,7 @@ function buildAssistantIdentityHeader(mode, inst = provisionedInstance) {
     const customName = `${inst.display_name || 'Mi ServiBot'} · ${inst.business_name || 'Tu Negocio'}`;
     return `<div class="bubble-identity bubble-identity-custom"><span class="bubble-bot-emoji" aria-hidden="true">🤖</span><strong>${escapeHtml(customName)}</strong></div>`;
   }
-  return `<div class="bubble-identity bubble-identity-official"><img src="/assets/servibot-logo.png" alt="" width="18" height="18" decoding="async" /><strong>Asesor Oficial Servi-Bot</strong></div>`;
+  return `<div class="bubble-identity bubble-identity-official"><img src="/assets/servibot-logo.png" alt="" width="18" height="18" decoding="async" /><strong>Asesor</strong></div>`;
 }
 
 function toggleVisibilityPair(imgEl, emojiEl, showCustomEmoji) {
@@ -1902,12 +1918,12 @@ function syncSimulatorHeaderLabel(inst = provisionedInstance) {
     if (topbarLbl) topbarLbl.textContent = customName;
     if (chatInput) chatInput.placeholder = `Escríbele como cliente a ${customName}...`;
   } else {
-    if (badgeEl) badgeEl.textContent = 'ASESOR OFICIAL SERVI-BOT';
-    if (titleEl) titleEl.textContent = 'Asesor Comercial Servi-Bot';
+    if (badgeEl) badgeEl.textContent = 'ASESOR';
+    if (titleEl) titleEl.textContent = 'Asesor';
     if (activeLbl) activeLbl.textContent = 'En línea · Información y Contratación';
-    if (fabText) fabText.textContent = 'Asesor Servi-Bot';
+    if (fabText) fabText.textContent = 'Asesor';
     if (topbarLbl) topbarLbl.textContent = 'Abrir Bot';
-    if (chatInput) chatInput.placeholder = 'Pregúntale al Asesor Oficial Servi-Bot...';
+    if (chatInput) chatInput.placeholder = 'Pregúntale al Asesor...';
   }
 
   updateQuickPrompts(isCustom, inst);
@@ -1943,7 +1959,7 @@ function setSimulatorBotMode(mode, { announceGreeting = false } = {}) {
         box.innerHTML = `<div class="chat-bubble assistant is-custom-bot">${buildAssistantIdentityHeader('custom', provisionedInstance)}${escapeHtml(greeting)}</div>`;
       } else {
         const officialMsg =
-          '¡Hola! Soy el Asesor Oficial de Servi-Bot. Pregúntame sobre nuestros planes, funcionamiento o cómo automatizar WhatsApp, Outlook y Teams.';
+          'Hola, soy ServiBot, ¿cómo puedo facilitar tu día?';
         box.innerHTML = `<div class="chat-bubble assistant is-official-bot">${buildAssistantIdentityHeader('official', null)}${escapeHtml(officialMsg)}</div>`;
       }
       box.scrollTop = box.scrollHeight;
@@ -2150,18 +2166,32 @@ function populateWizardForm(inst) {
   setVal('cfg-display-name', inst.display_name || '');
   setVal('cfg-tone', inst.tone || '');
   setVal('cfg-ai-soul', inst.ai_soul || '');
-  setVal('cfg-system-prompt', inst.system_prompt || '');
+
+  // Subsección 2: Reglas Clave (usar raw_rules si existe para preservar exactamente lo que escribió el usuario)
+  let rulesVal = inst.raw_rules !== undefined ? inst.raw_rules : '';
+  if (!rulesVal && inst.system_prompt) {
+    if (inst.system_prompt.includes('REGLAS CLAVE DEL NEGOCIO:\n')) {
+      const match = inst.system_prompt.match(/REGLAS CLAVE DEL NEGOCIO:\n([\s\S]*?)(?=\n\n(?:HORARIOS|PREGUNTAS)|$)/);
+      rulesVal = match ? match[1].trim() : inst.system_prompt;
+    } else {
+      rulesVal = inst.system_prompt;
+    }
+  }
+  setVal('cfg-system-prompt', rulesVal || '');
   setVal('cfg-welcome-message', inst.welcome_message || '');
 
-  if (Array.isArray(inst.catalog) && inst.catalog.length > 0) {
-    wizardCatalogItems = inst.catalog.map((item) => ({
+  // Subsección 4: Catálogo
+  const catalogList = Array.isArray(inst.catalog) ? inst.catalog : (Array.isArray(inst.catalog_items) ? inst.catalog_items : null);
+  if (Array.isArray(catalogList)) {
+    wizardCatalogItems = catalogList.map((item) => ({
       name: String(item.name || item.title || '').trim(),
       type: item.type === 'service' ? 'service' : 'product',
       price: Math.max(0, Number(item.price || 0)),
       billing_cycle: String(item.billing_cycle || 'estándar').trim(),
       tagline: String(item.tagline || '').trim(),
       description: String(item.description || item.name || '').trim()
-    }));
+    })).filter((it) => it.name);
+    renderCatalogUI();
   } else if (inst.initial_products) {
     const parsed = String(inst.initial_products)
       .split(/\r?\n/)
@@ -2180,16 +2210,28 @@ function populateWizardForm(inst) {
       })
       .filter((it) => it.name);
     if (parsed.length) wizardCatalogItems = parsed;
+    renderCatalogUI();
   }
-  renderCatalogUI();
 
-  if (Array.isArray(inst.quick_options) && inst.quick_options.length > 0) {
+  // Subsección 2: Opciones Rápidas
+  if (Array.isArray(inst.quick_options)) {
     wizardQuickOptions = inst.quick_options;
   }
   renderQuickOptionsList();
 
+  // Subsección 3: Horarios y Citas
+  if (Array.isArray(inst.schedule) && inst.schedule.length === 7) {
+    wizardSchedule = inst.schedule;
+  }
+  renderScheduleUI();
   updateScheduleSummary();
+
+  // Subsección 5: Preguntas Frecuentes (FAQ)
+  if (Array.isArray(inst.faq_items)) {
+    wizardFaqItems = inst.faq_items;
+  }
   renderFaqUI();
+
   updateWizardLivePreview();
 }
 
@@ -2454,6 +2496,12 @@ async function loadClientProvisionedInstance({ populateForm = true } = {}) {
     activeChatInstanceId = 'servibot-00';
     syncSimulatorHeaderLabel(null);
     if (populateForm) {
+      try {
+        const draft = JSON.parse(localStorage.getItem('servibot_draft_config') || 'null');
+        if (draft && typeof draft === 'object') {
+          populateWizardForm(draft);
+        }
+      } catch {}
       updateWizardLivePreview();
       updateCheckoutPricing();
       goToWizardStep(wizardCurrentStep || 1);
@@ -2476,8 +2524,18 @@ async function loadClientProvisionedInstance({ populateForm = true } = {}) {
     }
 
     const inst = data.instance;
-    const isUnconfigured =
-      String(inst.business_name || '').startsWith('Espacio Disponible') && !String(inst.client_name || '').trim();
+    const hasCustomConfig = Boolean(
+      (inst.business_name && !inst.business_name.startsWith('Espacio Disponible')) ||
+      inst.client_name ||
+      inst.ai_soul ||
+      inst.system_prompt ||
+      inst.raw_rules ||
+      (Array.isArray(inst.quick_options) && inst.quick_options.length) ||
+      (Array.isArray(inst.catalog) && inst.catalog.length) ||
+      (Array.isArray(inst.catalog_items) && inst.catalog_items.length) ||
+      (Array.isArray(inst.faq_items) && inst.faq_items.length)
+    );
+    const isUnconfigured = !hasCustomConfig && String(inst.business_name || '').startsWith('Espacio Disponible');
     if (isUnconfigured) {
       clientInstanceId = '';
       localStorage.removeItem('servibot_client_instance_id');
@@ -3933,13 +3991,15 @@ function setupEventListeners() {
     }
   });
 
-  document.getElementById('btn-logout')?.addEventListener('click', async () => {
+  const handleLogout = async () => {
     closeMenuPopoverIfOpen();
     await signOut(auth);
     document.getElementById('firebase-login-form')?.reset();
     resetPasswordToggle('btn-toggle-login-pw', 'auth-password');
     setFeedback('auth-status-msg', 'Sesión cerrada correctamente.', true);
-  });
+  };
+  document.getElementById('btn-logout')?.addEventListener('click', handleLogout);
+  document.getElementById('btn-header-logout')?.addEventListener('click', handleLogout);
 
   document.getElementById('btn-refresh-admin')?.addEventListener('click', () => {
     closeMenuPopoverIfOpen();

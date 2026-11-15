@@ -47,6 +47,7 @@ const {
   getTeamsChannelStatus
 } = require('./channels/teams_handler');
 const { startCloudflareTunnel, getTunnelStatus } = require('./tunnel_manager');
+const { allTimeRouter } = require('./alltime_api');
 
 const PORT = Number(process.env.PORT || 10000);
 const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyCZm5qX98Y8ww4ksJWX-xQs6deaSQojhHk';
@@ -1955,6 +1956,17 @@ async function main() {
     } catch {
       merged.quick_options = [];
     }
+    try {
+      merged.faq_items = JSON.parse(row.faq_json || '[]');
+    } catch {
+      merged.faq_items = [];
+    }
+    try {
+      merged.schedule = JSON.parse(row.schedule_json || '[]');
+    } catch {
+      merged.schedule = [];
+    }
+    merged.raw_rules = row.raw_rules || '';
     if (includeCatalog && row.instance_id) {
       try {
         const botDb = getBotDb(row.instance_id);
@@ -2085,27 +2097,20 @@ async function main() {
         }
       }
 
-      const businessName = String(body.business_name || '').trim();
+      const businessName = String(body.business_name || '').trim() || 'Mi Negocio';
       const clientName = String(body.client_name || '').trim();
       const clientContact = String(body.client_contact || '').trim();
       const adminEmail = String(body.admin_email || '').trim().toLowerCase();
       const displayName =
         String(body.display_name || '').trim() || (businessName ? `Asistente ${businessName}` : 'ServiBot');
       const tone = String(body.tone || '').trim() || 'Profesional, cálido y orientado a resultados';
-      const aiSoul = String(body.ai_soul || '').trim();
+      const aiSoul = String(body.ai_soul || '').trim() || 'Asistente comercial y de atención al cliente.';
       const systemPrompt = String(body.system_prompt || '').trim();
       const welcomeMessage =
         String(body.welcome_message || '').trim() ||
         (businessName
           ? `¡Hola! Soy ${displayName}, asesor inteligente de ${businessName}. ¿En qué te ayudo hoy?`
           : '¡Hola! Soy tu ServiBot. ¿En qué te ayudo hoy?');
-
-      if (!businessName || !aiSoul) {
-        return res.status(400).json({
-          ok: false,
-          error: 'Indica al menos el nombre de tu negocio y el alma o propósito de tu ServiBot.'
-        });
-      }
 
       const alloc = await allocateClientSlotForProspect({
         clientContact,
@@ -2155,6 +2160,9 @@ async function main() {
       }
 
       const quickOptionsJson = Array.isArray(body.quick_options) ? JSON.stringify(body.quick_options) : null;
+      const faqJson = Array.isArray(body.faq_items || body.faqs) ? JSON.stringify(body.faq_items || body.faqs) : null;
+      const scheduleJson = Array.isArray(body.schedule || body.schedule_config) ? JSON.stringify(body.schedule || body.schedule_config) : null;
+      const rawRules = body.raw_rules !== undefined ? String(body.raw_rules).trim() : (body.raw_system_prompt !== undefined ? String(body.raw_system_prompt).trim() : null);
 
       db.prepare(
         `
@@ -2170,6 +2178,9 @@ async function main() {
           system_prompt = ?,
           welcome_message = ?,
           quick_options_json = CASE WHEN ? IS NOT NULL THEN ? ELSE quick_options_json END,
+          faq_json = CASE WHEN ? IS NOT NULL THEN ? ELSE faq_json END,
+          schedule_json = CASE WHEN ? IS NOT NULL THEN ? ELSE schedule_json END,
+          raw_rules = CASE WHEN ? IS NOT NULL THEN ? ELSE raw_rules END,
           db_file = ?,
           active = 1,
           updated_at = datetime('now', 'localtime')
@@ -2188,6 +2199,12 @@ async function main() {
         welcomeMessage,
         quickOptionsJson,
         quickOptionsJson,
+        faqJson,
+        faqJson,
+        scheduleJson,
+        scheduleJson,
+        rawRules,
+        rawRules,
         getBotDbPath(instanceId),
         instanceId
       );
@@ -2303,6 +2320,10 @@ async function main() {
               ai_soul = ?,
               system_prompt = ?,
               welcome_message = ?,
+              quick_options_json = ?,
+              faq_json = ?,
+              schedule_json = ?,
+              raw_rules = ?,
               db_file = ?,
               active = 1,
               updated_at = datetime('now', 'localtime')
@@ -2317,6 +2338,10 @@ async function main() {
             foundProspect.ai_soul || '',
             foundProspect.system_prompt || '',
             foundProspect.welcome_message || '',
+            foundProspect.quick_options_json || '[]',
+            foundProspect.faq_json || '[]',
+            foundProspect.schedule_json || '[]',
+            foundProspect.raw_rules || '',
             getBotDbPath(alloc.instanceId),
             alloc.instanceId
           );
@@ -2454,6 +2479,11 @@ async function main() {
         syncWizardCatalogToBotDb(instanceId, rawCatalog, Boolean(body.replace_catalog));
       }
 
+      const quickOptionsJson = Array.isArray(body.quick_options) ? JSON.stringify(body.quick_options) : null;
+      const faqJson = Array.isArray(body.faq_items || body.faqs) ? JSON.stringify(body.faq_items || body.faqs) : null;
+      const scheduleJson = Array.isArray(body.schedule || body.schedule_config) ? JSON.stringify(body.schedule || body.schedule_config) : null;
+      const rawRules = body.raw_rules !== undefined ? String(body.raw_rules).trim() : (body.raw_system_prompt !== undefined ? String(body.raw_system_prompt).trim() : null);
+
       db.prepare(
         `
         UPDATE bot_instances SET
@@ -2465,6 +2495,10 @@ async function main() {
           ai_soul = ?,
           system_prompt = ?,
           welcome_message = ?,
+          quick_options_json = CASE WHEN ? IS NOT NULL THEN ? ELSE quick_options_json END,
+          faq_json = CASE WHEN ? IS NOT NULL THEN ? ELSE faq_json END,
+          schedule_json = CASE WHEN ? IS NOT NULL THEN ? ELSE schedule_json END,
+          raw_rules = CASE WHEN ? IS NOT NULL THEN ? ELSE raw_rules END,
           active = ?,
           updated_at = datetime('now', 'localtime')
         WHERE instance_id = ?
@@ -2478,6 +2512,14 @@ async function main() {
         aiSoul,
         systemPrompt,
         welcomeMessage,
+        quickOptionsJson,
+        quickOptionsJson,
+        faqJson,
+        faqJson,
+        scheduleJson,
+        scheduleJson,
+        rawRules,
+        rawRules,
         active,
         instanceId
       );
@@ -3848,6 +3890,12 @@ async function main() {
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });
     }
+  });
+
+  // Subaplicación All Time: Programador de Publicaciones en Redes Sociales
+  app.use('/api/alltime', allTimeRouter);
+  app.get('/alltime', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'alltime.html'));
   });
 
   // SPA fallback
