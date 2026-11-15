@@ -675,6 +675,10 @@ body.is-admin-session .container {
   pointer-events: none;
 }
 
+#public-carousel[data-active-section="offer"] .carousel-controls {
+  display: none;
+}
+
 .carousel-arrow {
   pointer-events: auto;
   touch-action: manipulation;
@@ -730,7 +734,7 @@ body.is-admin-session .container {
   flex: 0 0 100%;
   inline-size: 100%;
   scroll-snap-align: center;
-  scroll-snap-stop: always;
+  scroll-snap-stop: normal;
   overflow-y: auto;
   scrollbar-gutter: stable;
   overscroll-behavior: contain;

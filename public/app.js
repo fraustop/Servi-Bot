@@ -367,7 +367,7 @@ function initPublicCarousel() {
     btn.setAttribute('aria-label', sec.label);
     btn.dataset.section = sec.key;
     if (idx === 0) btn.setAttribute('aria-current', 'true');
-    btn.addEventListener('click', () => goToSlide(sec.targetIndex, { announce: true }));
+    btn.addEventListener('click', () => goToSlide(sec.targetIndex, { announce: true, instant: true }));
     markersNav.appendChild(btn);
     return btn;
   });
@@ -399,6 +399,7 @@ function initPublicCarousel() {
 
   function applyMarkerCurrent(index) {
     const activeSection = slides[index]?.dataset.section || 'description';
+    carousel.dataset.activeSection = activeSection;
     const currentSectionBtn = markers.find((m) => m.dataset.section === activeSection);
     if (liveMarkerIndex === index && currentSectionBtn?.getAttribute('aria-current') === 'true') {
       return;
@@ -421,9 +422,10 @@ function initPublicCarousel() {
   }
 
   function updateEndControls(index) {
-    // Con 2 diapositivas (< 3), el carrusel es finito y deshabilita botones en los extremos
+    // Recorrido finito dentro de las diapositivas de descripción (las flechas se ocultan en Configuración)
+    const maxDescIndex = offerSlideIndex > 0 ? offerSlideIndex - 1 : slides.length - 1;
     prevBtn.disabled = index <= 0;
-    nextBtn.disabled = index >= slides.length - 1;
+    nextBtn.disabled = index >= maxDescIndex;
   }
 
   function settleNavigation(expectedGen, allowAnnounce) {
@@ -444,7 +446,7 @@ function initPublicCarousel() {
     }
   }
 
-  function goToSlide(targetIndex, { announce = true } = {}) {
+  function goToSlide(targetIndex, { announce = true, instant = false } = {}) {
     const clamped = Math.max(0, Math.min(slides.length - 1, targetIndex));
     const currentIndex = pendingTarget ?? getNearestSlideIndex();
     if (clamped === currentIndex && pendingTarget === null) {
@@ -455,6 +457,7 @@ function initPublicCarousel() {
     pendingTarget = clamped;
     scrollGeneration += 1;
     const gen = scrollGeneration;
+    clearTimeout(settleTimer);
 
     // Actualizar el marcador al instante al hacer clic
     applyMarkerCurrent(clamped);
@@ -469,16 +472,32 @@ function initPublicCarousel() {
       return;
     }
 
-    const instant = prefersReducedMotion();
+    const currentSection = slides[currentIndex]?.dataset.section || 'description';
+    const targetSection = targetSlide?.dataset.section || 'description';
+    const useInstant = Boolean(
+      instant
+      || prefersReducedMotion()
+      || currentSection !== targetSection
+      || Math.abs(clamped - currentIndex) > 1
+    );
+
+    if (useInstant) {
+      track.style.scrollBehavior = 'auto';
+      track.style.scrollSnapType = 'none';
+      track.scrollLeft += delta;
+      void track.offsetWidth;
+      track.style.scrollSnapType = '';
+      track.style.scrollBehavior = '';
+      settleNavigation(gen, announce);
+      return;
+    }
+
     track.scrollBy({
       left: delta,
-      behavior: instant ? 'auto' : 'smooth'
+      behavior: 'smooth'
     });
 
-    if (instant) {
-      requestAnimationFrame(() => settleNavigation(gen, announce));
-    } else if (!('onscrollend' in window)) {
-      clearTimeout(settleTimer);
+    if (!('onscrollend' in window)) {
       settleTimer = setTimeout(() => settleNavigation(gen, announce), 160);
     }
   }
@@ -490,7 +509,8 @@ function initPublicCarousel() {
 
   nextBtn.addEventListener('click', () => {
     const baseIndex = pendingTarget ?? getNearestSlideIndex();
-    goToSlide(baseIndex + 1, { announce: true });
+    const maxDescIndex = offerSlideIndex > 0 ? offerSlideIndex - 1 : slides.length - 1;
+    goToSlide(Math.min(maxDescIndex, baseIndex + 1), { announce: true });
   });
 
   track.addEventListener('scroll', () => {
@@ -1460,11 +1480,20 @@ function setupEventListeners() {
   document.querySelectorAll('.btn-go-offer').forEach((btn) => {
     btn.addEventListener('click', () => {
       const offerIdx = Math.max(0, document.querySelectorAll('#public-carousel-track .carousel-slide').length - 1);
-      carouselController?.goToSlide(offerIdx, { announce: true });
+      carouselController?.goToSlide(offerIdx, { announce: true, instant: true });
+      requestAnimationFrame(() => {
+        const targetFocus =
+          wizardCurrentStep === 2
+            ? document.getElementById('cfg-display-name')
+            : wizardCurrentStep === 3
+              ? document.getElementById('btn-test-instance-sim')
+              : document.getElementById('cfg-client-name');
+        targetFocus?.focus({ preventScroll: true });
+      });
     });
   });
   document.getElementById('btn-go-description')?.addEventListener('click', () => {
-    carouselController?.goToSlide(0, { announce: true });
+    carouselController?.goToSlide(0, { announce: true, instant: true });
   });
 
   if (hasAdminUrlParam()) {
