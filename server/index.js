@@ -24,7 +24,10 @@ const {
   getSetting,
   setSetting,
   getBotSetting,
-  setBotSetting
+  setBotSetting,
+  addTrainingMemory,
+  getTrainingMemories,
+  applyTrainingAction
 } = require('./db');
 const {
   OLLAMA_PORT,
@@ -2665,6 +2668,116 @@ async function main() {
     }
   });
 
+  // --- INTÉRPRETE DE INSTRUCCIONES DE ENTRENAMIENTO ---
+  function interpretTrainingInstruction(instruction, currentInstance, catalogItems = []) {
+    const text = String(instruction || '').trim();
+    const lower = text.toLowerCase();
+
+    // 1. Agregar al catálogo / servicio / producto
+    // Ej: "Agrega al catálogo el servicio Consulta General a 400 pesos"
+    // Ej: "Ofrecemos corte de cabello por 150 pesos"
+    // Ej: "Agrega producto Shampoo anticaída con precio 250"
+    const catalogAddRegex = /(?:agrega(?:r)?|aÃ±ade|aÃ±adir|nuevo|nueva|ofrecemos|tenemos|vende(?:mos)?)\s+(?:al\s+cat[aá]logo\s+)?(?:el\s+servicio\s+|el\s+producto\s+|servicio\s+|producto\s+)?([^$0-9]+?)\s+(?:a\s+|en\s+|por\s+|con\s+precio\s+(?:de\s+)?|\$)\s*\$?([0-9]+(?:[\.,][0-9]{2})?)\s*(?:pesos|mxn|\$)?(?:\s+(mensual|anual|semanal|quincenal|por hora|único))?/i;
+    const matchAdd = text.match(catalogAddRegex);
+    if (matchAdd) {
+      const rawName = matchAdd[1].replace(/^(al\s+cat[aá]logo|el\s+servicio|el\s+producto|servicio|producto)\s+/i, '').trim();
+      const cleanName = rawName.replace(/^[:\-–\s]+|[:\-–\s]+$/g, '').trim();
+      const rawPrice = matchAdd[2].replace(',', '.');
+      const price = parseFloat(rawPrice) || 0;
+      const cycle = matchAdd[3] ? matchAdd[3].toLowerCase() : 'único';
+      if (cleanName.length >= 2) {
+        return {
+          actionType: 'catalog_add',
+          payload: {
+            name: cleanName.charAt(0).toUpperCase() + cleanName.slice(1),
+            price,
+            description: `Servicio/producto ${cleanName} ofrecido por ${currentInstance.business_name || 'el negocio'}.`,
+            billing_cycle: cycle,
+            type: cycle === 'mensual' || cycle === 'anual' ? 'plan' : 'service',
+            instruction: text
+          }
+        };
+      }
+    }
+
+    // 2. Eliminar del catálogo
+    const catalogDelRegex = /(?:elimina(?:r)?|borra(?:r)?|quitar?|ya\s+no\s+(?:ofrecemos|vendemos))\s+(?:del\s+cat[aá]logo\s+)?(?:el\s+servicio\s+|el\s+producto\s+|servicio\s+|producto\s+)?([^.\n]+)/i;
+    const matchDel = text.match(catalogDelRegex);
+    if (matchDel) {
+      const targetName = matchDel[1].trim();
+      if (targetName.length >= 2) {
+        return {
+          actionType: 'catalog_delete',
+          payload: {
+            name: targetName,
+            instruction: text
+          }
+        };
+      }
+    }
+
+    // 3. Actualizar horarios
+    if (lower.includes('horario') || lower.includes('abrimos') || lower.includes('atendemos') || lower.includes('cerramos')) {
+      return {
+        actionType: 'schedule_update',
+        payload: {
+          summary: text,
+          instruction: text
+        }
+      };
+    }
+
+    // 4. Preguntas Frecuentes (FAQ)
+    const faqRegex = /(?:agrega(?:r)?\s+(?:a\s+)?(?:las\s+)?(?:preguntas\s+frecuentes|faq(?:s)?)|faq)\s*[:\-–]?\s*(?:pregunta\s*[:\-–]?\s*)?([^?¿\n]+[?¿]?)\s*(?:respuesta\s*[:\-–]?\s*|\/|\n)\s*([^.\n]+)/i;
+    const matchFaq = text.match(faqRegex);
+    if (matchFaq) {
+      return {
+        actionType: 'faq_add',
+        payload: {
+          question: matchFaq[1].trim(),
+          answer: matchFaq[2].trim(),
+          instruction: text
+        }
+      };
+    }
+
+    // 5. Identidad (nombre, tono, bienvenida)
+    if (lower.startsWith('tu nombre es') || lower.startsWith('llámate') || lower.startsWith('llamare') || lower.includes('cambia tu nombre a')) {
+      const matchName = text.match(/(?:tu\s+nombre\s+es|ll[aá]mate|cambia\s+tu\s+nombre\s+a)\s+([a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]+)/i);
+      if (matchName) {
+        return {
+          actionType: 'identity_update',
+          payload: {
+            display_name: matchName[1].trim(),
+            instruction: text
+          }
+        };
+      }
+    }
+
+    if (lower.includes('tu tono es') || lower.includes('habla de forma') || lower.includes('cambia tu tono a')) {
+      const matchTone = text.match(/(?:tu\s+tono\s+es|habla\s+de\s+forma|cambia\s+tu\s+tono\s+a)\s+([^.\n]+)/i);
+      if (matchTone) {
+        return {
+          actionType: 'identity_update',
+          payload: {
+            tone: matchTone[1].trim(),
+            instruction: text
+          }
+        };
+      }
+    }
+
+    // 6. Por defecto: Regla de negocio
+    return {
+      actionType: 'rule_add',
+      payload: {
+        rule: text.replace(/^(agrega|aprende|recuerda|ten\s+en\s+cuenta\s+que|la\s+regla\s+es)\s*[:\-–]?\s*/i, '').trim(),
+        instruction: text
+      }
+    };
+  }
+
   // --- AGENTE DE VENTAS IA AISLADO POR INSTANCIA ---
   app.post('/api/chat', async (req, res) => {
     const isLoadTest = Boolean(
@@ -2685,7 +2798,8 @@ async function main() {
     const {
       sender_name = 'Visitante Web',
       message = '',
-      instance_id = 'servibot-00'
+      instance_id = 'servibot-00',
+      is_training_mode = false
     } = req.body || {};
 
     const trimmedMessage = String(message || '').trim();
@@ -2728,6 +2842,55 @@ async function main() {
       }
     }
 
+    // --- PIPELINE MODO ENTRENAMIENTO (ESCRITURA DIRECTA EN SQLite DE LA INSTANCIA) ---
+    if (canonicalInstance !== 'servibot-00' && Boolean(is_training_mode)) {
+      try {
+        const botDb = getBotDb(canonicalInstance);
+        const currentInst = db.prepare('SELECT * FROM bot_instances WHERE instance_id = ?').get(canonicalInstance);
+        const catalogItems = botDb.prepare('SELECT * FROM catalog_items WHERE active = 1 AND sent_to_bot = 1').all();
+
+        const interpreted = interpretTrainingInstruction(trimmedMessage, currentInst, catalogItems);
+        const applied = applyTrainingAction(canonicalInstance, interpreted.actionType, interpreted.payload);
+
+        // Registrar en conversación simulada
+        const convStmt = botDb.prepare(`
+          INSERT INTO conversations (channel, sender_id, sender_name, last_message, is_priority, hidden, updated_at)
+          VALUES (?, ?, ?, ?, 0, 0, datetime('now', 'localtime'))
+          ON CONFLICT(channel, sender_id) DO UPDATE SET
+            sender_name = excluded.sender_name,
+            last_message = excluded.last_message,
+            updated_at = datetime('now', 'localtime')
+        `);
+        convStmt.run(channel, cleanSenderId, String(sender_name || 'Dueño (Entrenamiento)').slice(0, 60), trimmedMessage);
+        const convRow = botDb.prepare('SELECT id FROM conversations WHERE channel = ? AND sender_id = ?').get(channel, cleanSenderId);
+
+        const replyText = `🧠 ¡Instrucción aprendida con éxito!\n\n${applied.summary}\n\nHe guardado este cambio permanentemente en mi base de datos para recordar siempre cómo atender a tus clientes.`;
+
+        if (convRow?.id) {
+          const msgStmt = botDb.prepare('INSERT INTO messages (conversation_id, role, content, metadata_json) VALUES (?, ?, ?, ?)');
+          msgStmt.run(convRow.id, 'user', trimmedMessage, JSON.stringify({ is_training: true }));
+          msgStmt.run(convRow.id, 'assistant', replyText, JSON.stringify({ is_training: true, category: applied.category }));
+        }
+
+        return res.json({
+          ok: true,
+          instance_id: canonicalInstance,
+          reply: replyText,
+          training_applied: true,
+          action: applied,
+          instance: applied.instance,
+          catalog: applied.catalog
+        });
+      } catch (trainErr) {
+        return res.status(400).json({
+          ok: false,
+          error: `Error al procesar instrucción de entrenamiento: ${trainErr.message}`
+        });
+      }
+    }
+
+    // Si el modo entrenamiento está DESACTIVADO, bloqueo estricto de escritura en BD.
+    // Se ejecuta runPythonSalesAgent de solo lectura para el cliente simulado o visitante de Bot 0.
     const result = await runPythonSalesAgent({
       channel,
       sender_id: cleanSenderId,
@@ -2745,6 +2908,17 @@ async function main() {
     }
 
     res.json(result);
+  });
+
+  // --- HISTORIAL DE ENTRENAMIENTO DE LA INSTANCIA ---
+  app.get('/api/instances/:instanceId/training', async (req, res) => {
+    try {
+      const canonicalInstance = normalizeInstanceIdKey(req.params.instanceId);
+      const memories = getTrainingMemories(canonicalInstance, req.query.limit || 50);
+      res.json({ ok: true, instance_id: canonicalInstance, memories });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
   });
 
   // --- WEBHOOK DE EVOLUTION API (WHATSAPP PUERTO 10001 -> 10000) ---

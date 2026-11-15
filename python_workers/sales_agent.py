@@ -64,8 +64,11 @@ def get_bedrock_client(region_name: str):
                 read_timeout=30,
             )
             if profile_name:
-                session = boto3.Session(profile_name=profile_name, region_name=region_name)
-                client = session.client("bedrock-runtime", config=cfg)
+                try:
+                    session = boto3.Session(profile_name=profile_name, region_name=region_name)
+                    client = session.client("bedrock-runtime", config=cfg)
+                except Exception:
+                    client = boto3.client("bedrock-runtime", region_name=region_name, config=cfg)
             else:
                 client = boto3.client("bedrock-runtime", region_name=region_name, config=cfg)
             _BEDROCK_CLIENTS[cache_key] = client
@@ -474,6 +477,86 @@ def create_order_in_db(
     }
 
 
+def create_mp_preference_py(main_db_path: str, order_code: str, order_items: list, customer_name: str, customer_contact: str) -> str:
+    """Generates a dynamic Mercado Pago checkout link for orders created in chat."""
+    conn = get_db_connection(main_db_path)
+    mp_cfg = {}
+    tunnel_cfg = {}
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT key, value_json FROM settings WHERE key IN ('mercadopago_config', 'tunnel_config')")
+        for row in cur.fetchall():
+            if row["key"] == "mercadopago_config":
+                try:
+                    mp_cfg = json.loads(row["value_json"])
+                except Exception:
+                    pass
+            elif row["key"] == "tunnel_config":
+                try:
+                    tunnel_cfg = json.loads(row["value_json"])
+                except Exception:
+                    pass
+    finally:
+        conn.close()
+
+    portal_url = (tunnel_cfg.get("public_url") or "https://servi-bot-cic.web.app").rstrip("/")
+    fallback_url = f"{portal_url}/?order={order_code}"
+
+    if not mp_cfg.get("enabled") or not mp_cfg.get("access_token") or not order_items:
+        return fallback_url
+
+    tax_rate = float(mp_cfg.get("tax_rate", 0.16))
+    mp_items = []
+    for it in order_items:
+        price = float(it.get("price") or 0)
+        if price > 0:
+            unit_with_tax = round(price * (1.0 + tax_rate), 2)
+            mp_items.append({
+                "id": str(it.get("slug") or "servibot-item")[:120],
+                "title": f"{it.get('name', 'Servicio Servi-Bot')} (IVA incluido)"[:250],
+                "quantity": 1,
+                "currency_id": "MXN",
+                "unit_price": unit_with_tax,
+            })
+
+    if not mp_items:
+        return fallback_url
+
+    success_url = mp_cfg.get("success_url") or f"{portal_url}/?mp_status=approved"
+    pending_url = mp_cfg.get("pending_url") or f"{portal_url}/?mp_status=pending"
+    failure_url = mp_cfg.get("failure_url") or f"{portal_url}/?mp_status=failure"
+    sep = "&" if "?" in success_url else "?"
+
+    body = {
+        "items": mp_items,
+        "external_reference": order_code,
+        "statement_descriptor": "SERVIBOT IA",
+        "back_urls": {
+            "success": f"{success_url}{sep}order={order_code}",
+            "pending": f"{pending_url}{sep}order={order_code}",
+            "failure": f"{failure_url}{sep}order={order_code}",
+        },
+        "auto_return": "approved",
+    }
+
+    try:
+        req = urllib.request.Request(
+            "https://api.mercadopago.com/checkout/preferences",
+            data=json.dumps(body).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {mp_cfg.get('access_token')}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data.get("init_point") or fallback_url
+    except Exception as e:
+        print(f"[MercadoPago Python] Error al crear preferencia: {e}", file=sys.stderr)
+        return fallback_url
+
+
 def build_system_prompt(
     catalog_items: list,
     promotions: list,
@@ -485,11 +568,11 @@ def build_system_prompt(
     inst_id = (inst.get("instance_id") or "servibot-00").strip()
     is_bot0 = inst_id == "servibot-00"
 
-    default_biz = "Proyecto Cero · Servi-Bot" if is_bot0 else "Negocio del Cliente"
-    default_bot = "ServiBot #00 · Proyecto Cero" if is_bot0 else "Asistente ServiBot"
+    default_biz = "Servi-Bot" if is_bot0 else "Negocio del Cliente"
+    default_bot = "Asesor" if is_bot0 else "Asistente ServiBot"
     business_name = (inst.get("business_name") or "").strip() or default_biz
     bot_name = (inst.get("display_name") or "").strip() or default_bot
-    tone = (inst.get("tone") or "").strip() or "Profesional, claro y enfocado en servicio"
+    tone = (inst.get("tone") or "").strip() or "Amable, claro, directo, sin tecnicismos y enfocado en servir"
     ai_soul = (inst.get("ai_soul") or "").strip()
     system_rules = (inst.get("system_prompt") or "").strip()
     welcome_msg = (inst.get("welcome_message") or "").strip()
@@ -524,12 +607,12 @@ def build_system_prompt(
     )
 
     parts = [
-        f"IDENTIDAD AISLADA DEL BOT ({inst_id}):",
-        f"- Eres {bot_name}, asistente exclusivo de {business_name} en el canal {channel.upper()}.",
+        f"IDENTIDAD DEL BOT ({inst_id}):",
+        f"- Eres {bot_name}, de {business_name} en el canal {channel.upper()}.",
         f"- Tono de comunicación: {tone}.",
     ]
     if is_whitelisted:
-        parts.append("- ATENCIÓN PRIORITARIA (LISTA BLANCA): Este contacto es prioritario. Atiéndelo con máxima agilidad y calidez.")
+        parts.append("- ATENCIÓN PRIORITARIA: Este contacto es prioritario. Atiéndelo con máxima agilidad y calidez.")
     if ai_soul:
         parts.append(f"ALMA DE LA IA:\n{ai_soul}")
     if system_rules:
@@ -539,20 +622,73 @@ def build_system_prompt(
 
     if is_bot0:
         parts.append(
-            "REGLAS TAXATIVAS DE PROYECTO CERO (BOT 0):\n"
-            "1. Solo debes contestar preguntas relacionadas con el Proyecto Cero (Servi-Bot). Si el usuario pregunta temas ajenos al Proyecto Cero, indica amablemente que únicamente respondes consultas del Proyecto Cero.\n"
-            "2. ESTÁ PROHIBIDO inventar ofertas, paquetes especiales, precios no listados o servicios inexistentes.\n"
-            "3. Limítate SIEMPRE y ÚNICAMENTE a dar la información exacta del catálogo y las promociones activas creadas en la interfaz (indicando '+ impuestos' cuando aplique)."
+            "REGLAS OFICIALES DEL ASESOR SERVIBOT:\n"
+            "1. IDENTIDAD EXACTA:\n"
+            "   - Eres el asesor ServiBot. Si el usuario te saluda ('hola', 'buenos días', etc.) o te pregunta quién eres, responde con naturalidad: 'Soy el asesor ServiBot, ¿en qué puedo servirte?'.\n"
+            "   - JAMÁS digas que eres 'el asistente oficial de Proyecto Cero' ni uses el término 'Proyecto Cero'.\n"
+            "2. LENGUAJE COTIDIANO, CÁLIDO Y SIN TECNICISMOS:\n"
+            "   - Habla en un lenguaje natural, empático, paciente y sumamente sencillo, comprensible para cualquier persona que no sepa nada de tecnología.\n"
+            "   - PROHIBIDO usar tecnicismos como 'SQLite', 'instancias aisladas', 'tokens', 'backend', 'endpoints', 'API', 'LLM', etc. Explica todo de forma humana, clara y accesible.\n"
+            "3. ENFOQUE EDUCATIVO Y CONSULTIVO (PROHIBIDO PRESIONAR A LA VENTA O APRESURAR CIERRES):\n"
+            "   - Eres un orientador y maestro servicial, NO un vendedor insistente.\n"
+            "   - NO presiones al cliente para que compre ni agregues frases de venta forzadas como 'si quieres contratar dime', '¿quieres el link de pago?' o 'avísame para contratar'.\n"
+            "   - Cuando el usuario pregunte cómo funciona, cómo se configura o qué opciones tiene, tu deber es EXPLICARLE CON CALMA Y DETALLE todas las opciones, enseñarle cómo configurarlo gratis y animarlo a probarlo en el simulador sin costo ni compromiso.\n"
+            "4. CÓMO FUNCIONA SERVIBOT:\n"
+            "   - ServiBot es un servicio de inteligencia artificial para negocios que atiende automáticamente a tus clientes las 24 horas por WhatsApp, Telegram, correo electrónico y Teams.\n"
+            "   - Responde dudas frecuentes, muestra tus productos o servicios con precios en tiempo real, cotiza y agenda citas o pedidos para que tú te dediques a tu negocio sin preocuparte por contestar mensajes todo el día.\n"
+            "5. CÓMO SE CONFIGURA EL BOT EN LA INTERFAZ WEB (PASO A PASO DETALLADO):\n"
+            "   - Indícale siempre que puede crear su cuenta gratis y configurarlo directamente en: https://servi-bot-cic.web.app\n"
+            "   - Explícale con paciencia los pasos exactos que encontrará en la interfaz:\n"
+            "     * Inicio / Registro: Entra a https://servi-bot-cic.web.app y hace clic en 'Diseña tu Bot'. Inicia sesión con Google o correo y confirma sus datos de contacto (nombre, correo, empresa y celular/WhatsApp para recibir alertas de su bot).\n"
+            "     * Paso 1 (Datos de tu Negocio): Le pone nombre a su negocio o marca y elige su giro comercial (clínica médica/dental, restaurante o café, estética o spa, tienda, etc.) con plantillas sugeridas o desde cero. Si ya tenía un bot antes, puede recuperarlo con su teléfono o folio.\n"
+            "     * Paso 2 (Diseña la Personalidad y Reglas en 6 pestañas):\n"
+            "       1) Pestaña Identidad y Alma: Le da un nombre a su asistente (ej. Sofía), elige su tono de atención (cálido, ejecutivo, amigable, etc.), redacta el propósito o 'alma' de su bot (cómo debe hablar y qué debe lograr) y define su saludo inicial.\n"
+            "       2) Pestaña Reglas de Negocio: Establece horarios de servicio, formas de pago aceptadas, tiempos de entrega y límites (qué cosas sí responde y cuándo debe canalizar con el dueño).\n"
+            "       3) Pestaña Catálogo y Servicios: Sube sus productos o servicios con nombre, precio, descripción y disponibilidad para que el bot cotice con total exactitud.\n"
+            "       4) Pestaña Cierre y Citas: Configura las preguntas para tomar pedidos o agendar citas (nombre, fecha, hora, teléfono).\n"
+            "       5) Pestaña Preguntas Frecuentes (FAQ): Escribe preguntas típicas con sus respuestas oficiales para que el bot nunca titubee (ej. ubicación, facturación, estacionamiento).\n"
+            "       6) Pestaña Aplicaciones: Para conectar herramientas adicionales como All Time para programar redes sociales.\n"
+            "     * Paso 3 (Simulador Web Interactivo en vivo):\n"
+            "       - ¡En el panel lateral derecho de la misma pantalla aparece un simulador de chat en vivo!\n"
+            "       - El usuario puede hablar directamente con su bot recién configurado, probar cómo contesta, hacerle preguntas como si fuera su propio cliente y ajustar lo que guste.\n"
+            "       - Esta prueba en el simulador web es 100% GRATUITA y sin límite, para que vea cómo funciona antes de pagar nada.\n"
+            "6. CUÁNDO ES GRATIS Y CUÁNDO TIENE COSTO (WHATSAPP Y CANALES REALES):\n"
+            "   - Crear la cuenta, configurar el bot y probarlo todas las veces que quiera en el simulador de la web es completamente GRATIS.\n"
+            "   - Conectar el bot al WhatsApp real de su negocio (o Telegram, Outlook o Teams) para que conteste a sus clientes reales 24/7 requiere contratar el plan mensual de $1,500 MXN (+ IVA).\n"
+            "   - Al contratar, su panel web desbloquea de inmediato el código QR oficial; basta con escanearlo desde la app de WhatsApp de su celular y queda conectado en segundos.\n"
+            "   - Servicios adicionales opcionales: Página web con ajustes mensuales ($300 MXN/mes + IVA) y Soporte técnico y entrenamiento continuo ($200 MXN/mes + IVA).\n"
+            "7. CONSULTAS DE '¿POR QUÉ NO PUEDO CONECTAR MI WHATSAPP?' O '¿POR QUÉ NO ME DA EL QR?':\n"
+            "   - Aclara con amabilidad que su bot actualmente está en modo de prueba gratuito dentro del simulador web. Para conectar su WhatsApp real y activar la atención en vivo se requiere contratar el plan mensual de $1,500 MXN (+ IVA). En cuanto se realiza el pago, se libera el código QR para vincular su número telefónico de inmediato.\n"
+            "8. ÉTICA DE VENTA: SIN PAGO NO HAY VENTA:\n"
+            "   - NUNCA des por hecha una venta ni digas que el pedido está listo sin pago.\n"
+            "   - Solo cuando el cliente pida explícitamente contratar o pagar, desglosa el servicio con su precio e IVA y pregúntale si desea que le generes el enlace de pago seguro.\n"
+            "   - Únicamente cuando el cliente confirme ('sí, quiero pagar', 'dame el enlace de pago', etc.), incluye [PEDIDO: slug] para que el sistema le genere su orden y el enlace de pago de Mercado Pago.\n"
+            "9. ASISTENTE CONFIGURADOR CONVERSACIONAL DEL BOT DEL USUARIO:\n"
+            "   - Tienes la capacidad de ayudar al usuario a configurar su propio bot secundario conversando con él de forma natural.\n"
+            "   - Si el usuario dice que quiere configurar o crear su bot, o te comparte información sobre su negocio, guíalo preguntándole con calidez y paciencia:\n"
+            "     * El nombre de su negocio o empresa.\n"
+            "     * El nombre que le gustaría darle a su asistente virtual (ej. Sofía, Carlos, etc.).\n"
+            "     * El propósito o 'alma' de su bot (ej. agendar citas, cotizar, resolver dudas frecuentes).\n"
+            "     * El tono de voz que prefiere (amable y cálido, formal y ejecutivo, juvenil, etc.).\n"
+            "     * El saludo o mensaje de bienvenida con el que recibirá a sus clientes.\n"
+            "     * Sus productos o servicios principales con precios aproximados.\n"
+            "     * Sus horarios de atención o reglas clave del negocio.\n"
+            "   - Sincronización automática con la interfaz:\n"
+            "     * En cada respuesta donde el usuario te dé alguno de estos datos, incluye al final de tu mensaje la etiqueta oculta con los campos actualizados en formato JSON:\n"
+            "       [CONFIG_UPDATE: {\"business_name\": \"...\", \"display_name\": \"...\", \"tone\": \"...\", \"ai_soul\": \"...\", \"welcome_message\": \"...\", \"raw_rules\": \"...\", \"catalog_items\": [{\"name\": \"...\", \"price\": 0, \"description\": \"...\"}]}]\n"
+            "     * Cuando el usuario te confirme que la información está completa o pida guardarlo/probarlo (ej. 'ya está listo', 'eso es todo', 'guarda mi bot', 'quiero probarlo'):\n"
+            "       Felicítalo calurosamente, explícale que su bot está listo y que puede hacer clic en el botón inferior '🚀 Probar en Modo Simulación' para hablar directamente con su nuevo bot, e incluye al final del mensaje:\n"
+            "       [CONFIG_COMPLETE]"
         )
     else:
         parts.append(
-            f"REGLAS DE AISLAMIENTO ESTRICTO PARA {inst_id}:\n"
-            f"1. Eres exclusivamente el bot de {business_name}. Jamás menciones servicios de Servi-Bot Central ni de otros bots.\n"
-            "2. Muestra y ofrece ÚNICAMENTE los productos, servicios y promociones integrados en tu propia interfaz abajo listados. Si no hay productos registrados en tu catálogo todavía, responde usando solo tu alma, tono e instrucciones de tu negocio sin inventar catálogo ni precios."
+            f"REGLAS DE AISLAMIENTO PARA {inst_id}:\n"
+            f"1. Eres exclusivamente el bot de {business_name}.\n"
+            "2. Muestra y ofrece ÚNICAMENTE los productos, servicios y promociones de tu negocio integrados en tu catálogo. Si no hay productos registrados todavía, responde usando tu alma, tono e instrucciones de tu negocio sin inventar catálogo ni precios."
         )
 
-    parts.append(f"CATÁLOGO EXCLUSIVO DE {inst_id} (SQLite aislado):\n{catalog_block}")
-    parts.append(f"PROMOCIONES ACTIVAS DE {inst_id} (SQLite aislado):\n{promo_block}")
+    parts.append(f"CATÁLOGO DE {inst_id}:\n{catalog_block}")
+    parts.append(f"PROMOCIONES DE {inst_id}:\n{promo_block}")
 
     # Directrices específicas según el tipo de canal
     channel_clean = str(channel or '').strip().lower()
@@ -577,13 +713,20 @@ def build_system_prompt(
             "- Inicia con un saludo formal, presenta la información solicitada de forma clara y estructurada, y concluye con una despedida cordial y la firma de atención al cliente."
         )
     elif channel_clean in ("whatsapp", "telegram", "teams"):
-        parts.append(
-            f"DIRECTRICES PARA CHAT EN {channel_clean.upper()}:\n"
-            "- Estás atendiendo una conversación de mensajería directa en tiempo real.\n"
-            "- Mantén un diálogo ameno, claro y enfocado en resolver sus dudas y facilitar la contratación."
-        )
+        if is_bot0:
+            parts.append(
+                f"DIRECTRICES PARA CHAT EN {channel_clean.upper()}:\n"
+                "- Estás atendiendo una conversación en tiempo real como asesor oficial de ServiBot.\n"
+                "- Mantén un diálogo pedagógico, paciente, cálido y enfocado en orientar, enseñar cómo funciona la plataforma y cómo se configura su bot en la web sin presionar a la venta."
+            )
+        else:
+            parts.append(
+                f"DIRECTRICES PARA CHAT EN {channel_clean.upper()}:\n"
+                "- Estás atendiendo una conversación de mensajería directa en tiempo real.\n"
+                "- Mantén un diálogo ameno, claro y enfocado en resolver sus dudas y facilitar la atención."
+            )
 
-    parts.append("Responde siempre en español de forma clara y breve.")
+    parts.append("Responde siempre en español con calidez, claridad y el nivel de detalle necesario para responder ampliamente las dudas del usuario sin tecnicismos.")
 
     if catalog_items:
         parts.append(
@@ -601,7 +744,7 @@ def generate_smart_fallback(instance_cfg: dict = None, catalog_items: list = Non
     if welcome_msg:
         base_msg = welcome_msg
     elif inst_id == "servibot-00":
-        base_msg = "¡Hola! Soy el asistente de Proyecto Cero (Servi-Bot). ¿En qué servicio del catálogo te podemos ayudar hoy?"
+        base_msg = "Hola, soy ServiBot, ¿cómo puedo facilitar tu día? Soy el asesor ServiBot, ¿en qué puedo servirte?"
     else:
         bot_name = (inst.get("display_name") or "").strip() or "ServiBot"
         business_name = (inst.get("business_name") or "").strip() or "nuestro negocio"
@@ -662,7 +805,7 @@ def call_bedrock_chat(model_id: str, system_prompt: str, history: list, user_mes
         system=[{"text": system_prompt}],
         messages=messages,
         inferenceConfig={
-            "maxTokens": 220,
+            "maxTokens": 700,
             "temperature": 0.2,
         },
     )
@@ -681,7 +824,7 @@ def call_ollama_chat(ollama_url: str, model: str, messages: list) -> dict:
         "options": {
             "temperature": 0.2,
             "num_ctx": 2048,
-            "num_predict": 220,
+            "num_predict": 700,
         },
     }
     req = urllib.request.Request(
@@ -708,31 +851,32 @@ def detect_explicit_order_intent(user_text: str, history: list, catalog_items: l
 
     text_clean = _normalize_text_for_intent(user_text)
     confirm_triggers = [
-        "quiero contratar",
-        "deseo contratar",
-        "me interesa contratar",
-        "quiero comprar",
-        "deseo comprar",
+        "proceder al pago",
+        "proceder con el pago",
+        "dame el link de pago",
+        "dame el enlace de pago",
+        "pasame el link de pago",
+        "pasame el enlace de pago",
+        "enlace de pago",
+        "link de pago",
+        "enlace para pagar",
+        "link para pagar",
+        "si, quiero pagar",
+        "si quiero pagar",
+        "listo para pagar",
+        "quiero pagar",
+        "proceder a pagar",
+        "confirmo el pago",
+        "confirmo la contratacion",
+        "confirmar contratacion",
         "confirmo el pedido",
         "confirmar pedido",
         "confirmo la orden",
         "confirmar orden",
-        "hazme el pedido",
-        "levanta el pedido",
-        "levantar pedido",
-        "generar orden",
-        "hacer el pedido",
-        "proceder con el pedido",
-        "lo quiero contratar",
-        "si lo quiero",
-        "lo contrato",
-        "registra mi pedido",
-        "registrar pedido",
-        "quiero adquirir",
-        "deseo adquirir",
-        "contratar ambos",
-        "quiero el paquete",
-        "proceder a la compra",
+        "si confirmo",
+        "si, confirmo",
+        "si lo contrato y confirmo",
+        "proceder a la compra"
     ]
     is_confirming = any(t in text_clean for t in confirm_triggers)
     if not is_confirming:
@@ -973,12 +1117,26 @@ def process_request(payload: dict) -> dict:
                 notes=notes,
             )
             items_summary = ", ".join(f"{i['name']} (${i['price']:,.0f} {i['currency']})" for i in created_order["items"])
+            tax_rate = 0.16
+            subtotal = float(created_order["total_amount"])
+            total_with_tax = round(subtotal * (1.0 + tax_rate), 2)
+
+            pay_link = create_mp_preference_py(
+                main_db_path=main_db_path,
+                order_code=created_order["order_code"],
+                order_items=created_order["items"],
+                customer_name=cust_name,
+                customer_contact=sender_id,
+            )
+
             order_banner = (
-                f"\n\n✅ *Pedido Registrado Exitosamente*\n"
+                f"\n\n📋 *Detalles de tu Orden (Pendiente de Pago)*\n"
                 f"• Folio: *{created_order['order_code']}*\n"
-                f"• Servicio(s): {items_summary}\n"
-                f"• Total base: *${created_order['total_amount']:,.0f} {created_order['currency']}*\n"
-                f"Ya quedó registrado en el Panel Administrativo de esta instancia."
+                f"• Servicio: {items_summary}\n"
+                f"• Total a pagar: *${total_with_tax:,.2f} MXN* (IVA incluido)\n\n"
+                f"💳 *Enlace de Pago Seguro (Mercado Pago):*\n"
+                f"{pay_link}\n\n"
+                f"⚠️ *Nota:* Recuerda que tu bot y canales en vivo se activan automáticamente en cuanto se acredite tu pago."
             )
             if created_order["order_code"] not in reply_text:
                 reply_text = f"{reply_text}{order_banner}"

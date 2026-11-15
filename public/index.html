@@ -729,7 +729,7 @@
 
                           <button
                             type="button"
-                            class="soul-tab-btn hidden" style="display: none !important;" hidden
+                            class="soul-tab-btn"
                             id="soul-tab-apps"
                             data-pane="soul-pane-apps"
                             role="tab"
@@ -997,7 +997,7 @@
                         </div>
 
                         <!-- SUBSECCIÓN 6: APLICACIONES E INTEGRACIONES -->
-                        <div class="soul-pane hidden" id="soul-pane-apps" role="tabpanel" aria-labelledby="soul-tab-apps" style="display: none !important;" hidden>
+                        <div class="soul-pane hidden" id="soul-pane-apps" role="tabpanel" aria-labelledby="soul-tab-apps" hidden>
                           <div class="soul-pane-header">
                             <div class="soul-header-actions-row">
                               <div>
@@ -1359,6 +1359,17 @@
           </button>
         </div>
 
+        <div class="chat-training-bar hidden" id="chat-training-bar">
+          <div class="training-status-box">
+            <span class="training-status-dot" id="training-status-dot"></span>
+            <span class="training-status-label" id="training-status-label">Modo Simulación (Cliente)</span>
+          </div>
+          <button type="button" class="btn-toggle-training" id="btn-toggle-training" title="Activar/Desactivar Modo Entrenamiento">
+            <span class="training-icon" aria-hidden="true">🧠</span>
+            <span class="training-btn-text" id="training-btn-text">Activar Entrenamiento</span>
+          </button>
+        </div>
+
         <div class="bot-messages" id="chat-messages">
           <div class="chat-bubble assistant is-official-bot">
             <div class="bubble-identity bubble-identity-official">
@@ -1368,10 +1379,12 @@
           </div>
         </div>
 
-        <div class="bot-quick-prompts">
-          <button type="button" class="quick-chip" data-prompt="Hola, ¿qué servicios ofrecen y cuáles son sus precios?">¿Qué planes tienen?</button>
-          <button type="button" class="quick-chip" data-prompt="¿Cómo funciona el bot de WhatsApp, Correo y Teams sin tokens?">¿Cómo funciona sin tokens?</button>
-          <button type="button" class="quick-chip" data-prompt="Quiero contratar el servicio de Bots Autónomos, mi nombre es Carlos Ruiz y mi correo es carlos@negocio.mx, confirma mi pedido.">¡Contratar Bots Autónomos!</button>
+        <div class="chat-action-bar bot-quick-prompts" id="chat-action-bar">
+          <div class="chat-action-buttons" id="chat-action-buttons">
+            <button type="button" class="btn-action-chip" data-prompt="Hola, ¿qué servicios ofrecen y cuáles son sus precios?">¿Qué planes tienen?</button>
+            <button type="button" class="btn-action-chip" data-prompt="¿Cómo funciona el bot de WhatsApp, Correo y Teams sin tokens?">¿Cómo funciona sin tokens?</button>
+            <button type="button" class="btn-action-chip" data-prompt="Quiero configurar mi propio bot para mi negocio">🤖 Configurar mi Bot</button>
+          </div>
         </div>
 
         <form class="bot-input-bar" id="chat-form">
@@ -1511,12 +1524,8 @@
 
             <div id="admin-role-banner" class="admin-instance-card">
               <div class="admin-instance-meta">
-                <span class="admin-instance-title" id="admin-instance-label">Instancia: —</span>
+                <span class="admin-instance-title" id="admin-instance-label">Bot Propio: —</span>
                 <span id="admin-expiry-badge" class="admin-expiry-badge"></span>
-              </div>
-              <div id="admin-super-controls" class="admin-super-controls hidden">
-                <label for="admin-instance-switcher" class="admin-switcher-label">Cambiar Bot:</label>
-                <select id="admin-instance-switcher" class="form-select-inline"></select>
               </div>
             </div>
           </div>
@@ -2336,15 +2345,15 @@
           </div>
         </div>
 
-        <!-- TAB 7: ALMA, PERSONALIDAD E INSTRUCCIONES DEL BOT -->
+        <!-- TAB 7: ALMA, PERSONALIDAD E INSTRUCCIONES DEL BOT (COPIA EXACTA DE LA CONFIGURACIÓN DEL BOT) -->
         <div id="tab-bot-soul" class="admin-tab-pane hidden">
           <div class="bot-soul-container">
             <header class="bot-soul-header">
               <div class="bot-soul-title-row">
                 <div>
-                  <h3 class="bot-soul-title">🧠 Alma, Personalidad e Instrucciones de tu Bot</h3>
+                  <h3 class="bot-soul-title">🧠 Define la personalidad y reglas de tu ServiBot</h3>
                   <p class="bot-soul-subtitle">
-                    Configura con precisión el comportamiento de tu bot, el tono de sus respuestas, su propósito central y cómo debe responder a preguntas frecuentes o situaciones clave de tus clientes.
+                    Configura la identidad, horarios, catálogo y respuestas de tu asistente. Los cambios se guardan directamente en tu instancia.
                   </p>
                 </div>
                 <div class="bot-soul-instance-pill">
@@ -2353,144 +2362,389 @@
               </div>
             </header>
 
-            <form id="bot-soul-form" class="bot-soul-form" novalidate>
-              <div class="bot-soul-grid">
-                <!-- Columna Izquierda: Identidad y Tono -->
-                <div class="bot-soul-col">
-                  <div class="panel-card bot-soul-card">
-                    <h4 class="soul-card-title">🎭 Identidad y Presencia</h4>
-                    <p class="soul-card-desc">Cómo se presenta el bot y qué nombre utiliza ante los clientes.</p>
+            <div class="soul-master-detail" id="admin-soul-master-detail">
+              <!-- Sidebar Izquierdo: Pestañas de Subsecciones -->
+              <nav class="soul-sidebar" aria-label="Secciones del Alma de tu IA">
+                <div class="soul-nav-tabs" role="tablist" aria-orientation="vertical">
+                  <button
+                    type="button"
+                    class="soul-tab-btn is-active"
+                    id="admin-soul-tab-identity"
+                    data-pane="admin-soul-pane-identity"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="admin-soul-pane-identity"
+                  >
+                    <span class="soul-tab-badge" aria-hidden="true">1</span>
+                    <div class="soul-tab-info">
+                      <span class="soul-tab-title">Nombre y Propósito</span>
+                      <span class="soul-tab-desc">Identidad, tono y saludo</span>
+                    </div>
+                  </button>
 
+                  <button
+                    type="button"
+                    class="soul-tab-btn"
+                    id="admin-soul-tab-rules"
+                    data-pane="admin-soul-pane-rules"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="admin-soul-pane-rules"
+                  >
+                    <span class="soul-tab-badge" aria-hidden="true">2</span>
+                    <div class="soul-tab-info">
+                      <span class="soul-tab-title">Reglas y Opciones</span>
+                      <span class="soul-tab-desc">Directrices y botones del chat</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="soul-tab-btn"
+                    id="admin-soul-tab-schedule"
+                    data-pane="admin-soul-pane-schedule"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="admin-soul-pane-schedule"
+                  >
+                    <span class="soul-tab-badge" aria-hidden="true">3</span>
+                    <div class="soul-tab-info">
+                      <span class="soul-tab-title">Horarios y Citas</span>
+                      <span class="soul-tab-desc">Apertura, comida y reservas</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="soul-tab-btn"
+                    id="admin-soul-tab-catalog"
+                    data-pane="admin-soul-pane-catalog"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="admin-soul-pane-catalog"
+                  >
+                    <span class="soul-tab-badge" aria-hidden="true">4</span>
+                    <div class="soul-tab-info">
+                      <span class="soul-tab-title">Catálogo</span>
+                      <span class="soul-tab-desc">Servicios y productos</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="soul-tab-btn"
+                    id="admin-soul-tab-faq"
+                    data-pane="admin-soul-pane-faq"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="admin-soul-pane-faq"
+                  >
+                    <span class="soul-tab-badge" aria-hidden="true">5</span>
+                    <div class="soul-tab-info">
+                      <span class="soul-tab-title">Preguntas Frecuentes</span>
+                      <span class="soul-tab-desc">Respuestas fijas del bot</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="soul-tab-btn"
+                    id="admin-soul-tab-apps"
+                    data-pane="admin-soul-pane-apps"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="admin-soul-pane-apps"
+                  >
+                    <span class="soul-tab-badge" aria-hidden="true">6</span>
+                    <div class="soul-tab-info">
+                      <span class="soul-tab-title">📱 Aplicaciones</span>
+                      <span class="soul-tab-desc">Integraciones (All Time)</span>
+                    </div>
+                  </button>
+                </div>
+              </nav>
+
+              <!-- Contenido Principal Derecho de las Pestañas -->
+              <div class="soul-main-content">
+                <!-- SUBSECCIÓN 1: NOMBRE Y PROPÓSITO -->
+                <div class="soul-pane is-active" id="admin-soul-pane-identity" role="tabpanel" aria-labelledby="admin-soul-tab-identity">
+                  <div class="soul-pane-header">
+                    <h4 class="soul-pane-heading">Identidad y Alma de tu Asistente</h4>
+                    <p class="soul-pane-intro">Define cómo se llamará tu asistente inteligente, su tono de atención y el objetivo de cada conversación.</p>
+                  </div>
+
+                  <div class="cfg-two-col">
                     <div class="field">
-                      <label for="soul-display-name">Nombre del Asistente Bot <span aria-hidden="true">*</span></label>
+                      <label for="admin-cfg-display-name">Nombre de tu asistente ServiBot <span aria-hidden="true">*</span></label>
                       <input
                         type="text"
-                        id="soul-display-name"
+                        id="admin-cfg-display-name"
                         name="display_name"
+                        enterkeyhint="next"
                         placeholder="Ej.: Sofía, Asistente de Sonrisa Norte"
+                        aria-describedby="admin-cfg-display-help"
                         required
                       />
-                      <span class="field-hint">Nombre propio con el que saluda y se identifica en WhatsApp, Teams y Web.</span>
+                      <span id="admin-cfg-display-help" class="field-hint">Nombre propio con el que saludará en WhatsApp.</span>
                     </div>
 
                     <div class="field">
-                      <label for="soul-business-name">Nombre de la Empresa o Marca <span aria-hidden="true">*</span></label>
+                      <label for="admin-cfg-tone">Tono y estilo de conversación</label>
                       <input
                         type="text"
-                        id="soul-business-name"
-                        name="business_name"
-                        placeholder="Ej.: Clínica Dental Sonrisa Norte"
-                        required
-                      />
-                      <span class="field-hint">La entidad o negocio al que representa de manera exclusiva.</span>
-                    </div>
-
-                    <div class="field">
-                      <label for="soul-welcome-message">Mensaje de Saludo o Bienvenida</label>
-                      <textarea
-                        id="soul-welcome-message"
-                        name="welcome_message"
-                        rows="3"
-                        placeholder="Ej.: ¡Hola! Te doy la bienvenida a Sonrisa Norte. Soy Sofía, ¿en qué servicio o duda te puedo asesorar hoy?"
-                      ></textarea>
-                      <span class="field-hint">Primer mensaje que envía al iniciar una conversación nueva o saludar.</span>
-                    </div>
-                  </div>
-
-                  <div class="panel-card bot-soul-card">
-                    <h4 class="soul-card-title">🗣️ Tono y Estilo de Comunicación</h4>
-                    <p class="soul-card-desc">El carácter y emoción de cada respuesta generada por la IA.</p>
-
-                    <div class="field">
-                      <label for="soul-tone">Tono de conversación</label>
-                      <input
-                        type="text"
-                        id="soul-tone"
+                        id="admin-cfg-tone"
                         name="tone"
-                        placeholder="Ej.: Cálido, empático, profesional y resolutivo"
+                        enterkeyhint="next"
+                        placeholder="Ej.: Cálido, profesional y empático"
+                        aria-describedby="admin-cfg-tone-help"
                       />
-                      <span class="field-hint">Personaliza el carácter (ej.: formal, amigable, alegre, sobrio, etc.).</span>
+                      <span id="admin-cfg-tone-help" class="field-hint">Personaliza el carácter de cada respuesta.</span>
                     </div>
+                  </div>
 
-                    <div class="preset-group">
-                      <span class="preset-label">Seleccionar tono predefinido:</span>
-                      <div class="preset-chips-row" id="soul-tone-presets">
-                        <button type="button" class="preset-chip" data-tone="Cálido, cercano y empático">🌟 Cálido y Empático</button>
-                        <button type="button" class="preset-chip" data-tone="Ejecutivo, directo y orientado a resultados">💼 Ejecutivo y Directo</button>
-                        <button type="button" class="preset-chip" data-tone="Elegante, consultivo y de alto nivel">👑 Premium / Consultivo</button>
-                        <button type="button" class="preset-chip" data-tone="Dinámico, amigable y entusiasta">⚡ Dinámico y Entusiasta</button>
-                        <button type="button" class="preset-chip" data-tone="Médico, riguroso, paciente y tranquilizador">🩺 Profesional Clínico</button>
+                  <div class="preset-group">
+                    <span class="preset-label" id="admin-tone-presets-label">Tono rápido:</span>
+                    <div class="preset-chips-row" id="admin-preset-tone-chips" role="group" aria-labelledby="admin-tone-presets-label">
+                      <button type="button" class="preset-chip" data-tone="Cálido, cercano y empático" aria-pressed="false">Cálido y Empático</button>
+                      <button type="button" class="preset-chip" data-tone="Ejecutivo, directo y orientado a cierre" aria-pressed="false">Ejecutivo y Directo</button>
+                      <button type="button" class="preset-chip" data-tone="Elegante, consultivo y de alto nivel" aria-pressed="false">Premium / Elegante</button>
+                      <button type="button" class="preset-chip" data-tone="Dinámico, amigable y entusiasta" aria-pressed="false">Entusiasta y Cercano</button>
+                    </div>
+                  </div>
+
+                  <div class="field">
+                    <label for="admin-cfg-ai-soul">Propósito y alma de tu IA <span aria-hidden="true">*</span></label>
+                    <textarea
+                      id="admin-cfg-ai-soul"
+                      name="ai_soul"
+                      rows="3"
+                      placeholder="Ej.: Atender pacientes que preguntan por limpieza, ortodoncia o urgencias, resolver sus dudas con calma y agendar su cita pidiendo nombre y horario."
+                      aria-describedby="admin-cfg-soul-help"
+                      required
+                    ></textarea>
+                    <span id="admin-cfg-soul-help" class="field-hint">Describe a quién atiende, cómo hace sentir al cliente y qué debe lograr en cada charla.</span>
+                  </div>
+
+                  <div class="field">
+                    <label for="admin-cfg-welcome-message">Saludo inicial sugerido</label>
+                    <textarea
+                      id="admin-cfg-welcome-message"
+                      name="welcome_message"
+                      rows="2"
+                      placeholder="Ej.: ¡Hola! Soy Sofía de Clínica Dental Sonrisa Norte, ¿en qué puedo ayudarte hoy?"
+                    ></textarea>
+                    <span class="field-hint">Primera impresión al iniciar chat o probar en el simulador.</span>
+                  </div>
+
+                  <div class="wizard-live-preview" aria-live="polite">
+                    <div class="wizard-preview-label">🤖 Vista previa en vivo de tu Asistente</div>
+                    <div class="wizard-preview-bubble-row">
+                      <span class="bot-emoji-avatar bot-emoji-sm" aria-hidden="true">🤖</span>
+                      <div class="wizard-preview-bubble">
+                        <strong id="admin-wizard-preview-bot-name">Tu ServiBot</strong>
+                        <p id="admin-wizard-preview-greeting">¡Hola! Cuéntame en qué puedo ayudar a tu negocio hoy.</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <!-- Columna Derecha: Alma, FAQ y Reglas de Comportamiento -->
-                <div class="bot-soul-col">
-                  <div class="panel-card bot-soul-card">
-                    <div class="soul-card-header-row">
+                <!-- SUBSECCIÓN 2: REGLAS Y OPCIONES RÁPIDAS -->
+                <div class="soul-pane hidden" id="admin-soul-pane-rules" role="tabpanel" aria-labelledby="admin-soul-tab-rules" hidden>
+                  <div class="soul-pane-header">
+                    <h4 class="soul-pane-heading">Reglas Clave y Opciones Rápidas</h4>
+                    <p class="soul-pane-intro">Define directrices estrictas para que la IA no invente datos y personaliza los botones rápidos que verán tus clientes al abrir el chat.</p>
+                  </div>
+
+                  <div class="field">
+                    <label for="admin-cfg-system-prompt">Reglas clave o directrices del negocio</label>
+                    <textarea
+                      id="admin-cfg-system-prompt"
+                      name="system_prompt"
+                      rows="3"
+                      placeholder="Ej.: Consulta de valoración en $400 MXN. Confirmar siempre sucursal y teléfono antes de agendar. No emitir diagnósticos médicos definitivos."
+                      aria-describedby="admin-cfg-system-help"
+                    ></textarea>
+                    <span id="admin-cfg-system-help" class="field-hint">Información real y restricciones estrictas que el bot debe respetar.</span>
+                  </div>
+
+                  <div class="quick-options-section">
+                    <div class="quick-options-header">
                       <div>
-                        <h4 class="soul-card-title">💫 Propósito y Alma de la IA (AI Soul)</h4>
-                        <p class="soul-card-desc">El espíritu, los valores y la misión de tu bot al interactuar.</p>
+                        <label class="field-subheading">Botones de Opciones Rápidas del Chat</label>
+                        <span class="field-hint">Tus clientes verán estas sugerencias interactivas para iniciar la conversación con un solo toque.</span>
                       </div>
+                      <button type="button" class="btn btn-outline btn-xs" id="btn-admin-reset-quick-opts" title="Restablecer opciones recomendadas">
+                        Restablecer por defecto
+                      </button>
                     </div>
 
-                    <div class="field">
-                      <label for="soul-ai-soul">Alma del Bot <span aria-hidden="true">*</span></label>
-                      <textarea
-                        id="soul-ai-soul"
-                        name="ai_soul"
-                        rows="4"
-                        placeholder="Ej.: Tu misión es escuchar con atención cada necesidad del cliente, transmitirle confianza absoluta y guiarlo paso a paso. Hazlo sentir valorado, jamás uses tecnicismos complicados y enfócate en solucionar su duda de forma ágil y transparente."
-                        required
-                      ></textarea>
-                      <span class="field-hint">Define su personalidad interna: cómo hace sentir al cliente y qué postura asume.</span>
+                    <div class="quick-options-list" id="admin-quick-options-list" aria-label="Lista de opciones rápidas configuradas">
+                    </div>
+
+                    <div class="quick-opt-form-card">
+                      <div class="quick-opt-form-row">
+                        <div class="field field-compact">
+                          <label for="admin-new-quick-opt-label">Etiqueta del botón <small>(lo que lee el cliente)</small></label>
+                          <input type="text" id="admin-new-quick-opt-label" placeholder="Ej.: ¿Qué servicios tienen?" maxlength="40" />
+                        </div>
+                        <div class="field field-compact flex-2">
+                          <label for="admin-new-quick-opt-prompt">Mensaje enviado <small>(lo que el bot procesa)</small></label>
+                          <input type="text" id="admin-new-quick-opt-prompt" placeholder="Ej.: Hola, ¿qué servicios o productos ofrecen y cuáles son sus costos?" />
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm btn-quick-add" id="btn-admin-add-quick-opt">
+                          + Agregar Opción
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SUBSECCIÓN 3: HORARIOS Y CITAS -->
+                <div class="soul-pane hidden" id="admin-soul-pane-schedule" role="tabpanel" aria-labelledby="admin-soul-tab-schedule" hidden>
+                  <div class="soul-pane-header">
+                    <div class="soul-header-actions-row">
+                      <div>
+                        <h4 class="soul-pane-heading">Horarios de Atención y Ventana de Citas</h4>
+                        <p class="soul-pane-intro">Configura los días y horarios en los que tu negocio está abierto y especifica en qué lapsos se permiten agendar citas.</p>
+                      </div>
+                      <button type="button" class="btn btn-outline btn-xs" id="btn-admin-copy-monday-schedule" title="Copiar el horario del Lunes a todos los días de apertura">
+                        Copiar Lunes a toda la semana
+                      </button>
                     </div>
                   </div>
 
-                  <div class="panel-card bot-soul-card">
-                    <div class="soul-card-header-row">
-                      <div>
-                        <h4 class="soul-card-title">📋 Reglas de Comportamiento y Respuestas Específicas</h4>
-                        <p class="soul-card-desc">Directrices exactas sobre cómo responder a preguntas determinadas, horarios, políticas y límites.</p>
+                  <div class="schedule-scroll-hint" aria-hidden="true"><span>↔ Desplaza horizontalmente para ver todos los horarios de comida y citas</span></div>
+                  <div class="schedule-days-container" id="admin-schedule-days-container">
+                  </div>
+
+                  <div class="schedule-summary-box">
+                    <span class="schedule-summary-badge">Resumen generado para la IA:</span>
+                    <p class="schedule-summary-text" id="admin-schedule-summary-preview">Cargando horario...</p>
+                  </div>
+                </div>
+
+                <!-- SUBSECCIÓN 4: CATÁLOGO DE PRODUCTOS / SERVICIOS -->
+                <div class="soul-pane hidden" id="admin-soul-pane-catalog" role="tabpanel" aria-labelledby="admin-soul-tab-catalog" hidden>
+                  <div class="soul-pane-header">
+                    <h4 class="soul-pane-heading">Catálogo de Productos y Servicios</h4>
+                    <p class="soul-pane-intro">Registra tus servicios y productos con precio y descripción para que tu ServiBot cotice e informe con exactitud.</p>
+                  </div>
+
+                  <div class="catalog-add-card">
+                    <div class="catalog-add-grid">
+                      <div class="field field-compact">
+                        <label for="admin-cat-item-name">Nombre del servicio o producto <span aria-hidden="true">*</span></label>
+                        <input type="text" id="admin-cat-item-name" placeholder="Ej.: Limpieza Dental Ultrasónica" />
+                      </div>
+                      <div class="field field-compact">
+                        <label for="admin-cat-item-type">Tipo</label>
+                        <select id="admin-cat-item-type">
+                          <option value="service" selected>Servicio</option>
+                          <option value="product">Producto</option>
+                        </select>
+                      </div>
+                      <div class="field field-compact">
+                        <label for="admin-cat-item-price">Precio (MXN) <span aria-hidden="true">*</span></label>
+                        <input type="number" id="admin-cat-item-price" min="0" step="1" placeholder="Ej.: 600" />
+                      </div>
+                      <div class="field field-compact">
+                        <label for="admin-cat-item-cycle">Modalidad de cobro</label>
+                        <input type="text" id="admin-cat-item-cycle" placeholder="Ej.: por sesión, pago único, mensual" />
                       </div>
                     </div>
-
-                    <!-- Botones de inserción rápida de plantillas -->
-                    <div class="soul-template-actions">
-                      <span class="preset-label">Plantillas rápidas:</span>
-                      <button type="button" class="btn btn-outline btn-xs soul-template-btn" id="btn-tmpl-faq">➕ Preguntas Frecuentes (FAQ)</button>
-                      <button type="button" class="btn btn-outline btn-xs soul-template-btn" id="btn-tmpl-hours">➕ Horarios y Ubicación</button>
-                      <button type="button" class="btn btn-outline btn-xs soul-template-btn" id="btn-tmpl-limits">➕ Reglas Estrictas / Prohibiciones</button>
+                    <div class="field field-compact field-cat-desc">
+                      <label for="admin-cat-item-desc">Descripción o detalles incluidos</label>
+                      <input type="text" id="admin-cat-item-desc" placeholder="Ej.: Profilaxis completa con ultrasonido, pulido dental y diagnóstico preventivo." />
                     </div>
-
-                    <div class="field" style="margin-top:0.75rem;">
-                      <label for="soul-system-prompt">Instrucciones y respuestas a preguntas específicas</label>
-                      <textarea
-                        id="soul-system-prompt"
-                        name="system_prompt"
-                        rows="8"
-                        placeholder="Escribe directrices concretas como:&#10;- Si preguntan por horarios: responder que abrimos de Lunes a Sábado de 9:00 a 19:00 hrs.&#10;- Si preguntan por ubicación: estamos en Av. Principal #123, Col. Centro.&#10;- Si preguntan por formas de pago: aceptamos tarjeta de débito/crédito, transferencia y efectivo.&#10;- Si preguntan por garantías: todos nuestros servicios cuentan con 30 días de garantía.&#10;- Jamás inventar precios ni servicios que no estén registrados en el catálogo."
-                      ></textarea>
-                      <span class="field-hint">Estas instrucciones tienen máxima prioridad al responder cualquier mensaje.</span>
+                    <div class="catalog-add-actions">
+                      <button type="button" class="btn btn-primary btn-sm" id="btn-admin-add-catalog-item">
+                        + Agregar al Catálogo
+                      </button>
                     </div>
+                  </div>
+
+                  <div class="catalog-items-wrap">
+                    <div class="catalog-items-header">
+                      <span class="catalog-items-count" id="admin-catalog-items-count">0 productos/servicios registrados</span>
+                    </div>
+                    <div class="catalog-items-grid" id="admin-catalog-items-grid">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SUBSECCIÓN 5: PREGUNTAS Y RESPUESTAS (FAQ) -->
+                <div class="soul-pane hidden" id="admin-soul-pane-faq" role="tabpanel" aria-labelledby="admin-soul-tab-faq" hidden>
+                  <div class="soul-pane-header">
+                    <h4 class="soul-pane-heading">Preguntas Frecuentes y Respuestas Oficiales</h4>
+                    <p class="soul-pane-intro">Escribe preguntas concretas y la respuesta obligatoria que el bot debe dar, evitando cualquier invento.</p>
+                  </div>
+
+                  <div class="faq-add-card">
+                    <div class="field field-compact">
+                      <label for="admin-faq-item-question">Pregunta de los clientes <span aria-hidden="true">*</span></label>
+                      <input type="text" id="admin-faq-item-question" placeholder="Ej.: ¿Aceptan tarjetas de crédito y dan factura?" />
+                    </div>
+                    <div class="field field-compact">
+                      <label for="admin-faq-item-answer">Respuesta oficial del bot <span aria-hidden="true">*</span></label>
+                      <textarea id="admin-faq-item-answer" rows="2" placeholder="Ej.: Sí, aceptamos todas las tarjetas Visa, Mastercard y emitimos factura electrónica (CFDI)."></textarea>
+                    </div>
+                    <div class="faq-add-actions">
+                      <button type="button" class="btn btn-primary btn-sm" id="btn-admin-add-faq-item">
+                        + Agregar Pregunta Frecuente
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="faq-items-wrap">
+                    <div class="faq-items-header">
+                      <span class="faq-items-count" id="admin-faq-items-count">0 preguntas frecuentes registradas</span>
+                    </div>
+                    <div class="faq-items-list" id="admin-faq-items-list">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SUBSECCIÓN 6: APLICACIONES E INTEGRACIONES (ALL TIME) -->
+                <div class="soul-pane hidden" id="admin-soul-pane-apps" role="tabpanel" aria-labelledby="admin-soul-tab-apps" hidden>
+                  <div class="soul-pane-header">
+                    <div class="soul-header-actions-row">
+                      <div>
+                        <h4 class="soul-pane-heading">📱 Aplicaciones e Integraciones Autónomas</h4>
+                        <p class="soul-pane-intro">Conecta tu ServiBot con las aplicaciones y canales oficiales de tu negocio para operar simultáneamente.</p>
+                      </div>
+                      <span class="badge-tag badge-tag-accent">Subaplicaciones</span>
+                    </div>
+                  </div>
+
+                  <div class="apps-grid" id="admin-apps-integrations-grid">
+                    <article class="app-integration-card">
+                      <header class="app-card-header app-card-header--black">
+                        <h5 class="app-card-title">All Time</h5>
+                      </header>
+                      <div class="app-card-body">
+                        <p class="app-card-desc">Aplicación para programar publicaciones en redes sociales.</p>
+                        <div class="app-card-action">
+                          <a href="alltime.html" class="btn btn-primary btn-sm" id="btn-admin-open-alltime">Abrir aplicación</a>
+                        </div>
+                      </div>
+                    </article>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <!-- Barra Inferior de Guardado y Feedback -->
-              <div class="bot-soul-footer">
-                <div id="bot-soul-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
-                <div class="bot-soul-footer-actions">
-                  <button type="button" class="btn btn-outline" id="btn-soul-test-simulator">
-                    🧪 Probar en Simulador
-                  </button>
-                  <button type="submit" class="btn btn-primary" id="btn-save-bot-soul">
-                    💾 Guardar Alma y Reglas del Bot
-                  </button>
-                </div>
+            <!-- Footer con Feedback y Botones -->
+            <div class="bot-soul-footer" style="margin-top: 1.5rem;">
+              <div id="admin-bot-soul-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
+              <div class="bot-soul-footer-actions">
+                <button type="button" class="btn btn-outline" id="btn-admin-soul-test-simulator">
+                  🧪 Probar en Simulador
+                </button>
+                <button type="button" class="btn btn-primary" id="btn-admin-save-bot-soul">
+                  💾 Guardar Alma y Reglas del Bot
+                </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
         </div>

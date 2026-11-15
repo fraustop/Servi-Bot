@@ -167,22 +167,45 @@ try {
 } catch {}
 
 function initSoulTabs() {
-  document.querySelectorAll('.soul-tab-btn').forEach((tab) => {
-    tab.addEventListener('click', () => {
-      const paneId = tab.dataset.pane;
-      switchSoulPane(paneId);
+  document.querySelectorAll('.soul-master-detail').forEach((container) => {
+    const tabs = container.querySelectorAll('.soul-tab-btn');
+    const panes = container.querySelectorAll('.soul-pane');
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const paneId = tab.dataset.pane;
+        tabs.forEach((t) => {
+          const isTarget = t === tab;
+          t.classList.toggle('is-active', isTarget);
+          t.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+        });
+        panes.forEach((pane) => {
+          const isTarget = pane.id === paneId;
+          pane.classList.toggle('hidden', !isTarget);
+          if (isTarget) {
+            pane.removeAttribute('hidden');
+          } else {
+            pane.setAttribute('hidden', '');
+          }
+        });
+      });
     });
   });
 }
 
 function switchSoulPane(targetPaneId) {
-  document.querySelectorAll('.soul-tab-btn').forEach((tab) => {
+  const targetPane = document.getElementById(targetPaneId);
+  if (!targetPane) return;
+  const container = targetPane.closest('.soul-master-detail');
+  if (!container) return;
+  const tabs = container.querySelectorAll('.soul-tab-btn');
+  const panes = container.querySelectorAll('.soul-pane');
+  tabs.forEach((tab) => {
     const isTarget = tab.dataset.pane === targetPaneId;
     tab.classList.toggle('is-active', isTarget);
     tab.setAttribute('aria-selected', isTarget ? 'true' : 'false');
   });
 
-  document.querySelectorAll('.soul-pane').forEach((pane) => {
+  panes.forEach((pane) => {
     const isTarget = pane.id === targetPaneId;
     pane.classList.toggle('hidden', !isTarget);
     if (isTarget) {
@@ -781,6 +804,8 @@ let mobileSimTriggerEl = null;
 let wizardCurrentStep = 1;
 let webSenderId = localStorage.getItem('servibot_sender_id') || `web-${Math.floor(10000 + Math.random() * 90000)}`;
 localStorage.setItem('servibot_sender_id', webSenderId);
+let isTrainingModeActive = false;
+let hasCompletedConversationalConfig = false;
 
 let prospectProfile = (() => {
   try {
@@ -974,14 +999,14 @@ function syncProspectGateUI() {
 
 function buildAdminEndpoint(endpoint) {
   const isSuper = Boolean(currentAdminMeta?.is_superadmin || currentUser?.email?.toLowerCase() === 'fraustop@outlook.com');
-  if (!isSuper || !adminSelectedInstanceId) return endpoint;
+  const targetInst = isSuper ? 'servibot-00' : (currentAdminMeta?.assigned_instance_id || 'servibot-01');
   const sep = endpoint.includes('?') ? '&' : '?';
-  return `${endpoint}${sep}instance_id=${encodeURIComponent(adminSelectedInstanceId)}`;
+  return `${endpoint}${sep}instance_id=${encodeURIComponent(targetInst)}`;
 }
 
 function getSelectedAdminInstanceId() {
   const isSuper = Boolean(currentAdminMeta?.is_superadmin || currentUser?.email?.toLowerCase() === 'fraustop@outlook.com');
-  if (isSuper) return adminSelectedInstanceId || 'servibot-00';
+  if (isSuper) return 'servibot-00';
   return currentAdminMeta?.assigned_instance_id || 'servibot-01';
 }
 
@@ -1926,7 +1951,12 @@ function syncSimulatorHeaderLabel(inst = provisionedInstance) {
     if (chatInput) chatInput.placeholder = 'Pregúntale al Asesor...';
   }
 
-  updateQuickPrompts(isCustom, inst);
+  const trainingBar = document.getElementById('chat-training-bar');
+  if (trainingBar) {
+    trainingBar.classList.toggle('hidden', !isCustom);
+  }
+  updateTrainingBarUI();
+  updateChatActionButtons();
 }
 
 function setSimulatorBotMode(mode, { announceGreeting = false } = {}) {
@@ -2012,38 +2042,122 @@ function closeMobileSimulator() {
   mobileSimTriggerEl = null;
 }
 
-function updateQuickPrompts(isCustom, inst = provisionedInstance) {
-  const container = document.querySelector('.bot-quick-prompts');
+function updateTrainingBarUI() {
+  const bar = document.getElementById('chat-training-bar');
+  const dot = document.getElementById('training-status-dot');
+  const label = document.getElementById('training-status-label');
+  const btnText = document.getElementById('training-btn-text');
+  const chatInput = document.getElementById('chat-input');
+
+  if (!bar) return;
+
+  if (isTrainingModeActive) {
+    bar.classList.add('is-active');
+    if (label) label.textContent = '🧠 Modo Entrenamiento ACTIVO';
+    if (btnText) btnText.textContent = 'Finalizar Entrenamiento';
+    if (chatInput) chatInput.placeholder = 'Dale una instrucción a tu bot (ej: Agrega corte a $150)...';
+  } else {
+    bar.classList.remove('is-active');
+    if (label) label.textContent = 'Modo Simulación (Cliente)';
+    if (btnText) btnText.textContent = 'Activar Entrenamiento';
+    const customName = provisionedInstance?.display_name || 'tu bot';
+    if (chatInput && activeBotMode === 'custom') chatInput.placeholder = `Escríbele como cliente a ${customName}...`;
+  }
+}
+
+function updateChatActionButtons() {
+  const container = document.getElementById('chat-action-buttons') || document.querySelector('.bot-quick-prompts');
   if (!container) return;
 
-  if (isCustom) {
-    const bizName = inst?.business_name || document.getElementById('cfg-business-name')?.value.trim() || 'tu negocio';
-    if (Array.isArray(wizardQuickOptions) && wizardQuickOptions.length > 0) {
-      container.innerHTML = wizardQuickOptions.map((opt) => {
-        const promptWithBiz = opt.prompt.replace(/\${bizName}/g, bizName);
-        return `<button type="button" class="quick-chip" data-prompt="${escapeHtml(promptWithBiz)}">${escapeHtml(opt.label)}</button>`;
-      }).join('');
+  container.innerHTML = '';
+
+  const isCustomMode = activeBotMode === 'custom' && Boolean(provisionedInstance);
+
+  if (isCustomMode) {
+    if (isTrainingModeActive) {
+      const trainButtons = [
+        { label: '➕ Agregar Servicio', prompt: 'Agrega al catálogo el servicio Consulta Express por $350 pesos' },
+        { label: '🕒 Actualizar Horario', prompt: 'Actualiza el horario a lunes a sábado de 9:00 a 19:00 hrs' },
+        { label: '❓ Agregar FAQ', prompt: 'Agrega pregunta frecuente: ¿Dónde están ubicados? Respuesta: En Calle Principal 123' },
+        { label: '📜 Agregar Regla', prompt: 'Recuerda que no damos crédito y solo aceptamos pagos de contado' }
+      ];
+      trainButtons.forEach((btnInfo) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-action-chip';
+        btn.textContent = btnInfo.label;
+        btn.addEventListener('click', () => sendChatMessage(btnInfo.prompt));
+        container.appendChild(btn);
+      });
     } else {
-      container.innerHTML = `
-        <button type="button" class="quick-chip" data-prompt="Hola, ¿qué servicios o productos ofrecen y cuáles son sus costos?">¿Qué servicios tienen?</button>
-        <button type="button" class="quick-chip" data-prompt="¿Cuáles son sus horarios de atención y su ubicación?">Horarios y Ubicación</button>
-        <button type="button" class="quick-chip" data-prompt="Hola, me gustaría agendar una cita o hacer un pedido en ${escapeHtml(bizName)}.">Agendar Cita / Pedido</button>
-      `;
+      const bizName = provisionedInstance?.business_name || document.getElementById('cfg-business-name')?.value.trim() || 'tu negocio';
+      if (Array.isArray(wizardQuickOptions) && wizardQuickOptions.length > 0) {
+        wizardQuickOptions.forEach((opt) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn-action-chip';
+          btn.textContent = opt.label;
+          const promptWithBiz = opt.prompt.replace(/\${bizName}/g, bizName);
+          btn.addEventListener('click', () => sendChatMessage(promptWithBiz));
+          container.appendChild(btn);
+        });
+      } else {
+        const custButtons = [
+          { label: '¿Qué servicios tienen?', prompt: `Hola, ¿qué servicios o productos ofrecen en ${bizName} y cuáles son sus precios?` },
+          { label: 'Horarios y Ubicación', prompt: `¿Cuáles son sus horarios de atención y su ubicación?` },
+          { label: 'Agendar Cita / Pedido', prompt: `Hola, me gustaría agendar una cita o hacer un pedido en ${bizName}.` }
+        ];
+        custButtons.forEach((btnInfo) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn-action-chip';
+          btn.textContent = btnInfo.label;
+          btn.addEventListener('click', () => sendChatMessage(btnInfo.prompt));
+          container.appendChild(btn);
+        });
+      }
     }
   } else {
-    container.innerHTML = `
-      <button type="button" class="quick-chip" data-prompt="Hola, ¿qué servicios ofrecen y cuáles son sus precios?">¿Qué planes tienen?</button>
-      <button type="button" class="quick-chip" data-prompt="¿Cómo funciona el bot de WhatsApp, Correo y Teams sin tokens?">¿Cómo funciona sin tokens?</button>
-      <button type="button" class="quick-chip" data-prompt="Quiero contratar el servicio de Bots Autónomos, mi nombre es Carlos Ruiz y mi correo es carlos@negocio.mx, confirma mi pedido.">¡Contratar Bots Autónomos!</button>
-    `;
-  }
+    // Modo Bot 0 (Configurador / Asesor Oficial)
+    const hasReadyBot = hasCompletedConversationalConfig || Boolean(
+      provisionedInstance &&
+      provisionedInstance.business_name &&
+      !String(provisionedInstance.business_name).startsWith('Espacio Disponible')
+    );
 
-    container.querySelectorAll('.quick-chip').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      const promptText = chip.dataset.prompt;
-      if (promptText) sendChatMessage(promptText);
-    });
-  });
+    if (hasReadyBot) {
+      const simBtn = document.createElement('button');
+      simBtn.type = 'button';
+      simBtn.className = 'btn-action-sim';
+      simBtn.id = 'btn-action-goto-sim';
+      simBtn.innerHTML = '<span>🚀</span> <strong>Probar en Modo Simulación</strong>';
+      simBtn.addEventListener('click', () => {
+        goToWizardStep(3);
+        setSimulatorBotMode('custom', { announceGreeting: true });
+        openMobileSimulator();
+      });
+      container.appendChild(simBtn);
+    } else {
+      const configButtons = [
+        { label: '🤖 Configurar mi Bot', prompt: 'Hola ServiBot, quiero configurar mi bot para mi negocio paso a paso.' },
+        { label: '¿Qué planes tienen?', prompt: 'Hola, ¿qué servicios ofrecen y cuáles son sus precios?' },
+        { label: '¿Cómo funciona sin tokens?', prompt: '¿Cómo funciona el bot de WhatsApp, Correo y Teams sin tokens?' },
+        { label: '✅ ¡Guardar y Probar Bot!', prompt: 'Ya tengo todos los datos listos, guarda mi bot y quiero probarlo en el simulador.' }
+      ];
+      configButtons.forEach((btnInfo) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-action-chip';
+        btn.textContent = btnInfo.label;
+        btn.addEventListener('click', () => sendChatMessage(btnInfo.prompt));
+        container.appendChild(btn);
+      });
+    }
+  }
+}
+
+function updateQuickPrompts(isCustom, inst = provisionedInstance) {
+  updateChatActionButtons();
 }
 
 function toggleSimulatorMinimize(forceState) {
@@ -2661,15 +2775,104 @@ async function loadPublicCatalog() {
   }
 }
 
-// ==================== CHAT EN VIVO CON ASESOR COMERCIAL ====================
-function appendChatBubble(role, text, botMode = activeBotMode) {
+// ==================== CONFIGURACIÓN CONVERSACIONAL (BOT 0 ASISTENTE) ====================
+function applyConversationalConfigUpdate(data) {
+  if (!data || typeof data !== 'object') return;
+
+  if (data.business_name) {
+    const el = document.getElementById('cfg-business-name');
+    if (el) el.value = data.business_name;
+  }
+  if (data.display_name || data.bot_name) {
+    const el = document.getElementById('cfg-display-name');
+    if (el) el.value = data.display_name || data.bot_name;
+  }
+  if (data.tone) {
+    const el = document.getElementById('cfg-tone');
+    if (el) el.value = data.tone;
+  }
+  if (data.ai_soul) {
+    const el = document.getElementById('cfg-ai-soul');
+    if (el) el.value = data.ai_soul;
+  }
+  if (data.welcome_message) {
+    const el = document.getElementById('cfg-welcome-message');
+    if (el) el.value = data.welcome_message;
+  }
+  if (data.raw_rules) {
+    const el = document.getElementById('cfg-raw-rules');
+    if (el) el.value = data.raw_rules;
+  }
+  if (Array.isArray(data.catalog_items) && data.catalog_items.length > 0) {
+    data.catalog_items.forEach((item) => {
+      const itemName = String(item.name || '').trim();
+      if (!itemName) return;
+      if (!wizardCatalogItems.some((c) => c.name.toLowerCase() === itemName.toLowerCase())) {
+        wizardCatalogItems.push({
+          name: itemName,
+          price: Math.max(0, Number(item.price || 0)),
+          type: item.type === 'service' ? 'service' : 'product',
+          billing_cycle: String(item.billing_cycle || 'estándar').trim(),
+          tagline: String(item.tagline || '').trim(),
+          description: String(item.description || itemName).trim()
+        });
+      }
+    });
+    renderCatalogUI();
+  }
+
+  scheduleAutoSaveInstance();
+}
+
+async function autoProvisionFromConversation() {
+  try {
+    const bizName = document.getElementById('cfg-business-name')?.value.trim() || 'Mi Negocio';
+    const botName = document.getElementById('cfg-display-name')?.value.trim() || 'Mi Asistente';
+    const tone = document.getElementById('cfg-tone')?.value.trim() || 'Cálido, profesional y servicial';
+    const soul = document.getElementById('cfg-ai-soul')?.value.trim() || '';
+    const welcome = document.getElementById('cfg-welcome-message')?.value.trim() || `¡Hola! Soy ${botName} de ${bizName}. ¿En qué puedo ayudarte hoy?`;
+    const rules = document.getElementById('cfg-raw-rules')?.value.trim() || document.getElementById('cfg-system-prompt')?.value.trim() || '';
+
+    const payload = {
+      business_name: bizName,
+      display_name: botName,
+      tone,
+      ai_soul: soul,
+      welcome_message: welcome,
+      raw_rules: rules,
+      catalog_items: wizardCatalogItems,
+      schedule: wizardSchedule,
+      quick_options: wizardQuickOptions,
+      faq_items: wizardFaqs
+    };
+
+    const res = await apiFetch('/api/instances/provision', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    if (res?.ok && res.instance) {
+      provisionedInstance = res.instance;
+      sessionStorage.setItem('provisioned_bot_instance', JSON.stringify(provisionedInstance));
+      localStorage.setItem('servibot_active_instance_id', res.instance.instance_id);
+      hasCompletedConversationalConfig = true;
+      updateChatActionButtons();
+    }
+  } catch (err) {
+    console.warn('Error en auto-provision conversacional:', err);
+  }
+}
+
+// ==================== CHAT EN VIVO CON ASESOR COMERCIAL & SIMULADOR ====================
+function appendChatBubble(role, text, botMode = activeBotMode, options = {}) {
   const box = document.getElementById('chat-messages');
   if (!box) return;
   const div = document.createElement('div');
   if (role === 'assistant') {
     const isCustom = botMode === 'custom' && Boolean(provisionedInstance);
     div.className = `chat-bubble assistant ${isCustom ? 'is-custom-bot' : 'is-official-bot'}`;
-    div.innerHTML = `${buildAssistantIdentityHeader(isCustom ? 'custom' : 'official', provisionedInstance)}${escapeHtml(text)}`;
+    const badgeHtml = options.isTraining ? `<div class="badge-training-pill">🧠 Instrucción Aprendida</div>` : '';
+    div.innerHTML = `${buildAssistantIdentityHeader(isCustom ? 'custom' : 'official', provisionedInstance)}${badgeHtml}${escapeHtml(text)}`;
   } else {
     div.className = `chat-bubble ${role}`;
     div.textContent = text;
@@ -2688,6 +2891,8 @@ async function sendChatMessage(text) {
     sendBtn.textContent = 'Pensando...';
   }
 
+  const isTrainingActive = Boolean(isTrainingModeActive && activeBotMode === 'custom');
+
   try {
     const res = await apiFetch('/api/chat', {
       method: 'POST',
@@ -2695,8 +2900,9 @@ async function sendChatMessage(text) {
         channel: 'web',
         instance_id: activeChatInstanceId || 'servibot-00',
         sender_id: webSenderId,
-        sender_name: 'Prospecto Web',
-        message: text
+        sender_name: isTrainingActive ? 'Dueño (Entrenamiento)' : 'Prospecto Web',
+        message: text,
+        is_training_mode: isTrainingActive
       })
     });
 
@@ -2719,7 +2925,54 @@ async function sendChatMessage(text) {
       return;
     }
 
-    appendChatBubble('assistant', res.reply || 'Gracias por tu mensaje.');
+    // Modo entrenamiento aplicado exitosamente
+    if (res?.training_applied) {
+      appendChatBubble('assistant', res.reply || 'Instrucción aprendida con éxito.', 'custom', { isTraining: true });
+      if (res.instance) {
+        provisionedInstance = res.instance;
+        sessionStorage.setItem('provisioned_bot_instance', JSON.stringify(provisionedInstance));
+        populateWizardForm(res.instance);
+        renderWizardSummary(res.instance);
+      }
+      if (res.catalog && Array.isArray(res.catalog)) {
+        wizardCatalogItems = res.catalog.map((c) => ({
+          name: c.name,
+          price: c.price,
+          description: c.description,
+          billing_cycle: c.billing_cycle,
+          type: c.type
+        }));
+        renderCatalogUI();
+      }
+      updateChatActionButtons();
+      return;
+    }
+
+    let cleanReply = res.reply || 'Gracias por tu mensaje.';
+
+    // Sincronización conversacional cuando atiende Bot 0
+    if (activeBotMode === 'official') {
+      const updateMatch = cleanReply.match(/\[CONFIG_UPDATE:\s*(\{[\s\S]*?\})\s*\]/);
+      if (updateMatch) {
+        try {
+          const configData = JSON.parse(updateMatch[1]);
+          applyConversationalConfigUpdate(configData);
+        } catch (e) {
+          console.warn('Error parsing [CONFIG_UPDATE]:', e);
+        }
+        cleanReply = cleanReply.replace(/\[CONFIG_UPDATE:\s*\{[\s\S]*?\}\s*\]/g, '').trim();
+      }
+
+      const isComplete = cleanReply.includes('[CONFIG_COMPLETE]');
+      if (isComplete) {
+        cleanReply = cleanReply.replace(/\[CONFIG_COMPLETE\]/g, '').trim();
+        await autoProvisionFromConversation();
+      }
+    }
+
+    appendChatBubble('assistant', cleanReply, activeBotMode);
+    updateChatActionButtons();
+
     if (res.order_created) {
       await refreshHealth();
       if (currentUser) await loadAdminOrders();
@@ -2868,65 +3121,53 @@ function syncAdminRoleUI(meData) {
   }
 
   if (isSuper) {
-    if (!adminSelectedInstanceId || adminSelectedInstanceId === 'servibot-01') {
-      adminSelectedInstanceId = 'servibot-00';
-    }
+    adminSelectedInstanceId = 'servibot-00';
     if (roleBadge) {
       roleBadge.textContent = `👑 SuperAdmin · ${userEmail || 'fraustop@outlook.com'}`;
-    }
-    if (superControls) {
-      superControls.classList.remove('hidden');
-      superControls.removeAttribute('hidden');
+      roleBadge.className = 'badge-tag badge-tag-accent';
     }
     const instances = Array.isArray(currentAdminMeta.instances) ? currentAdminMeta.instances : [];
-    const optionsHtml = instances.length
-      ? instances
-          .map((inst) => {
-            const label =
-              inst.instance_id === 'servibot-00'
-                ? 'servibot-00 · Bot 0 (Proyecto Cero Principal)'
-                : `${inst.instance_id} · ${inst.business_name || inst.slot_status || 'Disponible'}`;
-            return `<option value="${escapeHtml(inst.instance_id)}" ${
-              inst.instance_id === adminSelectedInstanceId ? 'selected' : ''
-            }>${escapeHtml(label)}</option>`;
-          })
-          .join('')
-      : '<option value="servibot-00">servibot-00 · Bot 0 (Proyecto Cero Principal)</option>';
-
-    if (switcher) {
-      switcher.innerHTML = optionsHtml;
-      switcher.value = adminSelectedInstanceId;
-    }
     if (accInstSelect) {
-      accInstSelect.innerHTML = optionsHtml;
+      const clientInstances = instances.filter((inst) => inst.instance_id !== 'servibot-00');
+      accInstSelect.innerHTML = clientInstances.length
+        ? clientInstances
+            .map((inst) => {
+              const label = `${inst.instance_id} · ${inst.business_name || inst.slot_status || 'Disponible'}`;
+              return `<option value="${escapeHtml(inst.instance_id)}">${escapeHtml(label)}</option>`;
+            })
+            .join('')
+        : '<option value="servibot-01">servibot-01 · Disponible</option>';
     }
     if (instLabel) {
-      instLabel.textContent = `Base activa en panel: ${adminSelectedInstanceId}`;
+      instLabel.textContent = 'Bot Propio: servibot-00 (Proyecto Cero)';
     }
     if (expiryBadge) {
-      expiryBadge.classList.add('hidden');
-      expiryBadge.setAttribute('hidden', '');
+      expiryBadge.className = 'admin-expiry-badge is-active';
+      expiryBadge.textContent = '⚡ Infraestructura Principal EC2';
+      expiryBadge.classList.remove('hidden');
+      expiryBadge.removeAttribute('hidden');
     }
   } else {
     adminSelectedInstanceId = assignedInstance;
     if (roleBadge) {
-      roleBadge.textContent = `🤖 Admin Estándar · ${userEmail || ''}`;
-    }
-    if (superControls) {
-      superControls.classList.add('hidden');
-      superControls.setAttribute('hidden', '');
+      roleBadge.textContent = `🤖 Admin · ${userEmail || ''}`;
+      roleBadge.className = 'badge-tag badge-tag-custom';
     }
     const biz = meData.instance?.business_name ? ` · ${meData.instance.business_name}` : '';
     if (instLabel) {
-      instLabel.textContent = `Instancia Asignada: ${assignedInstance}${biz}`;
+      instLabel.textContent = `Bot Propio: ${assignedInstance}${biz}`;
     }
     if (expiryBadge) {
       if (acct.subscription_expired) {
         expiryBadge.className = 'admin-expiry-badge is-expired';
         expiryBadge.textContent = '⛔ Suscripción Vencida';
+        expiryBadge.classList.remove('hidden');
+        expiryBadge.removeAttribute('hidden');
       } else if (acct.days_remaining !== null) {
         expiryBadge.className = 'admin-expiry-badge is-active';
         expiryBadge.textContent = `⏳ ${acct.days_remaining} días restantes`;
+        expiryBadge.classList.remove('hidden');
+        expiryBadge.removeAttribute('hidden');
       } else {
         expiryBadge.classList.add('hidden');
         expiryBadge.setAttribute('hidden', '');
@@ -3723,8 +3964,326 @@ async function loadAdminContactRules() {
   }
 }
 
+let adminWizardQuickOptions = [];
+let adminWizardSchedule = [];
+let adminWizardCatalogItems = [];
+let adminWizardFaqItems = [];
+
+function renderAdminQuickOptionsList() {
+  const container = document.getElementById('admin-quick-options-list');
+  if (!container) return;
+
+  if (!adminWizardQuickOptions.length) {
+    container.innerHTML = '<div style="font-size: 0.82rem; color: var(--text-muted); font-style: italic; padding: 0.5rem 0;">No hay opciones rápidas configuradas. Agrega una abajo o restablece los valores por defecto.</div>';
+    return;
+  }
+
+  container.innerHTML = adminWizardQuickOptions.map((opt, idx) => `
+    <div class="quick-opt-row">
+      <div class="quick-opt-info">
+        <span class="quick-opt-badge">${escapeHtml(opt.label)}</span>
+        <span class="quick-opt-prompt-preview" title="${escapeHtml(opt.prompt)}">${escapeHtml(opt.prompt)}</span>
+      </div>
+      <button type="button" class="btn btn-outline btn-xs btn-admin-del-quick-opt" data-index="${idx}" title="Eliminar opción">
+        ✕
+      </button>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.btn-admin-del-quick-opt').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.index);
+      adminWizardQuickOptions.splice(idx, 1);
+      renderAdminQuickOptionsList();
+    });
+  });
+}
+
+function renderAdminScheduleUI() {
+  const container = document.getElementById('admin-schedule-days-container');
+  if (!container) return;
+
+  container.innerHTML = adminWizardSchedule.map((d, idx) => `
+    <div class="schedule-day-row ${d.open ? '' : 'is-closed'}" data-index="${idx}">
+      <label class="schedule-day-label">
+        <input type="checkbox" class="admin-sched-open-chk" data-index="${idx}" ${d.open ? 'checked' : ''} />
+        <span>${d.day}</span>
+      </label>
+
+      <div class="schedule-time-group" ${d.open ? '' : 'style="opacity: 0.35; pointer-events: none;"'}>
+        <span>Horario:</span>
+        <input type="time" class="admin-sched-open-time" data-index="${idx}" value="${d.open_time}" />
+        <span>a</span>
+        <input type="time" class="admin-sched-close-time" data-index="${idx}" value="${d.close_time}" />
+      </div>
+
+      <div class="schedule-time-group" ${d.open ? '' : 'style="opacity: 0.35; pointer-events: none;"'}>
+        <label>
+          <input type="checkbox" class="admin-sched-lunch-chk" data-index="${idx}" ${d.has_lunch ? 'checked' : ''} />
+          <span>Comida:</span>
+        </label>
+        <input type="time" class="admin-sched-lunch-start" data-index="${idx}" value="${d.lunch_start}" ${d.has_lunch ? '' : 'disabled'} />
+        <span>-</span>
+        <input type="time" class="admin-sched-lunch-end" data-index="${idx}" value="${d.lunch_end}" ${d.has_lunch ? '' : 'disabled'} />
+      </div>
+
+      <div class="schedule-time-group" ${d.open ? '' : 'style="opacity: 0.35; pointer-events: none;"'}>
+        <label>
+          <input type="checkbox" class="admin-sched-appt-chk" data-index="${idx}" ${d.accepts_appt ? 'checked' : ''} />
+          <span>Citas:</span>
+        </label>
+        <input type="time" class="admin-sched-appt-start" data-index="${idx}" value="${d.appt_start}" ${d.accepts_appt ? '' : 'disabled'} />
+        <span>-</span>
+        <input type="time" class="admin-sched-appt-end" data-index="${idx}" value="${d.appt_end}" ${d.accepts_appt ? '' : 'disabled'} />
+      </div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.admin-sched-open-chk').forEach((chk) => {
+    chk.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      adminWizardSchedule[idx].open = e.target.checked;
+      renderAdminScheduleUI();
+      updateAdminScheduleSummary();
+    });
+  });
+
+  container.querySelectorAll('.admin-sched-open-time').forEach((inp) => {
+    inp.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      adminWizardSchedule[idx].open_time = e.target.value;
+      updateAdminScheduleSummary();
+    });
+  });
+
+  container.querySelectorAll('.admin-sched-close-time').forEach((inp) => {
+    inp.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      adminWizardSchedule[idx].close_time = e.target.value;
+      updateAdminScheduleSummary();
+    });
+  });
+
+  container.querySelectorAll('.admin-sched-lunch-chk').forEach((chk) => {
+    chk.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      adminWizardSchedule[idx].has_lunch = e.target.checked;
+      renderAdminScheduleUI();
+      updateAdminScheduleSummary();
+    });
+  });
+
+  container.querySelectorAll('.admin-sched-lunch-start').forEach((inp) => {
+    inp.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      adminWizardSchedule[idx].lunch_start = e.target.value;
+      updateAdminScheduleSummary();
+    });
+  });
+
+  container.querySelectorAll('.admin-sched-lunch-end').forEach((inp) => {
+    inp.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      adminWizardSchedule[idx].lunch_end = e.target.value;
+      updateAdminScheduleSummary();
+    });
+  });
+
+  container.querySelectorAll('.admin-sched-appt-chk').forEach((chk) => {
+    chk.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      adminWizardSchedule[idx].accepts_appt = e.target.checked;
+      renderAdminScheduleUI();
+      updateAdminScheduleSummary();
+    });
+  });
+
+  container.querySelectorAll('.admin-sched-appt-start').forEach((inp) => {
+    inp.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      adminWizardSchedule[idx].appt_start = e.target.value;
+      updateAdminScheduleSummary();
+    });
+  });
+
+  container.querySelectorAll('.admin-sched-appt-end').forEach((inp) => {
+    inp.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      adminWizardSchedule[idx].appt_end = e.target.value;
+      updateAdminScheduleSummary();
+    });
+  });
+}
+
+function updateAdminScheduleSummary() {
+  const summaryEl = document.getElementById('admin-schedule-summary-preview');
+  if (!summaryEl) return;
+
+  const openDays = adminWizardSchedule.filter((d) => d.open);
+  const closedDays = adminWizardSchedule.filter((d) => !d.open);
+
+  if (!openDays.length) {
+    summaryEl.textContent = 'Negocio actualmente sin horarios de apertura definidos.';
+    return;
+  }
+
+  const parts = [];
+  const openDaysNames = openDays.map((d) => d.day);
+  const first = openDays[0];
+  const allSame = openDays.every(
+    (d) =>
+      d.open_time === first.open_time &&
+      d.close_time === first.close_time &&
+      d.has_lunch === first.has_lunch &&
+      d.lunch_start === first.lunch_start &&
+      d.lunch_end === first.lunch_end
+  );
+
+  if (allSame) {
+    const range = openDaysNames.length > 2 ? `${openDaysNames[0]} a ${openDaysNames[openDaysNames.length - 1]}` : openDaysNames.join(' y ');
+    let text = `Horario de atención: ${range} de ${first.open_time} a ${first.close_time} hrs`;
+    if (first.has_lunch) {
+      text += ` (Comida/Receso: ${first.lunch_start} a ${first.lunch_end} hrs)`;
+    }
+    parts.push(text);
+  } else {
+    parts.push('Horarios de atención: ' + openDays.map((d) => `${d.day} (${d.open_time} a ${d.close_time}${d.has_lunch ? `, comida ${d.lunch_start}-${d.lunch_end}` : ''})`).join(', '));
+  }
+
+  const apptDays = adminWizardSchedule.filter((d) => d.open && d.accepts_appt);
+  if (apptDays.length) {
+    const firstAppt = apptDays[0];
+    const allSameAppt = apptDays.every((d) => d.appt_start === firstAppt.appt_start && d.appt_end === firstAppt.appt_end);
+    if (allSameAppt) {
+      const apptRange = apptDays.length > 2 ? `${apptDays[0].day} a ${apptDays[apptDays.length - 1].day}` : apptDays.map((d) => d.day).join(' y ');
+      parts.push(`Citas y reservaciones disponibles: ${apptRange} de ${firstAppt.appt_start} a ${firstAppt.appt_end} hrs`);
+    } else {
+      parts.push('Citas disponibles: ' + apptDays.map((d) => `${d.day} de ${d.appt_start} a ${d.appt_end}`).join(', '));
+    }
+  } else {
+    parts.push('No se agendan citas previas (atención conforme van llegando).');
+  }
+
+  if (closedDays.length) {
+    parts.push(`Días no laborables: ${closedDays.map((d) => d.day).join(', ')} cerrado.`);
+  }
+
+  summaryEl.textContent = parts.join('. ') + '.';
+}
+
+function renderAdminCatalogUI() {
+  const grid = document.getElementById('admin-catalog-items-grid');
+  const countEl = document.getElementById('admin-catalog-items-count');
+  if (!grid) return;
+
+  if (countEl) {
+    const s = adminWizardCatalogItems.length === 1 ? '' : 's';
+    countEl.textContent = `${adminWizardCatalogItems.length} producto${s}/servicio${s} registrado${s}`;
+  }
+
+  if (!adminWizardCatalogItems.length) {
+    grid.innerHTML = '<div style="grid-column: 1 / -1; padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.88rem; border: 1px dashed var(--metal-border); border-radius: 10px;">El catálogo de esta instancia está vacío. Agrega tus servicios o productos arriba.</div>';
+    return;
+  }
+
+  grid.innerHTML = adminWizardCatalogItems.map((item, idx) => `
+    <article class="catalog-item-card">
+      <div>
+        <div class="catalog-item-top">
+          <h5 class="catalog-item-title">${escapeHtml(item.name)}</h5>
+          <span class="catalog-item-price">${Number(item.price || 0).toLocaleString('es-MX')} MXN</span>
+        </div>
+        ${item.tagline ? `<div class="catalog-item-tagline">${escapeHtml(item.tagline)}</div>` : ''}
+        <p class="catalog-item-desc">${escapeHtml(item.description || '')}</p>
+      </div>
+      <div class="catalog-item-bottom">
+        <span class="catalog-item-badge">${item.type === 'service' ? '🛠️ Servicio' : '📦 Producto'} · ${escapeHtml(item.billing_cycle || 'estándar')}</span>
+        <button type="button" class="btn btn-outline btn-xs btn-admin-del-catalog-item" data-index="${idx}" title="Eliminar del catálogo">
+          🗑️ Eliminar
+        </button>
+      </div>
+    </article>
+  `).join('');
+
+  grid.querySelectorAll('.btn-admin-del-catalog-item').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.index);
+      adminWizardCatalogItems.splice(idx, 1);
+      renderAdminCatalogUI();
+    });
+  });
+}
+
+function renderAdminFaqUI() {
+  const list = document.getElementById('admin-faq-items-list');
+  const countEl = document.getElementById('admin-faq-items-count');
+  if (!list) return;
+
+  if (countEl) {
+    const s = adminWizardFaqItems.length === 1 ? '' : 's';
+    countEl.textContent = `${adminWizardFaqItems.length} pregunta${s} frecuente${s} registrada${s}`;
+  }
+
+  if (!adminWizardFaqItems.length) {
+    list.innerHTML = '<div style="padding: 1.2rem; text-align: center; color: var(--text-muted); font-size: 0.86rem; border: 1px dashed var(--metal-border); border-radius: 9px;">Aún no hay preguntas frecuentes registradas. Agrega una con el formulario arriba.</div>';
+    return;
+  }
+
+  list.innerHTML = adminWizardFaqItems.map((faq, idx) => `
+    <div class="faq-item-card">
+      <div class="faq-item-content">
+        <div class="faq-item-q">
+          <span class="faq-item-q-icon" aria-hidden="true">💡</span>
+          <span>${escapeHtml(faq.question)}</span>
+        </div>
+        <p class="faq-item-a">${escapeHtml(faq.answer)}</p>
+      </div>
+      <button type="button" class="btn btn-outline btn-xs btn-admin-del-faq" data-index="${idx}" title="Eliminar pregunta">
+        🗑️
+      </button>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.btn-admin-del-faq').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.index);
+      adminWizardFaqItems.splice(idx, 1);
+      renderAdminFaqUI();
+    });
+  });
+}
+
+function updateAdminLivePreview() {
+  const nameEl = document.getElementById('admin-wizard-preview-bot-name');
+  const greetEl = document.getElementById('admin-wizard-preview-greeting');
+  const displayName = document.getElementById('admin-cfg-display-name')?.value.trim() || 'Tu ServiBot';
+  const welcome = document.getElementById('admin-cfg-welcome-message')?.value.trim() || '¡Hola! Cuéntame en qué puedo ayudar a tu negocio hoy.';
+
+  if (nameEl) nameEl.textContent = displayName;
+  if (greetEl) greetEl.textContent = welcome;
+}
+
+function buildAdminFullSystemPrompt() {
+  const baseRules = document.getElementById('admin-cfg-system-prompt')?.value.trim() || '';
+  const scheduleSummary = document.getElementById('admin-schedule-summary-preview')?.textContent.trim() || '';
+  const parts = [];
+
+  if (baseRules) {
+    parts.push(`REGLAS CLAVE DEL NEGOCIO:\n${baseRules}`);
+  }
+  if (scheduleSummary && !scheduleSummary.includes('sin horarios') && !scheduleSummary.includes('Cargando horario')) {
+    parts.push(`HORARIOS Y DISPONIBILIDAD DE CITAS:\n${scheduleSummary}`);
+  }
+  if (adminWizardFaqItems.length) {
+    const faqsFormatted = adminWizardFaqItems.map((f, i) => `${i + 1}. P: ${f.question}\n   R: ${f.answer}`).join('\n');
+    parts.push(`PREGUNTAS FRECUENTES OBLIGATORIAS (FAQ):\n${faqsFormatted}`);
+  }
+
+  return parts.join('\n\n');
+}
+
 async function loadAdminBotSoul() {
-  const instanceId = adminSelectedInstanceId || 'servibot-00';
+  const instanceId = getSelectedAdminInstanceId();
   const pill = document.getElementById('soul-instance-pill');
   if (pill) pill.textContent = instanceId;
 
@@ -3740,25 +4299,158 @@ async function loadAdminBotSoul() {
       if (el) el.value = val ?? '';
     };
 
-    setVal('soul-display-name', inst.display_name || '');
-    setVal('soul-business-name', inst.business_name || '');
-    setVal('soul-welcome-message', inst.welcome_message || '');
-    setVal('soul-tone', inst.tone || '');
-    setVal('soul-ai-soul', inst.ai_soul || '');
-    setVal('soul-system-prompt', inst.system_prompt || '');
+    setVal('admin-cfg-display-name', inst.display_name || '');
+    setVal('admin-cfg-tone', inst.tone || '');
+    setVal('admin-cfg-ai-soul', inst.ai_soul || '');
+    setVal('admin-cfg-welcome-message', inst.welcome_message || '');
+
+    // Reglas (preservar raw_rules)
+    let rulesVal = inst.raw_rules !== undefined ? inst.raw_rules : '';
+    if (!rulesVal && inst.system_prompt) {
+      if (inst.system_prompt.includes('REGLAS CLAVE DEL NEGOCIO:\n')) {
+        const match = inst.system_prompt.match(/REGLAS CLAVE DEL NEGOCIO:\n([\s\S]*?)(?=\n\n(?:HORARIOS|PREGUNTAS)|$)/);
+        rulesVal = match ? match[1].trim() : inst.system_prompt;
+      } else {
+        rulesVal = inst.system_prompt;
+      }
+    }
+    setVal('admin-cfg-system-prompt', rulesVal || '');
 
     // Sincronizar estado visual de los chips de tono
     const currentTone = String(inst.tone || '').trim().toLowerCase();
-    document.querySelectorAll('#soul-tone-presets .preset-chip').forEach((btn) => {
+    document.querySelectorAll('#admin-preset-tone-chips .preset-chip').forEach((btn) => {
       const btnTone = String(btn.dataset.tone || '').trim().toLowerCase();
       const isActive = currentTone && (currentTone === btnTone || currentTone.includes(btnTone.split(',')[0]));
       btn.classList.toggle('is-selected', Boolean(isActive));
       btn.setAttribute('aria-pressed', String(Boolean(isActive)));
     });
 
-    setFeedback('bot-soul-feedback', '');
+    // Opciones rápidas
+    if (Array.isArray(inst.quick_options) && inst.quick_options.length) {
+      adminWizardQuickOptions = inst.quick_options;
+    } else {
+      adminWizardQuickOptions = [
+        { label: '¿Qué servicios tienen?', prompt: 'Hola, ¿qué servicios o productos ofrecen y cuáles son sus costos?' },
+        { label: 'Horarios y Ubicación', prompt: '¿Cuáles son sus horarios de atención y su ubicación?' },
+        { label: 'Agendar Cita / Pedido', prompt: 'Hola, me gustaría agendar una cita o hacer un pedido.' }
+      ];
+    }
+    renderAdminQuickOptionsList();
+
+    // Horarios
+    if (Array.isArray(inst.schedule) && inst.schedule.length === 7) {
+      adminWizardSchedule = inst.schedule;
+    } else {
+      adminWizardSchedule = DAYS_OF_WEEK.map((day, idx) => ({
+        day,
+        open: idx < 6,
+        open_time: '09:00',
+        close_time: '19:00',
+        has_lunch: true,
+        lunch_start: '14:00',
+        lunch_end: '15:00',
+        accepts_appt: idx < 6,
+        appt_start: '09:30',
+        appt_end: '18:30'
+      }));
+    }
+    renderAdminScheduleUI();
+    updateAdminScheduleSummary();
+
+    // Catálogo
+    const catalogList = Array.isArray(inst.catalog) ? inst.catalog : (Array.isArray(inst.catalog_items) ? inst.catalog_items : null);
+    if (Array.isArray(catalogList)) {
+      adminWizardCatalogItems = catalogList.map((item) => ({
+        name: String(item.name || item.title || '').trim(),
+        type: item.type === 'service' ? 'service' : 'product',
+        price: Math.max(0, Number(item.price || 0)),
+        billing_cycle: String(item.billing_cycle || 'estándar').trim(),
+        tagline: String(item.tagline || '').trim(),
+        description: String(item.description || item.name || '').trim()
+      })).filter((it) => it.name);
+    } else {
+      adminWizardCatalogItems = [];
+    }
+    renderAdminCatalogUI();
+
+    // FAQ
+    if (Array.isArray(inst.faq_items)) {
+      adminWizardFaqItems = inst.faq_items;
+    } else {
+      adminWizardFaqItems = [];
+    }
+    renderAdminFaqUI();
+
+    updateAdminLivePreview();
+    setFeedback('admin-bot-soul-feedback', '');
   } catch (err) {
-    setFeedback('bot-soul-feedback', `⚠️ Error al cargar alma del bot: ${err.message}`, false);
+    setFeedback('admin-bot-soul-feedback', `⚠️ Error al cargar alma del bot: ${err.message}`, false);
+  }
+}
+
+async function saveAdminBotSoul() {
+  const instanceId = getSelectedAdminInstanceId();
+  const saveBtn = document.getElementById('btn-admin-save-bot-soul');
+
+  const displayName = document.getElementById('admin-cfg-display-name')?.value.trim();
+  const welcomeMessage = document.getElementById('admin-cfg-welcome-message')?.value.trim();
+  const tone = document.getElementById('admin-cfg-tone')?.value.trim();
+  const aiSoul = document.getElementById('admin-cfg-ai-soul')?.value.trim();
+  const rawRules = document.getElementById('admin-cfg-system-prompt')?.value.trim() || '';
+
+  if (!displayName) {
+    setFeedback('admin-bot-soul-feedback', '⚠️ El nombre del asistente es obligatorio.', false);
+    return;
+  }
+  if (!aiSoul) {
+    setFeedback('admin-bot-soul-feedback', '⚠️ El propósito y alma de la IA (AI Soul) es obligatorio.', false);
+    return;
+  }
+
+  setFeedback('admin-bot-soul-feedback', 'Guardando cambios en el alma del bot...', true);
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Guardando...';
+  }
+
+  const compiledPrompt = buildAdminFullSystemPrompt();
+
+  try {
+    const res = await apiFetch(`/api/instances/${encodeURIComponent(instanceId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        display_name: displayName,
+        welcome_message: welcomeMessage,
+        tone: tone || 'Profesional, cálido y enfocado en servicio',
+        ai_soul: aiSoul,
+        system_prompt: compiledPrompt,
+        raw_rules: rawRules,
+        raw_system_prompt: rawRules,
+        quick_options: adminWizardQuickOptions,
+        schedule: adminWizardSchedule,
+        catalog_items: adminWizardCatalogItems,
+        replace_catalog: true,
+        faq_items: adminWizardFaqItems
+      })
+    });
+
+    if (!res.ok) {
+      throw new Error(res.error || 'Error al guardar.');
+    }
+
+    setFeedback('admin-bot-soul-feedback', '✅ ¡Alma, personalidad y reglas guardadas con éxito!', true);
+
+    if (provisionedInstance && provisionedInstance.instance_id === instanceId) {
+      provisionedInstance = { ...provisionedInstance, ...res.instance };
+      syncSimulatorHeaderLabel(provisionedInstance);
+    }
+  } catch (err) {
+    setFeedback('admin-bot-soul-feedback', `⚠️ Error al guardar: ${err.message}`, false);
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 Guardar Alma y Reglas del Bot';
+    }
   }
 }
 
@@ -4004,25 +4696,6 @@ function setupEventListeners() {
   document.getElementById('btn-refresh-admin')?.addEventListener('click', () => {
     closeMenuPopoverIfOpen();
     loadAllAdminData();
-  });
-
-  // Selector de Bot / Instancia exclusivo para SuperAdmin (fraustop@outlook.com)
-  document.getElementById('admin-instance-switcher')?.addEventListener('change', async (e) => {
-    adminSelectedInstanceId = e.target.value || 'servibot-00';
-    const instLabel = document.getElementById('admin-instance-label');
-    if (instLabel) instLabel.textContent = `Base activa en panel: ${adminSelectedInstanceId}`;
-    selectedCatalogItemId = null;
-    await Promise.all([
-      loadAdminCatalog(),
-      loadAdminPromotions(),
-      loadAdminContactRules(),
-      loadAdminOrders(),
-      loadWhatsAppStatus(),
-      loadMicrosoftChannelStatus(),
-      loadAdminConversations(),
-      loadAdminBotSoul(),
-      refreshHealth()
-    ]);
   });
 
   // Crear nueva cuenta dentro de Admin (solo SuperAdmin)
@@ -4847,6 +5520,16 @@ function setupEventListeners() {
     setSimulatorBotMode(activeBotMode, { announceGreeting: true });
   });
 
+  document.getElementById('btn-toggle-training')?.addEventListener('click', () => {
+    isTrainingModeActive = !isTrainingModeActive;
+    updateTrainingBarUI();
+    updateChatActionButtons();
+    const statusMsg = isTrainingModeActive
+      ? '🧠 Modo Entrenamiento ACTIVADO.\nPuedes darme instrucciones directas para agregar o eliminar productos del catálogo, actualizar horarios o establecer reglas de atención. Todo lo que me enseñes se guardará en mi base de datos.'
+      : '✅ Modo Entrenamiento DESACTIVADO.\nHe vuelto al Modo Simulación Cliente (solo lectura). No se modificarán datos de mi base de datos.';
+    appendChatBubble('assistant', statusMsg, 'custom', { isTraining: isTrainingModeActive });
+  });
+
   // Modal de pedido directo
   document.getElementById('btn-close-order-modal')?.addEventListener('click', () => {
     document.getElementById('order-dialog')?.close();
@@ -5399,81 +6082,20 @@ function setupEventListeners() {
     if (currentUser) await loadAllAdminData();
   });
 
-  // ==================== SECCIÓN ALMA DEL BOT (PERSONALIDAD E IA) ====================
+  // ==================== SECCIÓN ALMA DEL BOT (PERSONALIDAD E IA) EN ADMIN ====================
   // 1. Guardar cambios del Alma e Instrucciones del Bot
-  document.getElementById('bot-soul-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const instanceId = adminSelectedInstanceId || 'servibot-00';
-    const saveBtn = document.getElementById('btn-save-bot-soul');
-
-    const displayName = document.getElementById('soul-display-name')?.value.trim();
-    const businessName = document.getElementById('soul-business-name')?.value.trim();
-    const welcomeMessage = document.getElementById('soul-welcome-message')?.value.trim();
-    const tone = document.getElementById('soul-tone')?.value.trim();
-    const aiSoul = document.getElementById('soul-ai-soul')?.value.trim();
-    const systemPrompt = document.getElementById('soul-system-prompt')?.value.trim();
-
-    if (!displayName) {
-      setFeedback('bot-soul-feedback', '⚠️ El nombre del asistente es obligatorio.', false);
-      return;
-    }
-    if (!businessName) {
-      setFeedback('bot-soul-feedback', '⚠️ El nombre de la empresa o marca es obligatorio.', false);
-      return;
-    }
-    if (!aiSoul) {
-      setFeedback('bot-soul-feedback', '⚠️ El propósito y alma de la IA (AI Soul) es obligatorio.', false);
-      return;
-    }
-
-    setFeedback('bot-soul-feedback', 'Guardando cambios en el alma del bot...', true);
-    if (saveBtn) {
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Guardando...';
-    }
-
-    try {
-      const res = await apiFetch(`/api/instances/${encodeURIComponent(instanceId)}`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          display_name: displayName,
-          business_name: businessName,
-          welcome_message: welcomeMessage,
-          tone: tone || 'Profesional, cálido y enfocado en servicio',
-          ai_soul: aiSoul,
-          system_prompt: systemPrompt
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error(res.error || 'Error al guardar.');
-      }
-
-      setFeedback('bot-soul-feedback', '✅ ¡Alma, personalidad e instrucciones guardadas con éxito!', true);
-
-      // Sincronizar en memoria y en el encabezado del simulador
-      if (provisionedInstance && provisionedInstance.instance_id === instanceId) {
-        provisionedInstance = { ...provisionedInstance, ...res.instance };
-        syncSimulatorHeaderLabel(provisionedInstance);
-      }
-    } catch (err) {
-      setFeedback('bot-soul-feedback', `⚠️ Error al guardar: ${err.message}`, false);
-    } finally {
-      if (saveBtn) {
-        saveBtn.disabled = false;
-        saveBtn.textContent = '💾 Guardar Alma y Reglas del Bot';
-      }
-    }
+  document.getElementById('btn-admin-save-bot-soul')?.addEventListener('click', async () => {
+    await saveAdminBotSoul();
   });
 
-  // 2. Chips de selección rápida de tono para el alma
-  document.querySelectorAll('#soul-tone-presets .preset-chip').forEach((btn) => {
+  // 2. Chips de selección rápida de tono para el alma en admin
+  document.querySelectorAll('#admin-preset-tone-chips .preset-chip').forEach((btn) => {
     btn.addEventListener('click', () => {
       const toneVal = btn.dataset.tone;
-      const toneInput = document.getElementById('soul-tone');
+      const toneInput = document.getElementById('admin-cfg-tone');
       if (toneInput && toneVal) {
         toneInput.value = toneVal;
-        document.querySelectorAll('#soul-tone-presets .preset-chip').forEach((b) => {
+        document.querySelectorAll('#admin-preset-tone-chips .preset-chip').forEach((b) => {
           const isCurrent = b === btn;
           b.classList.toggle('is-selected', isCurrent);
           b.setAttribute('aria-pressed', String(isCurrent));
@@ -5482,47 +6104,124 @@ function setupEventListeners() {
     });
   });
 
-  // 3. Plantillas rápidas para insertar en instrucciones y preguntas específicas
-  const appendToSystemPrompt = (snippet) => {
-    const area = document.getElementById('soul-system-prompt');
-    if (!area) return;
-    const current = area.value.trim();
-    area.value = current ? `${current}\n\n${snippet.trim()}` : snippet.trim();
-    area.focus();
-    area.scrollTop = area.scrollHeight;
-  };
-
-  document.getElementById('btn-tmpl-faq')?.addEventListener('click', () => {
-    appendToSystemPrompt(
-      `--- PREGUNTAS FRECUENTES (FAQ) ---\n` +
-      `- Horarios de atención: Lunes a Sábado de 9:00 a 19:00 hrs.\n` +
-      `- Ubicación: Av. Principal #123, Col. Centro.\n` +
-      `- Formas de pago: Tarjeta de débito/crédito, transferencia bancaria y efectivo.\n` +
-      `- Facturación: Emitimos factura fiscal (CFDI) dentro del mes de compra.`
-    );
+  // 3. Live preview en vivo del asistente dentro del panel admin
+  ['admin-cfg-display-name', 'admin-cfg-welcome-message'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('input', () => {
+      updateAdminLivePreview();
+    });
   });
 
-  document.getElementById('btn-tmpl-hours')?.addEventListener('click', () => {
-    appendToSystemPrompt(
-      `--- REGLAS DE ATENCIÓN Y CONTACTO ---\n` +
-      `- Si el cliente pregunta por cotización personalizada o agendar cita, solicita su nombre y teléfono para que un asesor le dé seguimiento.\n` +
-      `- Si escriben fuera de horario laboral, agradecer amablemente e indicar que su mensaje será atendido a primera hora del siguiente día hábil.`
-    );
+  // 4. Agregar y resetear opciones rápidas en admin
+  document.getElementById('btn-admin-add-quick-opt')?.addEventListener('click', () => {
+    const labelInput = document.getElementById('admin-new-quick-opt-label');
+    const promptInput = document.getElementById('admin-new-quick-opt-prompt');
+    const label = labelInput?.value.trim();
+    const prompt = promptInput?.value.trim();
+
+    if (!label) {
+      labelInput?.focus();
+      return;
+    }
+    const finalPrompt = prompt || label;
+    adminWizardQuickOptions.push({ label, prompt: finalPrompt });
+    if (labelInput) labelInput.value = '';
+    if (promptInput) promptInput.value = '';
+
+    renderAdminQuickOptionsList();
   });
 
-  document.getElementById('btn-tmpl-limits')?.addEventListener('click', () => {
-    appendToSystemPrompt(
-      `--- REGLAS ESTRICTAS Y PROHIBICIONES ---\n` +
-      `- NUNCA inventar precios, descuentos ni servicios que no estén explícitamente en el catálogo registrado.\n` +
-      `- Responder siempre con amabilidad, precisión y sin usar respuestas excesivamente largas (máximo 3 párrafos cortos).\n` +
-      `- Si no conoces la respuesta a una duda técnica muy específica, indica amablemente que consultarás con el equipo correspondiente.`
-    );
+  document.getElementById('btn-admin-reset-quick-opts')?.addEventListener('click', () => {
+    adminWizardQuickOptions = [
+      { label: '¿Qué servicios tienen?', prompt: 'Hola, ¿qué servicios o productos ofrecen y cuáles son sus costos?' },
+      { label: 'Horarios y Ubicación', prompt: '¿Cuáles son sus horarios de atención y su ubicación?' },
+      { label: 'Agendar Cita / Pedido', prompt: 'Hola, me gustaría agendar una cita o hacer un pedido.' }
+    ];
+    renderAdminQuickOptionsList();
   });
 
-  // 4. Botón "Probar en Simulador" desde el panel de Alma
-  document.getElementById('btn-soul-test-simulator')?.addEventListener('click', () => {
+  // 5. Horarios en admin: Copiar Lunes a toda la semana
+  document.getElementById('btn-admin-copy-monday-schedule')?.addEventListener('click', () => {
+    if (!adminWizardSchedule.length) return;
+    const monday = adminWizardSchedule[0];
+    for (let i = 1; i < 6; i++) {
+      adminWizardSchedule[i].open = monday.open;
+      adminWizardSchedule[i].open_time = monday.open_time;
+      adminWizardSchedule[i].close_time = monday.close_time;
+      adminWizardSchedule[i].has_lunch = monday.has_lunch;
+      adminWizardSchedule[i].lunch_start = monday.lunch_start;
+      adminWizardSchedule[i].lunch_end = monday.lunch_end;
+      adminWizardSchedule[i].accepts_appt = monday.accepts_appt;
+      adminWizardSchedule[i].appt_start = monday.appt_start;
+      adminWizardSchedule[i].appt_end = monday.appt_end;
+    }
+    renderAdminScheduleUI();
+    updateAdminScheduleSummary();
+  });
+
+  // 6. Catálogo en admin: Agregar servicio o producto
+  document.getElementById('btn-admin-add-catalog-item')?.addEventListener('click', () => {
+    const nameInput = document.getElementById('admin-cat-item-name');
+    const typeSelect = document.getElementById('admin-cat-item-type');
+    const priceInput = document.getElementById('admin-cat-item-price');
+    const cycleInput = document.getElementById('admin-cat-item-cycle');
+    const descInput = document.getElementById('admin-cat-item-desc');
+
+    const name = nameInput?.value.trim();
+    const price = Number(priceInput?.value || 0);
+    const type = typeSelect?.value === 'product' ? 'product' : 'service';
+    const billing_cycle = cycleInput?.value.trim() || 'estándar';
+    const description = descInput?.value.trim() || name;
+
+    if (!name) {
+      nameInput?.focus();
+      return;
+    }
+
+    adminWizardCatalogItems.push({
+      name,
+      type,
+      price,
+      billing_cycle,
+      tagline: '',
+      description
+    });
+
+    if (nameInput) nameInput.value = '';
+    if (priceInput) priceInput.value = '';
+    if (cycleInput) cycleInput.value = '';
+    if (descInput) descInput.value = '';
+
+    renderAdminCatalogUI();
+  });
+
+  // 7. Preguntas frecuentes en admin: Agregar FAQ
+  document.getElementById('btn-admin-add-faq-item')?.addEventListener('click', () => {
+    const qInput = document.getElementById('admin-faq-item-question');
+    const aInput = document.getElementById('admin-faq-item-answer');
+    const question = qInput?.value.trim();
+    const answer = aInput?.value.trim();
+
+    if (!question) {
+      qInput?.focus();
+      return;
+    }
+    if (!answer) {
+      aInput?.focus();
+      return;
+    }
+
+    adminWizardFaqItems.push({ question, answer });
+    if (qInput) qInput.value = '';
+    if (aInput) aInput.value = '';
+
+    renderAdminFaqUI();
+  });
+
+  // 8. Botón "Probar en Simulador" desde el panel de Alma
+  document.getElementById('btn-admin-soul-test-simulator')?.addEventListener('click', () => {
     openMobileSimulator();
-    if (adminSelectedInstanceId && adminSelectedInstanceId !== 'servibot-00') {
+    const instId = getSelectedAdminInstanceId();
+    if (instId && instId !== 'servibot-00') {
       setSimulatorBotMode('custom', { announceGreeting: true });
     } else {
       setSimulatorBotMode('official', { announceGreeting: true });

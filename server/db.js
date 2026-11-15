@@ -371,6 +371,15 @@ function initBotDbSchema(conn) {
       value_json TEXT NOT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
+
+    CREATE TABLE IF NOT EXISTS training_memory (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL DEFAULT 'rule',
+      instruction TEXT NOT NULL,
+      applied_summary TEXT NOT NULL,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
   `);
 
   ensureColumn(conn, 'catalog_items', 'sent_to_bot', 'INTEGER NOT NULL DEFAULT 1');
@@ -713,9 +722,9 @@ function setBotSetting(rawInstanceId, key, valueObj) {
 function seedDatabase() {
   const defaultSettings = {
     bot_config: {
-      business_name: 'Proyecto Cero · Servi-Bot',
-      bot_name: 'ServiBot #00 · Proyecto Cero',
-      tone: 'Consultivo, ejecutivo, claro y estricto con la información oficial',
+      business_name: 'Servi-Bot',
+      bot_name: 'Asesor',
+      tone: 'Amable, claro, directo, sin tecnicismos y enfocado en servir y solucionar las necesidades del cliente',
       ai_provider: 'bedrock',
       bedrock_model: 'us.amazon.nova-micro-v1:0',
       aws_region: 'us-east-2',
@@ -811,15 +820,15 @@ function seedDatabase() {
     instance_id: 'servibot-00',
     slot_number: 0,
     tier: 'official',
-    display_name: 'ServiBot #00 · Proyecto Cero',
-    business_name: 'Proyecto Cero · Servi-Bot',
-    tone: 'Consultivo, ejecutivo, claro y estricto con la información oficial',
+    display_name: 'Asesor',
+    business_name: 'Servi-Bot',
+    tone: 'Amable, pedagógico, claro, sin tecnicismos y enfocado en orientar, enseñar la plataforma y solucionar las dudas del cliente',
     ai_soul:
-      'Asesor oficial de Proyecto Cero (Servi-Bot). Atiende exclusivamente preguntas relacionadas con el Proyecto Cero y los servicios registrados en el catálogo de su interfaz.',
+      'Eres el asesor ServiBot. Cuando te saluden o pregunten quién eres, contesta: "Soy el asesor ServiBot, ¿en qué puedo servirte?". Eres un orientador y maestro servicial que explica con paciencia cómo funciona la plataforma y cómo se configura un bot paso a paso de forma gratuita en la web, sin presionar jamás con ventas apresuradas.',
     system_prompt:
-      'REGLAS ESTRICTAS: 1) Solo debes contestar preguntas relacionadas con el Proyecto Cero (Servi-Bot). Si te preguntan algo ajeno al Proyecto Cero, indica amablemente que solo atiendes consultas del Proyecto Cero. 2) Prohibido inventar ofertas, descuentos, paquetes o servicios. 3) Limítate siempre y únicamente a dar la información del catálogo y promociones activas creadas en la interfaz.',
+      'DIRECTRICES PRINCIPALES:\n1. Identidad: Eres el asesor ServiBot. Saludo o identidad: "Soy el asesor ServiBot, ¿en qué puedo servirte?". Jamás menciones "Proyecto Cero".\n2. Cero tecnicismos: Explica todo de forma natural, sencilla y accesible para cualquier persona sin conocimientos técnicos. Evita términos como SQLite, instancias, tokens, backend, APIs o LLMs.\n3. Enfoque consultivo y educativo: No presiones al cliente ni te apresures a cerrar ventas. Explica con calma cómo funciona el servicio y cómo se configura en la interfaz web.\n4. Cómo funciona ServiBot: Asistente con inteligencia artificial que atiende 24/7 a los clientes de tu negocio en WhatsApp, Telegram, correo o Teams, resolviendo dudas, cotizando servicios y agendando citas o pedidos.\n5. Cómo se configura en la interfaz web (https://servi-bot-cic.web.app):\n   - Registro inicial: Entra a https://servi-bot-cic.web.app, pulsa "Diseña tu Bot", inicia sesión gratis con Google/correo y confirma datos de contacto.\n   - Paso 1 (Datos del Negocio): Nombre del negocio y selección de giro (clínica, restaurante, estética, tienda, etc.) o recuperación de bot previo.\n   - Paso 2 (Personalidad y Reglas en 6 pestañas):\n     1) Identidad y Alma: Nombre del bot (ej. Sofía), tono de voz y propósito/alma de la IA.\n     2) Reglas de Negocio: Horarios, formas de pago, tiempos de entrega y límites de atención.\n     3) Catálogo y Servicios: Productos o servicios con precios y descripciones para cotización exacta.\n     4) Cierre y Citas: Preguntas para tomar pedidos o agendar citas.\n     5) Preguntas Frecuentes (FAQ): Respuestas oficiales a dudas recurrentes.\n     6) Aplicaciones: Conexiones externas como All Time para programar redes sociales.\n   - Paso 3 (Simulador en Vivo): Panel lateral derecho interactivo para chatear en tiempo real con su bot recién configurado, 100% GRATIS y sin compromiso.\n6. Gratuito vs Canales Reales:\n   - La configuración y uso en el simulador web es 100% GRATIS.\n   - Conectar a WhatsApp real (o Telegram/Teams) para atender clientes reales 24/7 requiere contratar el plan mensual de $1,500 MXN (+ IVA). Al acreditarse el pago, se desbloquea de inmediato el código QR para vincular su línea.\n   - Opcionales: Página web ($300 MXN/mes + IVA) y Soporte técnico 24/7 ($200 MXN/mes + IVA).\n7. Sin pago no hay venta: Jamás des por cerrada una venta sin pago registrado. Solo genera el enlace de pago seguro de Mercado Pago si el cliente lo solicita y confirma explícitamente.',
     welcome_message:
-      '¡Hola! Soy el asistente oficial de Proyecto Cero (Servi-Bot). ¿Te gustaría conocer nuestro servicio de bot, página web o soporte técnico?'
+      'Hola, soy ServiBot, ¿cómo puedo facilitar tu día?'
   };
 
   db.prepare(`
@@ -830,6 +839,12 @@ function seedDatabase() {
     ON CONFLICT(instance_id) DO UPDATE SET
       slot_number = 0,
       tier = 'official',
+      display_name = excluded.display_name,
+      business_name = excluded.business_name,
+      tone = excluded.tone,
+      ai_soul = excluded.ai_soul,
+      system_prompt = excluded.system_prompt,
+      welcome_message = excluded.welcome_message,
       admin_email = excluded.admin_email,
       db_file = excluded.db_file
   `).run(
@@ -844,21 +859,18 @@ function seedDatabase() {
     getBotDbPath('servibot-00')
   );
 
-  // Si servibot-00 aún tiene campos genéricos vacíos, asegurar su configuración oficial
-  const currentBot0 = db.prepare("SELECT * FROM bot_instances WHERE instance_id = 'servibot-00'").get();
-  if (currentBot0 && !currentBot0.ai_soul) {
-    db.prepare(`
-      UPDATE bot_instances SET display_name = ?, business_name = ?, tone = ?, ai_soul = ?, system_prompt = ?, welcome_message = ?
-      WHERE instance_id = 'servibot-00'
-    `).run(
-      bot0Config.display_name,
-      bot0Config.business_name,
-      bot0Config.tone,
-      bot0Config.ai_soul,
-      bot0Config.system_prompt,
-      bot0Config.welcome_message
-    );
-  }
+  // Asegurar la configuración oficial en servibot-00
+  db.prepare(`
+    UPDATE bot_instances SET display_name = ?, business_name = ?, tone = ?, ai_soul = ?, system_prompt = ?, welcome_message = ?
+    WHERE instance_id = 'servibot-00'
+  `).run(
+    bot0Config.display_name,
+    bot0Config.business_name,
+    bot0Config.tone,
+    bot0Config.ai_soul,
+    bot0Config.system_prompt,
+    bot0Config.welcome_message
+  );
 
   // Convertir antiguo servibot-01 semilla ("Servi-Bot Central") en espacio libre de clientes si nunca fue configurado por cliente
   const oldSlot1 = db.prepare("SELECT * FROM bot_instances WHERE instance_id = 'servibot-01'").get();
@@ -904,6 +916,142 @@ function seedDatabase() {
   getBotDb('servibot-00');
 }
 
+// ==================== MODO ENTRENAMIENTO (TRAINING MEMORY Y MUTACIONES) ====================
+function addTrainingMemory(rawInstanceId, category, instruction, summary, meta = {}) {
+  const instanceId = normalizeInstanceIdKey(rawInstanceId);
+  const botDb = getBotDb(instanceId);
+  const stmt = botDb.prepare(`
+    INSERT INTO training_memory (category, instruction, applied_summary, metadata_json)
+    VALUES (?, ?, ?, ?)
+  `);
+  const metaStr = typeof meta === 'string' ? meta : JSON.stringify(meta || {});
+  const res = stmt.run(category || 'rule', String(instruction || ''), String(summary || ''), metaStr);
+  return botDb.prepare('SELECT * FROM training_memory WHERE id = ?').get(res.lastInsertRowid);
+}
+
+function getTrainingMemories(rawInstanceId, limit = 50) {
+  const instanceId = normalizeInstanceIdKey(rawInstanceId);
+  const botDb = getBotDb(instanceId);
+  return botDb.prepare('SELECT * FROM training_memory ORDER BY id DESC LIMIT ?').all(Number(limit) || 50);
+}
+
+function applyTrainingAction(rawInstanceId, actionType, payload = {}) {
+  const instanceId = normalizeInstanceIdKey(rawInstanceId);
+  if (instanceId === 'servibot-00') {
+    throw new Error('Bot 0 oficial no puede ser reentrenado desde el simulador de clientes.');
+  }
+
+  const botDb = getBotDb(instanceId);
+  let summary = '';
+  let category = actionType || 'general';
+
+  const instance = db.prepare('SELECT * FROM bot_instances WHERE instance_id = ?').get(instanceId);
+  if (!instance) {
+    throw new Error(`Instancia ${instanceId} no encontrada.`);
+  }
+
+  if (actionType === 'catalog_add' || actionType === 'add_catalog_item') {
+    category = 'catalog';
+    const name = String(payload.name || '').trim();
+    if (!name) throw new Error('Nombre del servicio o producto requerido.');
+    const price = Number(payload.price) || 0;
+    const desc = String(payload.description || payload.tagline || name).trim();
+    const billingCycle = String(payload.billing_cycle || 'único').trim();
+    const type = String(payload.type || 'service').trim();
+
+    let slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const exists = botDb.prepare('SELECT id FROM catalog_items WHERE slug = ?').get(slug);
+    if (exists) slug = `${slug}-${Date.now().toString().slice(-4)}`;
+
+    botDb.prepare(`
+      INSERT INTO catalog_items (
+        slug, type, name, tagline, description, price, currency, billing_cycle,
+        setup_fee, features_json, image_url, badge, active, sent_to_bot
+      ) VALUES (?, ?, ?, '', ?, ?, 'MXN', ?, 0, '[]', '/assets/service-bots.svg', '', 1, 1)
+    `).run(slug, type, name, desc, price, billingCycle);
+
+    summary = `Servicio/producto '${name}' agregado al catálogo con precio $${price.toLocaleString('es-MX')} MXN (${billingCycle}).`;
+  } else if (actionType === 'catalog_delete' || actionType === 'delete_catalog_item') {
+    category = 'catalog';
+    const name = String(payload.name || '').trim();
+    if (payload.id) {
+      botDb.prepare('DELETE FROM catalog_items WHERE id = ?').run(payload.id);
+      summary = `Elemento de catálogo #${payload.id} eliminado.`;
+    } else if (name) {
+      botDb.prepare('DELETE FROM catalog_items WHERE LOWER(name) = LOWER(?) OR slug = LOWER(?)').run(name, name);
+      summary = `Servicio/producto '${name}' eliminado del catálogo.`;
+    }
+  } else if (actionType === 'rule_add' || actionType === 'add_rule') {
+    category = 'rule';
+    const rule = String(payload.rule || payload.instruction || '').trim();
+    if (!rule) throw new Error('Regla requerida.');
+    const currentRules = String(instance.raw_rules || '').trim();
+    const updatedRules = currentRules ? `${currentRules}\n- ${rule}` : `- ${rule}`;
+    db.prepare("UPDATE bot_instances SET raw_rules = ?, updated_at = datetime('now', 'localtime') WHERE instance_id = ?")
+      .run(updatedRules, instanceId);
+    summary = `Nueva regla de negocio aprendida: "${rule}".`;
+  } else if (actionType === 'faq_add' || actionType === 'add_faq') {
+    category = 'faq';
+    const q = String(payload.question || '').trim();
+    const a = String(payload.answer || '').trim();
+    if (!q || !a) throw new Error('Pregunta y respuesta requeridas para la FAQ.');
+    let faqs = [];
+    try {
+      faqs = JSON.parse(instance.faq_json || '[]');
+    } catch {
+      faqs = [];
+    }
+    faqs.push({ question: q, answer: a });
+    db.prepare("UPDATE bot_instances SET faq_json = ?, updated_at = datetime('now', 'localtime') WHERE instance_id = ?")
+      .run(JSON.stringify(faqs), instanceId);
+    summary = `Nueva FAQ aprendida: "${q}".`;
+  } else if (actionType === 'schedule_update' || actionType === 'update_schedule') {
+    category = 'schedule';
+    const scheduleData = payload.schedule || payload.days;
+    const scheduleStr = typeof scheduleData === 'string' ? scheduleData : JSON.stringify(scheduleData || []);
+    db.prepare("UPDATE bot_instances SET schedule_json = ?, updated_at = datetime('now', 'localtime') WHERE instance_id = ?")
+      .run(scheduleStr, instanceId);
+    summary = `Horario de atención actualizado: ${payload.summary || 'Nuevos horarios guardados'}.`;
+  } else if (actionType === 'identity_update' || actionType === 'update_identity') {
+    category = 'identity';
+    const updates = [];
+    const params = [];
+    if (payload.display_name) { updates.push('display_name = ?'); params.push(payload.display_name.trim()); }
+    if (payload.business_name) { updates.push('business_name = ?'); params.push(payload.business_name.trim()); }
+    if (payload.tone) { updates.push('tone = ?'); params.push(payload.tone.trim()); }
+    if (payload.ai_soul) { updates.push('ai_soul = ?'); params.push(payload.ai_soul.trim()); }
+    if (payload.welcome_message) { updates.push('welcome_message = ?'); params.push(payload.welcome_message.trim()); }
+    if (updates.length > 0) {
+      params.push(instanceId);
+      db.prepare(`UPDATE bot_instances SET ${updates.join(', ')}, updated_at = datetime('now', 'localtime') WHERE instance_id = ?`).run(...params);
+      summary = `Identidad del bot actualizada: ${Object.keys(payload).join(', ')}.`;
+    }
+  } else {
+    category = 'general_instruction';
+    summary = String(payload.summary || payload.instruction || 'Instrucción general guardada.');
+  }
+
+  const memoryRecord = addTrainingMemory(
+    instanceId,
+    category,
+    payload.instruction || summary,
+    summary,
+    payload
+  );
+
+  const freshInstance = db.prepare('SELECT * FROM bot_instances WHERE instance_id = ?').get(instanceId);
+  const catalog = botDb.prepare('SELECT * FROM catalog_items WHERE active = 1 AND sent_to_bot = 1 ORDER BY id ASC').all();
+
+  return {
+    ok: true,
+    summary,
+    category,
+    memory: memoryRecord,
+    instance: freshInstance,
+    catalog
+  };
+}
+
 seedDatabase();
 
 module.exports = {
@@ -926,5 +1074,8 @@ module.exports = {
   getSetting,
   setSetting,
   getBotSetting,
-  setBotSetting
+  setBotSetting,
+  addTrainingMemory,
+  getTrainingMemories,
+  applyTrainingAction
 };
