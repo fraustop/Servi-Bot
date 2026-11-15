@@ -1596,6 +1596,7 @@ body.is-admin-session .container {
   margin-top: 0.18rem;
   inline-size: 1.05rem;
   block-size: 1.05rem;
+  color-scheme: dark;
   accent-color: var(--wa-green);
   cursor: pointer;
   flex-shrink: 0;
@@ -1631,12 +1632,25 @@ body.is-admin-session .container {
   margin-bottom: 0.75rem;
 }
 
+.checkout-tax-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  padding-bottom: 0.28rem;
+  margin-bottom: 0.28rem;
+  border-bottom: 1px dashed rgba(148, 163, 184, 0.16);
+}
+
 .checkout-total-row {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.5rem;
   flex-wrap: wrap;
+  padding-top: 0.15rem;
 }
 
 .checkout-total-row span {
@@ -1647,15 +1661,19 @@ body.is-admin-session .container {
 
 .checkout-total-row strong {
   font-family: var(--font-serif);
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   color: var(--wa-green-bright);
 }
 
 .checkout-total-breakdown {
-  margin: 0.25rem 0 0;
-  font-size: 0.76rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
   color: var(--text-muted);
   line-height: 1.38;
+}
+
+.checkout-mp-cta-wrap {
+  margin: 0.65rem 0;
 }
 
 .checkout-actions-row {

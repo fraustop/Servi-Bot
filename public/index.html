@@ -575,7 +575,7 @@
                           <div class="base-price-callout">
                             <div class="base-price-figure">
                               <strong>$1,500 pesos</strong>
-                              <span>más impuestos</span>
+                              <span>+ IVA 16% (+$240 = $1,740 MXN)</span>
                             </div>
                             <p class="base-price-note">
                               Únicamente por tu bot ServiBot ya configurado con la esencia y reglas de tu empresa.
@@ -583,19 +583,19 @@
                           </div>
 
                           <p class="cfg-wa-desc">
-                            Verifica cómo atiende en el simulador de la derecha. Al pasar a pagar podrás elegir servicios opcionales adicionales o quedarte solo con tu bot por <strong>$1,500 pesos más impuestos</strong>.
+                            Verifica cómo atiende en el simulador de la derecha. Al pasar a pagar con <strong>Mercado Pago</strong> podrás elegir servicios opcionales o quedarte solo con tu bot por <strong>$1,500 pesos + $240 de IVA (16%) = $1,740 MXN</strong>.
                           </p>
 
                           <button type="button" class="btn btn-emerald" id="btn-go-checkout" style="inline-size: 100%; justify-content: center;">
-                            Pasar a Pagar →
+                            Pasar a Pagar con Mercado Pago →
                           </button>
                         </div>
 
-                        <!-- Vista de checkout con servicios opcionales desmarcables -->
+                        <!-- Vista de checkout con servicios opcionales desmarcables e IVA México 16% -->
                         <div id="wizard-checkout-panel" class="hidden" hidden>
                           <header class="cfg-card-head" style="margin-bottom: 0.55rem;">
                             <div>
-                              <span class="badge-tag badge-tag-accent">Configuración de Pago</span>
+                              <span class="badge-tag badge-tag-accent">Mercado Pago México · IVA 16%</span>
                               <h4 id="wizard-checkout-title" tabindex="-1" style="margin: 0.35rem 0 0; font-family: var(--font-serif); font-size: 1.15rem;">
                                 Personaliza tu Paquete
                               </h4>
@@ -608,7 +608,7 @@
                           </div>
 
                           <p class="wizard-pane-sub" style="margin-bottom: 0.55rem; font-size: 0.78rem;">
-                            Servicios opcionales incluidos ($2,500 más impuestos en paquete completo). Si no los deseas, desmárcalos para pagar solo $1,500 pesos más impuestos:
+                            Servicios opcionales incluidos ($2,500 + $400 IVA 16% = $2,900 MXN). Si no los deseas, desmárcalos para pagar solo $1,500 + $240 IVA = $1,740 MXN:
                           </p>
 
                           <div class="checkout-addons-list">
@@ -647,23 +647,44 @@
                           </div>
 
                           <div class="checkout-total-box" aria-live="polite">
+                            <div class="checkout-tax-row">
+                              <span>Subtotal sin impuestos:</span>
+                              <span id="checkout-subtotal-amount">$2,500 pesos</span>
+                            </div>
+                            <div class="checkout-tax-row">
+                              <span>IVA México (16%):</span>
+                              <span id="checkout-tax-amount">+$400 pesos (16%)</span>
+                            </div>
                             <div class="checkout-total-row">
-                              <span>Total a pagar:</span>
-                              <strong id="checkout-total-amount">$2,500 pesos más impuestos</strong>
+                              <span>Total con impuestos (MXN):</span>
+                              <strong id="checkout-total-amount">$2,900 pesos ($2,500 + $400 IVA)</strong>
                             </div>
                             <p class="checkout-total-breakdown" id="checkout-total-breakdown">
-                              Bot configurado ($1,500) + Catálogo Virtual ($500) + Página Web ($300) + Soporte Técnico ($200).
+                              Incluye Bot configurado ($1,500) + Catálogo Virtual ($500) + Página Web ($300) + Soporte Técnico ($200) = $2,500 + $400 IVA (16%) = $2,900 MXN.
                             </p>
                           </div>
 
                           <div id="checkout-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
+
+                          <div id="checkout-mp-cta-wrap" class="checkout-mp-cta-wrap hidden" hidden>
+                            <a
+                              id="btn-mp-pay-now"
+                              class="btn btn-primary btn-sm"
+                              href="#"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style="inline-size: 100%; justify-content: center;"
+                            >
+                              Pagar ahora en Mercado Pago ↗
+                            </a>
+                          </div>
 
                           <div class="checkout-actions-row">
                             <button type="button" class="btn btn-outline btn-sm" id="btn-back-from-checkout">
                               ← Volver
                             </button>
                             <button type="button" class="btn btn-emerald btn-sm" id="btn-confirm-checkout">
-                              Confirmar Pedido ($2,500 MXN + imp.) →
+                              Pagar con Mercado Pago ($2,900 MXN IVA incl.) →
                             </button>
                           </div>
                         </div>

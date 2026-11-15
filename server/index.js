@@ -3,8 +3,16 @@ const cors = require('cors');
 const path = require('node:path');
 const fs = require('node:fs');
 const { spawn } = require('node:child_process');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { db, DB_PATH, getSetting, setSetting } = require('./db');
-const { OLLAMA_PORT, ensureOllamaOnPort10002, getOllamaStatus } = require('./ollama_service');
+const {
+  OLLAMA_PORT,
+  WORKER_PORT,
+  resolvePythonExecutable,
+  buildWorkerEnv,
+  ensureOllamaOnPort10002,
+  getOllamaStatus
+} = require('./ollama_service');
 const { EVOLUTION_PORT, INSTANCE_IDS, resolveInstanceId, startEvolutionServer } = require('./evolution_server');
 const {
   startEmailPolling,
@@ -29,34 +37,52 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 /**
- * Ejecuta a demanda el agente de ventas en Python (python_workers/sales_agent.py)
- * conectado a SQLite y a Ollama en el puerto 10002.
+ * Ejecuta de forma asíncrona el agente de ventas mediante el worker persistente (puerto 10003)
+ * conectado a Amazon Bedrock, con respaldo automático a subproceso Python bajo demanda.
  */
-function runPythonSalesAgent({
+async function runPythonSalesAgent({
   channel = 'web',
   sender_id = 'anon',
   sender_name = '',
   message = '',
   instance_id = 'servibot-01'
 }) {
-  return new Promise((resolve) => {
-    const botCfg = getSetting('bot_config', {});
-    const canonicalInstance = resolveInstanceId(instance_id);
-    const scriptPath = path.join(__dirname, '..', 'python_workers', 'sales_agent.py');
-    const payload = {
-      db_path: DB_PATH,
-      channel,
-      sender_id,
-      sender_name,
-      message,
-      instance_id: canonicalInstance,
-      ollama_url: botCfg.ollama_host || `http://127.0.0.1:${OLLAMA_PORT}`,
-      ollama_model: botCfg.ollama_model || 'llama3.2:3b'
-    };
+  const botCfg = getSetting('bot_config', {});
+  const canonicalInstance = resolveInstanceId(instance_id);
+  const payload = {
+    db_path: DB_PATH,
+    channel,
+    sender_id,
+    sender_name,
+    message,
+    instance_id: canonicalInstance,
+    ollama_url: botCfg.ollama_host || `http://127.0.0.1:${OLLAMA_PORT}`,
+    ollama_model: botCfg.ollama_model || 'llama3.2:3b',
+    ai_provider: botCfg.ai_provider || process.env.AI_PROVIDER || 'bedrock',
+    bedrock_model: botCfg.bedrock_model || process.env.BEDROCK_MODEL_ID || 'us.amazon.nova-micro-v1:0',
+    aws_region: botCfg.aws_region || process.env.AWS_REGION || 'us-east-2'
+  };
 
-    const py = spawn('python', [scriptPath], {
+  try {
+    const resp = await fetch(`http://127.0.0.1:${WORKER_PORT}/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(45000)
+    });
+    if (resp.ok) {
+      return await resp.json();
+    }
+  } catch (err) {
+    console.warn(`[AsyncWorker] Puerto ${WORKER_PORT} no disponible (${err.message}); usando respaldo CLI.`);
+  }
+
+  return new Promise((resolve) => {
+    const scriptPath = path.join(__dirname, '..', 'python_workers', 'sales_agent.py');
+    const pythonBin = resolvePythonExecutable();
+    const py = spawn(pythonBin, [scriptPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      env: buildWorkerEnv()
     });
 
     let stdoutData = '';
@@ -147,6 +173,125 @@ function slugify(text) {
   );
 }
 
+/**
+ * Obtiene la configuración activa de Mercado Pago y la tasa de IVA de México (16%).
+ */
+function getMercadoPagoConfig() {
+  const saved = getSetting('mercadopago_config', {});
+  const publicKey = process.env.MP_PUBLIC_KEY || saved.public_key || '';
+  const accessToken = process.env.MP_ACCESS_TOKEN || saved.access_token || '';
+  const parsedTax = Number(process.env.MP_TAX_RATE ?? saved.tax_rate ?? 0.16);
+  const taxRate = Number.isFinite(parsedTax) && parsedTax >= 0 ? parsedTax : 0.16;
+  return {
+    enabled: Boolean(accessToken),
+    publicKey,
+    accessToken,
+    taxRate,
+    currency: 'MXN',
+    country: 'MX',
+    successUrl:
+      process.env.MP_SUCCESS_URL || saved.success_url || 'https://servi-bot-cic.web.app/?mp_status=approved',
+    pendingUrl:
+      process.env.MP_PENDING_URL || saved.pending_url || 'https://servi-bot-cic.web.app/?mp_status=pending',
+    failureUrl:
+      process.env.MP_FAILURE_URL || saved.failure_url || 'https://servi-bot-cic.web.app/?mp_status=failure'
+  };
+}
+
+/**
+ * Crea una preferencia de pago Checkout Pro en Mercado Pago México (MXN).
+ */
+async function createMercadoPagoPreference({
+  orderCode,
+  customer_name = '',
+  customer_contact = '',
+  customer_company = '',
+  orderItems = []
+}) {
+  const mpCfg = getMercadoPagoConfig();
+  if (!mpCfg.enabled || !orderItems.length) return null;
+
+  const appendOrderParam = (urlStr, extraStatus = '') => {
+    const sep = urlStr.includes('?') ? '&' : '?';
+    return `${urlStr}${sep}order=${encodeURIComponent(orderCode)}${extraStatus}`;
+  };
+
+  const mpItems = orderItems
+    .filter((it) => Number(it.price || 0) > 0)
+    .map((it) => ({
+      id: String(it.slug || 'servibot-item').slice(0, 120),
+      title: String(it.name || 'Servicio Servi-Bot').slice(0, 250),
+      description: String(customer_company ? `${it.name} · ${customer_company}` : it.name).slice(0, 250),
+      quantity: 1,
+      currency_id: 'MXN',
+      unit_price: Math.round(Number(it.price || 0) * 100) / 100
+    }));
+
+  if (!mpItems.length) return null;
+
+  const payer = { name: String(customer_name || 'Cliente Servi-Bot').slice(0, 120) };
+  const contactStr = String(customer_contact || '').trim();
+  if (contactStr.includes('@')) {
+    payer.email = contactStr;
+  } else {
+    const digits = contactStr.replace(/\D/g, '');
+    if (digits.length >= 8) {
+      payer.phone = { number: digits.slice(-10) };
+    }
+  }
+
+  const body = {
+    items: mpItems,
+    payer,
+    external_reference: orderCode,
+    statement_descriptor: 'SERVIBOT IA',
+    back_urls: {
+      success: appendOrderParam(mpCfg.successUrl),
+      pending: appendOrderParam(mpCfg.pendingUrl),
+      failure: appendOrderParam(mpCfg.failureUrl)
+    },
+    auto_return: 'approved',
+    metadata: {
+      order_code: orderCode,
+      company: customer_company || '',
+      country: 'MX',
+      tax_rate: mpCfg.taxRate
+    }
+  };
+
+  const tunnelUrl = getTunnelStatus()?.publicUrl || '';
+  if (tunnelUrl.startsWith('https://')) {
+    body.notification_url = `${tunnelUrl.replace(/\/+$/, '')}/api/payments/mercadopago/webhook`;
+  }
+
+  try {
+    const resp = await fetch('https://api.mercadopago.com/checkout/preferences', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${mpCfg.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000)
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data?.id) {
+      console.error('[MercadoPago] Error creando preferencia:', resp.status, data);
+      return { ok: false, error: data?.message || `HTTP ${resp.status}` };
+    }
+    return {
+      ok: true,
+      preference_id: data.id,
+      init_point: data.init_point,
+      sandbox_init_point: data.sandbox_init_point,
+      public_key: mpCfg.publicKey
+    };
+  } catch (err) {
+    console.error('[MercadoPago] Excepción creando preferencia:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
 async function main() {
   // 1. Iniciar Ollama en puerto 10002
   await ensureOllamaOnPort10002();
@@ -187,6 +332,7 @@ async function main() {
       instancesCount: db.prepare('SELECT COUNT(*) as c FROM bot_instances').get().c
     };
 
+    const mpCfg = getMercadoPagoConfig();
     res.json({
       ok: true,
       service: 'Servi-Bot Main Orchestrator',
@@ -194,13 +340,21 @@ async function main() {
       ports: {
         server: PORT,
         evolution: EVOLUTION_PORT,
-        ollama: OLLAMA_PORT
+        ollama: OLLAMA_PORT,
+        worker: WORKER_PORT
       },
       ollama,
       evolution,
       email: getEmailWorkerStatus(),
       teams: getTeamsChannelStatus(),
       tunnel: getTunnelStatus(),
+      mercadopago: {
+        enabled: mpCfg.enabled,
+        publicKey: mpCfg.publicKey,
+        taxRate: mpCfg.taxRate,
+        country: mpCfg.country,
+        currency: mpCfg.currency
+      },
       stats
     });
   });
@@ -461,6 +615,25 @@ async function main() {
         });
       }
 
+      const mpCfg = getMercadoPagoConfig();
+      const taxRate = req.body?.apply_tax === false ? 0 : mpCfg.taxRate;
+      const subtotalAmount = Math.round(totalAmount * 100) / 100;
+      const taxAmount = Math.round(subtotalAmount * taxRate * 100) / 100;
+
+      if (taxAmount > 0) {
+        orderItems.push({
+          id: null,
+          slug: 'iva-mexico-16',
+          name: `IVA México (${Math.round(taxRate * 100)}%)`,
+          price: taxAmount,
+          setup_fee: 0,
+          billing_cycle: 'Impuesto México',
+          currency
+        });
+      }
+
+      totalAmount = Math.round((subtotalAmount + taxAmount) * 100) / 100;
+
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const orderCode = `SB-${dateStr}-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -483,12 +656,36 @@ async function main() {
           notes || 'Pedido creado desde el catálogo web'
         );
 
+      const mpPreference = await createMercadoPagoPreference({
+        orderCode,
+        customer_name,
+        customer_contact,
+        customer_company,
+        orderItems
+      });
+
+      if (mpPreference?.preference_id) {
+        const enrichedNotes = `${notes || 'Pedido web'} | MP Pref: ${mpPreference.preference_id}`.trim();
+        db.prepare('UPDATE orders SET notes = ? WHERE id = ?').run(enrichedNotes, result.lastInsertRowid);
+      }
+
       const created = db.prepare('SELECT * FROM orders WHERE id = ?').get(result.lastInsertRowid);
       await notifyTeamsIncomingWebhook(
-        `🛒 **Nuevo Pedido Web (${orderCode})** de **${customer_name}** (${customer_contact}) por **$${totalAmount} ${currency}**`
+        `🛒 **Nuevo Pedido Web (${orderCode})** de **${customer_name}** (${customer_contact}) por **$${totalAmount} ${currency}** (Subtotal $${subtotalAmount} + IVA $${taxAmount})`
       );
 
-      res.json({ ok: true, order: { ...created, items: orderItems } });
+      res.json({
+        ok: true,
+        order: {
+          ...created,
+          subtotal_amount: subtotalAmount,
+          tax_rate: taxRate,
+          tax_amount: taxAmount,
+          total_amount: totalAmount,
+          items: orderItems
+        },
+        mercadopago: mpPreference
+      });
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });
     }
@@ -915,20 +1112,90 @@ async function main() {
     res.json({ ok: true, status: getEmailWorkerStatus() });
   });
 
+  // --- MERCADO PAGO CHECKOUT PRO Y WEBHOOK (MÉXICO MXN) ---
+  app.get('/api/payments/mercadopago/config', (req, res) => {
+    const mpCfg = getMercadoPagoConfig();
+    res.json({
+      ok: true,
+      enabled: mpCfg.enabled,
+      publicKey: mpCfg.publicKey,
+      taxRate: mpCfg.taxRate,
+      taxLabel: `IVA México (${Math.round(mpCfg.taxRate * 100)}%)`,
+      currency: mpCfg.currency,
+      country: mpCfg.country
+    });
+  });
+
+  app.post('/api/payments/mercadopago/webhook', async (req, res) => {
+    try {
+      const mpCfg = getMercadoPagoConfig();
+      const topic = req.body?.type || req.body?.topic || req.query?.topic || req.query?.type || '';
+      const paymentId = req.body?.data?.id || req.query?.['data.id'] || req.query?.id || '';
+
+      if (!mpCfg.enabled || !paymentId || (topic && topic !== 'payment')) {
+        return res.status(200).json({ ok: true, received: true });
+      }
+
+      const payResp = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
+        headers: { Authorization: `Bearer ${mpCfg.accessToken}` },
+        signal: AbortSignal.timeout(10000)
+      });
+      if (payResp.ok) {
+        const payment = await payResp.json();
+        const orderCode = payment?.external_reference;
+        const mpStatus = payment?.status;
+        if (orderCode) {
+          const mappedStatus =
+            mpStatus === 'approved'
+              ? 'paid'
+              : mpStatus === 'rejected' || mpStatus === 'cancelled'
+                ? 'cancelled'
+                : 'pending';
+          const existing = db.prepare('SELECT id, notes FROM orders WHERE order_code = ?').get(orderCode);
+          if (existing) {
+            const nextNotes = `${existing.notes || ''} | Pago MP #${paymentId}: ${mpStatus}`.trim();
+            db.prepare('UPDATE orders SET status = ?, notes = ? WHERE id = ?').run(mappedStatus, nextNotes, existing.id);
+            if (mpStatus === 'approved') {
+              await notifyTeamsIncomingWebhook(
+                `💳 **Pago Aprobado en Mercado Pago (${orderCode})** · Pago #${paymentId} por **$${payment.transaction_amount} ${payment.currency_id || 'MXN'}**`
+              );
+            }
+          }
+        }
+      }
+
+      return res.status(200).json({ ok: true, received: true });
+    } catch (err) {
+      console.error('[MercadoPago Webhook] Error:', err.message);
+      return res.status(200).json({ ok: false, error: err.message });
+    }
+  });
+
   // --- CONFIGURACIÓN GENERAL Y CREDENCIALES DE CANALES ---
   app.get('/api/settings', requireFirebaseAuth, (req, res) => {
+    const mpSaved = getSetting('mercadopago_config', {});
+    const mpCfg = getMercadoPagoConfig();
     res.json({
       ok: true,
       bot_config: getSetting('bot_config', {}),
       email_config: getSetting('email_config', {}),
       teams_config: getSetting('teams_config', {}),
-      tunnel_config: getSetting('tunnel_config', {})
+      tunnel_config: getSetting('tunnel_config', {}),
+      mercadopago_config: {
+        enabled: mpCfg.enabled,
+        public_key: mpCfg.publicKey,
+        has_access_token: Boolean(mpCfg.accessToken),
+        tax_rate: mpCfg.taxRate,
+        country: mpCfg.country,
+        currency: mpCfg.currency,
+        updated_via: mpSaved.public_key ? 'sqlite' : 'env'
+      }
     });
   });
 
   app.put('/api/settings/:key', requireFirebaseAuth, async (req, res) => {
     const key = req.params.key;
-    const allowed = ['bot_config', 'email_config', 'teams_config', 'tunnel_config'];
+    const allowed = ['bot_config', 'email_config', 'teams_config', 'tunnel_config', 'mercadopago_config'];
     if (!allowed.includes(key)) {
       return res.status(400).json({ ok: false, error: 'Clave de configuración no permitida.' });
     }
@@ -942,7 +1209,7 @@ async function main() {
       await startCloudflareTunnel(PORT);
     }
 
-    res.json({ ok: true, key, value: merged, tunnel: getTunnelStatus() });
+    res.json({ ok: true, key, value: key === 'mercadopago_config' ? { ...merged, access_token: merged.access_token ? '***' : '' } : merged, tunnel: getTunnelStatus() });
   });
 
   // --- GESTIÓN DE CUENTAS DE ADMINISTRACIÓN (FIREBASE AUTH + SQLITE) ---

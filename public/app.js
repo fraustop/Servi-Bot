@@ -828,8 +828,22 @@ function toggleCheckoutPanel(showCheckout) {
   }
 }
 
+function resetCheckoutMpCta() {
+  const wrap = document.getElementById('checkout-mp-cta-wrap');
+  const link = document.getElementById('btn-mp-pay-now');
+  if (wrap) {
+    wrap.classList.add('hidden');
+    wrap.setAttribute('hidden', '');
+  }
+  if (link) {
+    link.setAttribute('href', '#');
+    link.textContent = 'Pagar ahora en Mercado Pago ↗';
+  }
+}
+
 function updateCheckoutPricing() {
   const BASE_BOT_PRICE = 1500;
+  const TAX_RATE = 0.16;
   const checks = Array.from(document.querySelectorAll('.checkout-addon-check'));
   const selectedAddons = checks
     .filter((chk) => chk.checked)
@@ -840,26 +854,39 @@ function updateCheckoutPricing() {
     }));
 
   const addonsTotal = selectedAddons.reduce((sum, item) => sum + item.price, 0);
-  const grandTotal = BASE_BOT_PRICE + addonsTotal;
-  const formattedTotal = `$${grandTotal.toLocaleString('es-MX')}`;
+  const subtotal = BASE_BOT_PRICE + addonsTotal;
+  const taxAmount = Math.round(subtotal * TAX_RATE);
+  const totalWithTax = subtotal + taxAmount;
 
+  const fmtSubtotal = `$${subtotal.toLocaleString('es-MX')}`;
+  const fmtTax = `$${taxAmount.toLocaleString('es-MX')}`;
+  const fmtTotal = `$${totalWithTax.toLocaleString('es-MX')}`;
+
+  const subtotalEl = document.getElementById('checkout-subtotal-amount');
+  const taxEl = document.getElementById('checkout-tax-amount');
   const totalEl = document.getElementById('checkout-total-amount');
   const breakdownEl = document.getElementById('checkout-total-breakdown');
   const confirmBtn = document.getElementById('btn-confirm-checkout');
 
+  if (subtotalEl) {
+    subtotalEl.textContent = `${fmtSubtotal} pesos`;
+  }
+  if (taxEl) {
+    taxEl.textContent = `+${fmtTax} pesos (16%)`;
+  }
   if (totalEl) {
-    totalEl.textContent = `${formattedTotal} pesos más impuestos`;
+    totalEl.textContent = `${fmtTotal} pesos (${fmtSubtotal} + ${fmtTax} IVA)`;
   }
   if (breakdownEl) {
     breakdownEl.textContent = selectedAddons.length
-      ? `Bot configurado ($1,500) + ${selectedAddons.map((a) => `${a.label} ($${a.price})`).join(' + ')}. Si desmarcas los opcionales pagarás solo $1,500 pesos más impuestos.`
-      : 'Incluye únicamente tu bot ServiBot ya configurado ($1,500 MXN). Sin servicios opcionales.';
+      ? `Incluye Bot configurado ($1,500) + ${selectedAddons.map((a) => `${a.label} ($${a.price})`).join(' + ')} = ${fmtSubtotal} + ${fmtTax} IVA (16%) = ${fmtTotal} MXN.`
+      : `Incluye únicamente tu bot ServiBot configurado ($1,500) + $240 IVA México (16%) = $1,740 MXN.`;
   }
   if (confirmBtn && !confirmBtn.disabled) {
-    confirmBtn.textContent = `Confirmar Pedido (${formattedTotal} MXN + imp.) →`;
+    confirmBtn.textContent = `Pagar con Mercado Pago (${fmtTotal} MXN IVA incl.) →`;
   }
 
-  return { basePrice: BASE_BOT_PRICE, selectedAddons, addonsTotal, grandTotal };
+  return { basePrice: BASE_BOT_PRICE, selectedAddons, addonsTotal, subtotal, taxRate: TAX_RATE, taxAmount, totalWithTax };
 }
 
 function validateWizardStep1() {
@@ -933,6 +960,7 @@ function resetWizardForNewBot() {
   setFeedback('wizard-step-1-error', '');
   setFeedback('instance-save-status', '');
   setFeedback('checkout-feedback', '');
+  resetCheckoutMpCta();
   toggleCheckoutPanel(false);
   updateCheckoutPricing();
   syncSimulatorHeaderLabel(null);
@@ -1841,6 +1869,8 @@ function setupEventListeners() {
 
   document.querySelectorAll('.checkout-addon-check').forEach((chk) => {
     chk.addEventListener('change', () => {
+      resetCheckoutMpCta();
+      setFeedback('checkout-feedback', '');
       updateCheckoutPricing();
     });
   });
@@ -1853,6 +1883,7 @@ function setupEventListeners() {
 
     const btn = document.getElementById('btn-confirm-checkout');
     setFeedback('checkout-feedback', '');
+    resetCheckoutMpCta();
 
     const customItems = [
       {
@@ -1876,7 +1907,9 @@ function setupEventListeners() {
       }
     });
 
-    const totalPesos = customItems.reduce((acc, it) => acc + Number(it.price || 0), 0);
+    const subtotalPesos = customItems.reduce((acc, it) => acc + Number(it.price || 0), 0);
+    const ivaPesos = Math.round(subtotalPesos * 0.16);
+    const totalConIva = subtotalPesos + ivaPesos;
     const addonLabels = customItems
       .slice(1)
       .map((it) => `${it.name} ($${it.price})`)
@@ -1884,7 +1917,7 @@ function setupEventListeners() {
 
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Registrando pedido...';
+      btn.textContent = 'Generando link de Mercado Pago...';
     }
 
     try {
@@ -1902,34 +1935,64 @@ function setupEventListeners() {
           customer_company: provisionedInstance.business_name || '',
           channel: 'web',
           custom_items: customItems,
-          notes: `Configuración ServiBot (${provisionedInstance.instance_id}). Adicionales: ${addonLabels || 'Ninguno'}. Total $${totalPesos} MXN más impuestos.`
+          apply_tax: true,
+          notes: `Configuración ServiBot (${provisionedInstance.instance_id}). Adicionales: ${addonLabels || 'Ninguno'}. Subtotal $${subtotalPesos} + IVA 16% ($${ivaPesos}) = $${totalConIva} MXN.`
         })
       });
 
       if (!data.ok || !data.order) {
-        setFeedback('checkout-feedback', data.error || 'No se pudo confirmar tu pedido.', false);
+        setFeedback('checkout-feedback', data.error || 'No se pudo generar tu orden de pago.', false);
         return;
       }
 
       const orderCode = data.order.order_code;
-      setFeedback(
-        'checkout-feedback',
-        `¡Pedido ${orderCode} registrado! Total: $${Number(data.order.total_amount).toLocaleString('es-MX')} pesos más impuestos. Te contactaremos para activar tu ServiBot.`,
-        true
-      );
+      const srvSub = Number(data.order.subtotal_amount ?? subtotalPesos);
+      const srvTax = Number(data.order.tax_amount ?? ivaPesos);
+      const srvTotal = Number(data.order.total_amount ?? totalConIva);
+      const fmtSub = srvSub.toLocaleString('es-MX');
+      const fmtTax = srvTax.toLocaleString('es-MX');
+      const fmtTotal = srvTotal.toLocaleString('es-MX');
+
+      const mpUrl = data.mercadopago?.init_point || '';
+      if (mpUrl) {
+        const wrap = document.getElementById('checkout-mp-cta-wrap');
+        const link = document.getElementById('btn-mp-pay-now');
+        if (link) {
+          link.setAttribute('href', mpUrl);
+          link.textContent = `Ir a Pagar en Mercado Pago ($${fmtTotal} MXN) ↗`;
+        }
+        if (wrap) {
+          wrap.classList.remove('hidden');
+          wrap.removeAttribute('hidden');
+        }
+        setFeedback(
+          'checkout-feedback',
+          `¡Pedido ${orderCode} listo para pago! Subtotal: $${fmtSub} + IVA (16%): $${fmtTax} = Total: $${fmtTotal} MXN. Haz clic en el botón azul para completar tu pago en Mercado Pago.`,
+          true
+        );
+      } else {
+        setFeedback(
+          'checkout-feedback',
+          `¡Pedido ${orderCode} registrado! Subtotal: $${fmtSub} + IVA (16%): $${fmtTax} = Total: $${fmtTotal} MXN.`,
+          true
+        );
+      }
 
       const box = document.getElementById('chat-messages');
       if (box) {
         const bubble = document.createElement('div');
         bubble.className = 'chat-bubble assistant';
-        bubble.innerHTML = `<strong>${escapeHtml(provisionedInstance.display_name || 'ServiBot')} · Pedido ${escapeHtml(orderCode)}</strong><br />¡Gracias! Tu solicitud por <strong>$${Number(data.order.total_amount).toLocaleString('es-MX')} pesos más impuestos</strong> quedó registrada (${addonLabels || 'solo ServiBot configurado'}). Puedes seguir probando aquí mismo cómo atiendo a tus clientes.`;
+        const mpHtml = mpUrl
+          ? `<br /><a href="${escapeHtml(mpUrl)}" target="_blank" rel="noopener noreferrer" style="color: #8cc8ff; font-weight: 700; text-decoration: underline;">Pagar $${escapeHtml(fmtTotal)} MXN en Mercado Pago ↗</a>`
+          : '';
+        bubble.innerHTML = `<strong>${escapeHtml(provisionedInstance.display_name || 'ServiBot')} · Pedido ${escapeHtml(orderCode)}</strong><br />Subtotal: <strong>$${escapeHtml(fmtSub)}</strong> + IVA México (16%): <strong>$${escapeHtml(fmtTax)}</strong> = <strong>$${escapeHtml(fmtTotal)} MXN</strong> (${addonLabels || 'solo ServiBot configurado'}).${mpHtml}`;
         box.appendChild(bubble);
         box.scrollTop = box.scrollHeight;
       }
 
       await refreshHealth();
     } catch (err) {
-      setFeedback('checkout-feedback', `Error al registrar el pedido: ${err.message}`, false);
+      setFeedback('checkout-feedback', `Error al generar orden de pago: ${err.message}`, false);
     } finally {
       if (btn) {
         btn.disabled = false;
@@ -2190,11 +2253,59 @@ function setupEventListeners() {
   });
 }
 
+function handleMercadoPagoReturn() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const mpStatus = params.get('mp_status') || params.get('collection_status') || '';
+    const orderCode = params.get('order') || params.get('external_reference') || '';
+    if (!mpStatus) return;
+
+    const statusMap = {
+      approved: {
+        ok: true,
+        msg: `✅ ¡Pago aprobado en Mercado Pago${orderCode ? ` para el pedido ${orderCode}` : ''}! Tu ServiBot está listo para activarse.`
+      },
+      pending: {
+        ok: true,
+        msg: `⏳ Pago en proceso en Mercado Pago${orderCode ? ` (${orderCode})` : ''}. En cuanto se acredite te notificaremos.`
+      },
+      in_process: {
+        ok: true,
+        msg: `⏳ Pago en revisión en Mercado Pago${orderCode ? ` (${orderCode})` : ''}.`
+      },
+      failure: {
+        ok: false,
+        msg: `El pago en Mercado Pago no se completó${orderCode ? ` (${orderCode})` : ''}. Puedes volver a intentarlo desde el checkout.`
+      }
+    };
+
+    const info = statusMap[mpStatus];
+    if (!info) return;
+
+    goToSlide(3, { instant: true });
+    goToWizardStep(3);
+    toggleCheckoutPanel(true);
+    setFeedback('checkout-feedback', info.msg, info.ok);
+
+    const box = document.getElementById('chat-messages');
+    if (box) {
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-bubble assistant';
+      bubble.textContent = info.msg;
+      box.appendChild(bubble);
+      box.scrollTop = box.scrollHeight;
+    }
+  } catch {
+    // ignore URL parse issues
+  }
+}
+
 // Inicialización
 (async () => {
   await resolveInitialApiBase();
   setupEventListeners();
   await Promise.all([loadClientProvisionedInstance({ populateForm: true }), loadPublicCatalog()]);
+  handleMercadoPagoReturn();
   await refreshHealth();
   setInterval(refreshHealth, 12000);
   setInterval(() => {
