@@ -46,17 +46,33 @@ if (!('closedBy' in HTMLDialogElement.prototype)) {
 
 let API_BASE = '';
 let currentUser = null;
+let currentAdminMeta = null;
+let adminSelectedInstanceId = 'servibot-00';
 let activeView = 'public';
 let activeAdminTab = 'tab-catalog';
 let catalogCache = [];
+let promotionsCache = [];
+let rulesCache = [];
+let vipCache = [];
 let clientInstanceId = localStorage.getItem('servibot_client_instance_id') || '';
-let activeChatInstanceId = clientInstanceId || 'servibot-01';
+let activeChatInstanceId = clientInstanceId || 'servibot-00';
 let provisionedInstance = null;
 let activeBotMode = 'official';
 let mobileSimTriggerEl = null;
 let wizardCurrentStep = 1;
 let webSenderId = localStorage.getItem('servibot_sender_id') || `web-${Math.floor(10000 + Math.random() * 90000)}`;
 localStorage.setItem('servibot_sender_id', webSenderId);
+
+function buildAdminEndpoint(endpoint) {
+  if (!currentAdminMeta?.is_superadmin || !adminSelectedInstanceId) return endpoint;
+  const sep = endpoint.includes('?') ? '&' : '?';
+  return `${endpoint}${sep}instance_id=${encodeURIComponent(adminSelectedInstanceId)}`;
+}
+
+function getSelectedAdminInstanceId() {
+  if (currentAdminMeta?.is_superadmin) return adminSelectedInstanceId || 'servibot-00';
+  return currentAdminMeta?.assigned_instance_id || 'servibot-01';
+}
 
 // ==================== CONEXIÓN CON BACKEND ====================
 async function isBackendReachable(baseUrl, timeoutMs = 2200) {
@@ -80,16 +96,18 @@ async function resolveInitialApiBase() {
     return;
   }
 
-  // 1) Intentar backend local en la misma máquina
-  if (await isBackendReachable('http://localhost:10000', 2000)) {
+  const isLocalHostPage = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+  // 1) En servidor dev local, intentar backend local primero
+  if (isLocalHostPage && (await isBackendReachable('http://localhost:10000', 1800))) {
     API_BASE = 'http://localhost:10000';
     syncApiOverrideInput();
     return;
   }
 
-  // 2) Intentar override manual guardado en este navegador si sigue activo
+  // 2) Intentar override manual guardado (excluyendo localhost si estamos en Hosting público)
   const savedBase = (localStorage.getItem('servibot_api_base') || '').trim().replace(/\/+$/, '');
-  if (savedBase) {
+  if (savedBase && (isLocalHostPage || !savedBase.includes('localhost'))) {
     if (await isBackendReachable(savedBase, 2500)) {
       API_BASE = savedBase;
       syncApiOverrideInput();
@@ -98,7 +116,7 @@ async function resolveInitialApiBase() {
     localStorage.removeItem('servibot_api_base');
   }
 
-  // 3) Leer URL vigente del túnel Cloudflare publicada en Hosting
+  // 3) Leer URL vigente del servidor remoto publicada en Hosting (/runtime-backend.json)
   try {
     const rt = await fetch('/runtime-backend.json', { cache: 'no-store' });
     if (rt.ok) {
@@ -113,7 +131,13 @@ async function resolveInitialApiBase() {
     // ignorar error de runtime-backend.json
   }
 
-  API_BASE = 'http://localhost:10000';
+  if (await isBackendReachable('http://localhost:10000', 1500)) {
+    API_BASE = 'http://localhost:10000';
+    syncApiOverrideInput();
+    return;
+  }
+
+  API_BASE = 'https://dqo1j67xmphbf.cloudfront.net';
   syncApiOverrideInput();
 }
 
@@ -149,9 +173,13 @@ async function apiFetch(endpoint, options = {}) {
 
   const text = await res.text();
   try {
-    return JSON.parse(text);
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object' && parsed.statusCode == null) {
+      parsed.statusCode = res.status;
+    }
+    return parsed;
   } catch {
-    return { ok: false, error: text || `Error HTTP ${res.status}` };
+    return { ok: false, statusCode: res.status, error: text || `Error HTTP ${res.status}` };
   }
 }
 
@@ -809,14 +837,18 @@ function syncSimulatorHeaderLabel(inst = provisionedInstance) {
   const chatInput = document.getElementById('chat-input');
 
   const hasCustom = Boolean(
-    inst && inst.instance_id && inst.business_name && !String(inst.business_name).startsWith('Espacio Disponible')
+    inst &&
+      inst.instance_id &&
+      !inst.locked_for_public &&
+      inst.business_name &&
+      !String(inst.business_name).startsWith('Espacio Disponible')
   );
   if (!hasCustom && activeBotMode === 'custom') {
     activeBotMode = 'official';
   }
 
   const isCustom = activeBotMode === 'custom' && hasCustom;
-  activeChatInstanceId = isCustom ? inst.instance_id : 'servibot-01';
+  activeChatInstanceId = isCustom ? inst.instance_id : 'servibot-00';
 
   if (panel) panel.dataset.botMode = isCustom ? 'custom' : 'official';
   if (fabBtn) fabBtn.dataset.botMode = isCustom ? 'custom' : 'official';
@@ -1035,6 +1067,18 @@ function populateWizardForm(inst) {
   setVal('cfg-ai-soul', inst.ai_soul || '');
   setVal('cfg-system-prompt', inst.system_prompt || '');
   setVal('cfg-welcome-message', inst.welcome_message || '');
+
+  const productsText = Array.isArray(inst.catalog)
+    ? inst.catalog
+        .map((item) => {
+          const parts = [String(item.title || '').trim(), item.price != null ? String(item.price) : '0'];
+          if (item.description) parts.push(String(item.description).trim());
+          return parts.join(' | ');
+        })
+        .filter(Boolean)
+        .join('\n')
+    : (inst.initial_products || '');
+  setVal('cfg-initial-products', productsText);
   updateWizardLivePreview();
 }
 
@@ -1179,16 +1223,76 @@ function validateWizardStep1() {
   return true;
 }
 
+function clearLockedWizardBanner() {
+  const banner = document.getElementById('wizard-locked-banner');
+  const createdCard = document.getElementById('wizard-created-card');
+  const pricingCard = document.getElementById('wizard-pricing-card');
+  if (banner) {
+    banner.classList.add('hidden');
+    banner.setAttribute('hidden', '');
+  }
+  if (createdCard) {
+    createdCard.classList.remove('hidden');
+    createdCard.removeAttribute('hidden');
+  }
+  if (pricingCard) {
+    pricingCard.classList.remove('hidden');
+    pricingCard.removeAttribute('hidden');
+  }
+}
+
+function renderLockedWizardState(instOrLock) {
+  const banner = document.getElementById('wizard-locked-banner');
+  const titleEl = document.getElementById('wizard-locked-title');
+  const descEl = document.getElementById('wizard-locked-desc');
+  const createdCard = document.getElementById('wizard-created-card');
+  const pricingCard = document.getElementById('wizard-pricing-card');
+
+  const instId = instOrLock?.instance_id || clientInstanceId || '';
+  const exp = instOrLock?.subscription_expires_at || '';
+  const expText = exp ? ` · Vigencia hasta ${new Date(exp).toLocaleDateString('es-MX')}` : '';
+
+  if (titleEl) {
+    titleEl.textContent = `🔒 Instancia ${instId || 'Contratada'} Bloqueada · Plan Mensual (30 Días Naturales${expText})`;
+  }
+  if (descEl) {
+    descEl.textContent =
+      instOrLock?.message ||
+      'Esta instancia ya realizó su pago y quedó bloqueada e inaccesible para edición o chat en la interfaz pública. Inicia sesión en tu Panel Admin Estándar para administrarla.';
+  }
+
+  if (banner) {
+    banner.classList.remove('hidden');
+    banner.removeAttribute('hidden');
+  }
+  if (createdCard) {
+    createdCard.classList.add('hidden');
+    createdCard.setAttribute('hidden', '');
+  }
+  if (pricingCard) {
+    pricingCard.classList.add('hidden');
+    pricingCard.setAttribute('hidden', '');
+  }
+
+  activeBotMode = 'official';
+  activeChatInstanceId = 'servibot-00';
+  provisionedInstance = null;
+  syncSimulatorHeaderLabel(null);
+}
+
 function resetWizardForNewBot() {
   clientInstanceId = '';
   provisionedInstance = null;
-  activeChatInstanceId = 'servibot-01';
+  activeChatInstanceId = 'servibot-00';
   localStorage.removeItem('servibot_client_instance_id');
+  clearLockedWizardBanner();
 
   const form = document.getElementById('servibot-wizard-form');
   form?.reset();
   const idInput = document.getElementById('cfg-instance-id');
   if (idInput) idInput.value = '';
+  const initProdInput = document.getElementById('cfg-initial-products');
+  if (initProdInput) initProdInput.value = '';
 
   ['cfg-tone', 'cfg-ai-soul', 'cfg-system-prompt', 'cfg-welcome-message'].forEach((id) => {
     const el = document.getElementById(id);
@@ -1210,6 +1314,7 @@ function resetWizardForNewBot() {
   setFeedback('wizard-step-1-error', '');
   setFeedback('instance-save-status', '');
   setFeedback('checkout-feedback', '');
+  setFeedback('wizard-recover-status', '');
   resetCheckoutMpCta();
   toggleCheckoutPanel(false);
   updateCheckoutPricing();
@@ -1221,8 +1326,9 @@ function resetWizardForNewBot() {
 
 async function loadClientProvisionedInstance({ populateForm = true } = {}) {
   if (!clientInstanceId) {
+    clearLockedWizardBanner();
     activeBotMode = 'official';
-    activeChatInstanceId = 'servibot-01';
+    activeChatInstanceId = 'servibot-00';
     syncSimulatorHeaderLabel(null);
     if (populateForm) {
       updateWizardLivePreview();
@@ -1234,37 +1340,55 @@ async function loadClientProvisionedInstance({ populateForm = true } = {}) {
 
   try {
     const data = await apiFetch(`/api/instances/${encodeURIComponent(clientInstanceId)}`);
-    if (!data.ok || !data.instance) {
+    if (!data.ok || (!data.instance && !data.locked)) {
       throw new Error('Instancia previa no disponible');
     }
+
+    if (data.locked || data.instance?.locked_for_public) {
+      renderLockedWizardState(data.locked ? data : data.instance);
+      if (populateForm) {
+        goToWizardStep(3);
+      }
+      return;
+    }
+
     const inst = data.instance;
     const isUnconfigured =
       String(inst.business_name || '').startsWith('Espacio Disponible') && !String(inst.client_name || '').trim();
     if (isUnconfigured) {
       clientInstanceId = '';
       localStorage.removeItem('servibot_client_instance_id');
+      clearLockedWizardBanner();
       activeBotMode = 'official';
-      activeChatInstanceId = 'servibot-01';
+      activeChatInstanceId = 'servibot-00';
       syncSimulatorHeaderLabel(null);
       return;
     }
 
-    provisionedInstance = inst;
+    clearLockedWizardBanner();
+    const enriched = { ...inst, catalog: Array.isArray(data.catalog) ? data.catalog : inst.catalog };
+    provisionedInstance = enriched;
     activeBotMode = 'custom';
     activeChatInstanceId = inst.instance_id;
-    syncSimulatorHeaderLabel(inst);
-    renderWizardSummary(inst);
+    syncSimulatorHeaderLabel(enriched);
+    renderWizardSummary(enriched);
     updateCheckoutPricing();
 
     if (populateForm) {
-      populateWizardForm(inst);
+      populateWizardForm(enriched);
       goToWizardStep(3);
     }
-  } catch {
+  } catch (err) {
+    if (err?.status === 423 || err?.payload?.locked) {
+      renderLockedWizardState(err.payload || { instance_id: clientInstanceId, message: err.message });
+      if (populateForm) goToWizardStep(3);
+      return;
+    }
     clientInstanceId = '';
     localStorage.removeItem('servibot_client_instance_id');
+    clearLockedWizardBanner();
     activeBotMode = 'official';
-    activeChatInstanceId = 'servibot-01';
+    activeChatInstanceId = 'servibot-00';
     syncSimulatorHeaderLabel(null);
   }
 }
@@ -1383,12 +1507,31 @@ async function sendChatMessage(text) {
       method: 'POST',
       body: JSON.stringify({
         channel: 'web',
-        instance_id: activeChatInstanceId || 'servibot-01',
+        instance_id: activeChatInstanceId || 'servibot-00',
         sender_id: webSenderId,
         sender_name: 'Prospecto Web',
         message: text
       })
     });
+
+    if (res?.locked || res?.statusCode === 423) {
+      renderLockedWizardState(res);
+      appendChatBubble(
+        'assistant',
+        `🔒 ${res.message || res.error || 'Esta instancia ya realizó su pago y quedó bloqueada en la vista pública. Adminístrala desde tu Panel Admin Estándar.'}`,
+        'official'
+      );
+      return;
+    }
+
+    if ((res?.blacklisted || res?.omitted) && !res?.reply) {
+      return;
+    }
+
+    if (res && res.ok === false && res.error) {
+      appendChatBubble('assistant', `⚠️ ${res.error}`);
+      return;
+    }
 
     appendChatBubble('assistant', res.reply || 'Gracias por tu mensaje.');
     if (res.order_created) {
@@ -1466,6 +1609,124 @@ function mapFirebaseAuthError(err) {
 }
 
 // ==================== FIREBASE AUTH & PANEL ADMIN ====================
+function syncAdminRoleUI(meData) {
+  currentAdminMeta = meData || null;
+  const isSuper = Boolean(meData?.is_superadmin);
+
+  document.querySelectorAll('[data-superadmin-only="1"]').forEach((el) => {
+    const hide = !isSuper;
+    el.classList.toggle('hidden', hide);
+    if (hide) el.setAttribute('hidden', '');
+    else el.removeAttribute('hidden');
+  });
+
+  if (!isSuper && activeAdminTab === 'tab-accounts') {
+    activeAdminTab = 'tab-catalog';
+  }
+
+  const banner = document.getElementById('admin-role-banner');
+  const roleBadge = document.getElementById('admin-role-badge');
+  const instLabel = document.getElementById('admin-instance-label');
+  const expiryBadge = document.getElementById('admin-expiry-badge');
+  const superControls = document.getElementById('admin-super-controls');
+  const switcher = document.getElementById('admin-instance-switcher');
+  const accInstSelect = document.getElementById('account-instance-select');
+
+  ['email-config-form', 'teams-config-form', 'tunnel-token-input', 'admin-api-override'].forEach((id) => {
+    const card = document.getElementById(id)?.closest('.panel-card');
+    if (card) {
+      const hideCard = !isSuper;
+      card.classList.toggle('hidden', hideCard);
+      if (hideCard) card.setAttribute('hidden', '');
+      else card.removeAttribute('hidden');
+    }
+  });
+
+  if (!meData) {
+    if (banner) {
+      banner.classList.add('hidden');
+      banner.setAttribute('hidden', '');
+    }
+    return;
+  }
+
+  if (banner) {
+    banner.classList.remove('hidden');
+    banner.removeAttribute('hidden');
+  }
+
+  if (isSuper) {
+    if (!adminSelectedInstanceId) {
+      adminSelectedInstanceId = 'servibot-00';
+    }
+    if (roleBadge) {
+      roleBadge.textContent = `👑 SuperAdmin · ${meData.email || 'fraustop@outlook.com'}`;
+    }
+    if (superControls) {
+      superControls.classList.remove('hidden');
+      superControls.removeAttribute('hidden');
+    }
+    const instances = Array.isArray(meData.instances) ? meData.instances : [];
+    const optionsHtml = instances.length
+      ? instances
+          .map((inst) => {
+            const label =
+              inst.instance_id === 'servibot-00'
+                ? 'servibot-00 · Bot 0 (Proyecto Cero Principal)'
+                : `${inst.instance_id} · ${inst.business_name || inst.slot_status || 'Disponible'}`;
+            return `<option value="${escapeHtml(inst.instance_id)}" ${
+              inst.instance_id === adminSelectedInstanceId ? 'selected' : ''
+            }>${escapeHtml(label)}</option>`;
+          })
+          .join('')
+      : '<option value="servibot-00">servibot-00 · Bot 0 (Principal)</option>';
+
+    if (switcher) {
+      switcher.innerHTML = optionsHtml;
+      switcher.value = adminSelectedInstanceId;
+    }
+    if (accInstSelect) {
+      accInstSelect.innerHTML = optionsHtml;
+    }
+    if (instLabel) {
+      instLabel.textContent = `Base activa en panel: ${adminSelectedInstanceId}`;
+    }
+    if (expiryBadge) {
+      expiryBadge.classList.add('hidden');
+      expiryBadge.setAttribute('hidden', '');
+    }
+  } else {
+    adminSelectedInstanceId = meData.assigned_instance_id || 'servibot-01';
+    if (roleBadge) {
+      roleBadge.textContent = `🤖 Admin Estándar · ${meData.email || ''}`;
+    }
+    if (superControls) {
+      superControls.classList.add('hidden');
+      superControls.setAttribute('hidden', '');
+    }
+    const biz = meData.instance?.business_name ? ` · ${meData.instance.business_name}` : '';
+    if (instLabel) {
+      instLabel.textContent = `Instancia aislada: ${adminSelectedInstanceId}${biz}`;
+    }
+    if (expiryBadge) {
+      expiryBadge.classList.remove('hidden');
+      expiryBadge.removeAttribute('hidden');
+      if (meData.subscription_expired) {
+        expiryBadge.textContent = '⛔ Suscripción de 30 días vencida (solo lectura)';
+        expiryBadge.className = 'badge-tag badge-status-dot-hidden';
+      } else if (meData.subscription_expires_at) {
+        const msLeft = new Date(meData.subscription_expires_at).getTime() - Date.now();
+        const daysLeft = Math.max(0, Math.ceil(msLeft / 86400000));
+        expiryBadge.textContent = `⏳ Vigencia: ${daysLeft} días restantes`;
+        expiryBadge.className = 'badge-tag badge-status-dot-active';
+      } else {
+        expiryBadge.textContent = '⏳ Plan mensual (30 días naturales)';
+        expiryBadge.className = 'badge-tag badge-tag-accent';
+      }
+    }
+  }
+}
+
 onAuthStateChanged(auth, async (user) => {
   // Rechazar sesiones anónimas heredadas; el acceso Admin exige cuenta con correo y contraseña
   if (user && (user.isAnonymous || !user.email)) {
@@ -1479,13 +1740,30 @@ onAuthStateChanged(auth, async (user) => {
   const dash = document.getElementById('admin-dashboard');
 
   if (user) {
+    const me = await apiFetch('/api/admin/me');
+    if (!me?.ok || me?.statusCode === 403) {
+      currentAdminMeta = null;
+      adminSelectedInstanceId = '';
+      currentUser = null;
+      await signOut(auth).catch(() => {});
+      gate?.classList.remove('hidden');
+      dash?.classList.add('hidden');
+      setFeedback('auth-status-msg', me?.error || 'Esta cuenta no tiene acceso habilitado al panel Admin.', false);
+      syncHeaderAndNavigation();
+      return;
+    }
+
     gate?.classList.add('hidden');
     dash?.classList.remove('hidden');
     setFeedback('auth-status-msg', '');
+    syncAdminRoleUI(me);
     syncHeaderAndNavigation();
     switchAdminTab(activeAdminTab);
     await loadAllAdminData();
   } else {
+    currentAdminMeta = null;
+    adminSelectedInstanceId = '';
+    syncAdminRoleUI(null);
     gate?.classList.remove('hidden');
     dash?.classList.add('hidden');
     syncHeaderAndNavigation();
@@ -1494,84 +1772,276 @@ onAuthStateChanged(auth, async (user) => {
 
 async function loadAllAdminData() {
   if (!currentUser) return;
-  await Promise.all([
+  const tasks = [
     loadAdminCatalog(),
+    loadAdminPromotions(),
+    loadAdminContactRules(),
     loadAdminOrders(),
     loadAdminSettings(),
     loadWhatsAppStatus(),
     loadAdminConversations(),
-    loadAdminAccounts(),
     refreshHealth()
-  ]);
+  ];
+  if (currentAdminMeta?.is_superadmin) {
+    tasks.push(loadAdminAccounts(), loadAdminVipInstances(), loadAdminProspects());
+  }
+  await Promise.all(tasks);
+}
+
+let adminCatalogCache = [];
+let selectedCatalogItemId = null;
+
+function resetCatalogForm() {
+  const form = document.getElementById('catalog-form');
+  if (form) form.reset();
+  const idEl = document.getElementById('item-id');
+  if (idEl) idEl.value = '';
+  const imgUrl = document.getElementById('item-image-url');
+  if (imgUrl) imgUrl.value = '/assets/service-bots.svg';
+  const activeChk = document.getElementById('item-active');
+  if (activeChk) activeChk.checked = true;
+  const sentBotChk = document.getElementById('item-sent-to-bot');
+  if (sentBotChk) sentBotChk.checked = true;
+  const title = document.getElementById('catalog-form-title');
+  if (title) title.textContent = '➕ Crear Producto / Servicio';
+}
+
+function openCatalogModal(mode = 'create', item = null) {
+  const modal = document.getElementById('catalog-modal');
+  const titleEl = document.getElementById('catalog-form-title');
+  if (!modal) return;
+
+  if (mode === 'edit' && item) {
+    document.getElementById('item-id').value = item.id;
+    document.getElementById('item-name').value = item.name || '';
+    document.getElementById('item-type').value = item.type || 'service';
+    document.getElementById('item-badge').value = item.badge || '';
+    document.getElementById('item-price').value = item.price || 0;
+    document.getElementById('item-currency').value = item.currency || 'MXN';
+    document.getElementById('item-cycle').value = item.billing_cycle || 'mensual';
+    document.getElementById('item-setup').value = item.setup_fee || 0;
+    document.getElementById('item-tagline').value = item.tagline || '';
+    document.getElementById('item-description').value = item.description || '';
+    document.getElementById('item-features').value = (item.features || []).join('\n');
+    document.getElementById('item-image-url').value = item.image_url || '/assets/service-bots.svg';
+    document.getElementById('item-active').checked = Boolean(item.active);
+    const sentBotChk = document.getElementById('item-sent-to-bot');
+    if (sentBotChk) sentBotChk.checked = Boolean(item.sent_to_bot);
+    if (titleEl) titleEl.textContent = `✏️ Editar: ${item.name}`;
+  } else {
+    resetCatalogForm();
+    if (titleEl) titleEl.textContent = '➕ Crear Producto / Servicio';
+  }
+
+  if (typeof modal.showModal === 'function') {
+    modal.showModal();
+  }
+}
+
+function renderProductDetail(item) {
+  const emptyState = document.getElementById('catalog-detail-empty');
+  const detailView = document.getElementById('catalog-detail-view');
+  if (!emptyState || !detailView) return;
+
+  if (!item) {
+    emptyState.classList.remove('hidden');
+    detailView.classList.add('hidden');
+    return;
+  }
+
+  emptyState.classList.add('hidden');
+  detailView.classList.remove('hidden');
+
+  const titleEl = document.getElementById('detail-title');
+  if (titleEl) titleEl.textContent = item.name || 'Sin nombre';
+
+  const taglineEl = document.getElementById('detail-tagline');
+  if (taglineEl) {
+    taglineEl.textContent = item.tagline || '';
+    taglineEl.style.display = item.tagline ? 'block' : 'none';
+  }
+
+  const typeBadge = document.getElementById('detail-type-badge');
+  if (typeBadge) {
+    typeBadge.textContent = item.type === 'product' ? '📦 Producto' : '⚙️ Servicio';
+    typeBadge.className = `badge-tag ${item.type === 'product' ? 'badge-tag-purple' : 'badge-tag-accent'}`;
+  }
+
+  const statusBadge = document.getElementById('detail-status-badge');
+  if (statusBadge) {
+    statusBadge.textContent = item.active ? '🟢 Activo en Tienda' : '⚪ Oculto';
+    statusBadge.className = `badge-tag ${item.active ? 'badge-status-dot-active' : 'badge-status-dot-hidden'}`;
+  }
+
+  const botBadge = document.getElementById('detail-bot-badge');
+  if (botBadge) {
+    botBadge.textContent = item.sent_to_bot ? '🤖 Enviado al Bot' : 'Solo interfaz';
+    botBadge.className = `badge-tag ${item.sent_to_bot ? 'badge-tag-custom' : 'badge-status-dot-hidden'}`;
+  }
+
+  const sendBotBtn = document.getElementById('btn-send-selected-to-bot');
+  if (sendBotBtn) {
+    sendBotBtn.textContent = item.sent_to_bot ? '✅ En Bot (Reenviar)' : '🤖 Enviar a mi Bot';
+  }
+
+  const highlightBadge = document.getElementById('detail-highlight-badge');
+  if (highlightBadge) {
+    if (item.badge) {
+      highlightBadge.textContent = `★ ${item.badge}`;
+      highlightBadge.classList.remove('hidden');
+    } else {
+      highlightBadge.classList.add('hidden');
+    }
+  }
+
+  const imgEl = document.getElementById('detail-image');
+  if (imgEl) {
+    imgEl.src = resolveAssetUrl(item.image_url || '/assets/service-bots.svg');
+    imgEl.alt = item.name;
+  }
+
+  const priceEl = document.getElementById('detail-price');
+  if (priceEl) priceEl.textContent = `$${Number(item.price).toLocaleString('es-MX')}`;
+
+  const currencyCycleEl = document.getElementById('detail-currency-cycle');
+  if (currencyCycleEl) currencyCycleEl.textContent = `${escapeHtml(item.currency || 'MXN')} / ${escapeHtml(item.billing_cycle || 'mensual')}`;
+
+  const setupRow = document.getElementById('detail-setup-row');
+  const setupText = document.getElementById('detail-setup-text');
+  if (setupRow && setupText) {
+    if (Number(item.setup_fee) > 0) {
+      setupRow.classList.remove('hidden');
+      setupText.textContent = `+ $${Number(item.setup_fee).toLocaleString('es-MX')} ${escapeHtml(item.currency || 'MXN')} activación inicial`;
+    } else {
+      setupRow.classList.remove('hidden');
+      setupText.textContent = 'Activación inmediata incluida';
+    }
+  }
+
+  const slugEl = document.getElementById('detail-slug');
+  if (slugEl) slugEl.textContent = item.slug || String(item.id);
+
+  const descEl = document.getElementById('detail-description');
+  if (descEl) descEl.textContent = item.description || 'Sin descripción detallada.';
+
+  const featsList = document.getElementById('detail-features-list');
+  const featsSection = document.getElementById('detail-features-section');
+  if (featsList) {
+    const feats = item.features || [];
+    if (feats.length) {
+      if (featsSection) featsSection.classList.remove('hidden');
+      featsList.innerHTML = feats
+        .map((f) => `<li><span class="feat-check" aria-hidden="true">✔</span><span>${escapeHtml(f)}</span></li>`)
+        .join('');
+    } else {
+      if (featsSection) featsSection.classList.add('hidden');
+      featsList.innerHTML = '';
+    }
+  }
+}
+
+function renderAdminCatalogList(filterTerm = '') {
+  const list = document.getElementById('admin-catalog-list');
+  if (!list) return;
+
+  let items = adminCatalogCache;
+  if (filterTerm) {
+    const term = filterTerm.toLowerCase();
+    items = items.filter(
+      (it) =>
+        (it.name && it.name.toLowerCase().includes(term)) ||
+        (it.type && it.type.toLowerCase().includes(term)) ||
+        (it.tagline && it.tagline.toLowerCase().includes(term)) ||
+        (it.slug && it.slug.toLowerCase().includes(term))
+    );
+  }
+
+  if (!items.length) {
+    list.innerHTML = `
+      <div class="product-list-empty-msg">
+        ${filterTerm ? 'No se encontraron resultados para tu búsqueda.' : 'No hay productos o servicios registrados. Haz clic en "➕ Nuevo Producto" para crear uno.'}
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = items
+    .map((item) => {
+      const isSelected = item.id === selectedCatalogItemId;
+      return `
+        <div class="product-list-card ${isSelected ? 'active' : ''}" role="option" aria-selected="${isSelected ? 'true' : 'false'}" data-id="${item.id}" tabindex="0">
+          <img class="product-list-card-thumb" src="${escapeHtml(resolveAssetUrl(item.image_url))}" alt="${escapeHtml(item.name)}" loading="lazy" />
+          <div class="product-list-card-body">
+            <div class="product-list-card-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+            <div class="product-list-card-meta">
+              <span class="product-list-card-price">$${Number(item.price).toLocaleString('es-MX')} ${escapeHtml(item.currency)}</span>
+              <span>·</span>
+              <span class="product-list-card-cycle">${escapeHtml(item.billing_cycle)}</span>
+              ${item.sent_to_bot ? '<span class="badge-tag badge-tag-custom" style="margin-left:0.25rem; font-size:0.7rem;">🤖 Bot</span>' : ''}
+            </div>
+          </div>
+          <span class="badge-tag ${item.active ? 'badge-status-dot-active' : 'badge-status-dot-hidden'}">${item.active ? 'Activo' : 'Oculto'}</span>
+        </div>
+      `;
+    })
+    .join('');
+
+  list.querySelectorAll('.product-list-card').forEach((card) => {
+    const handleSelect = () => {
+      const id = Number(card.dataset.id);
+      selectedCatalogItemId = id;
+      list.querySelectorAll('.product-list-card').forEach((c) => {
+        const isCur = Number(c.dataset.id) === id;
+        c.classList.toggle('active', isCur);
+        c.setAttribute('aria-selected', isCur ? 'true' : 'false');
+      });
+      const selectedItem = adminCatalogCache.find((it) => it.id === id);
+      renderProductDetail(selectedItem || null);
+    };
+
+    card.addEventListener('click', handleSelect);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleSelect();
+      }
+    });
+  });
 }
 
 async function loadAdminCatalog() {
   const list = document.getElementById('admin-catalog-list');
   if (!list) return;
-  const data = await apiFetch('/api/catalog?all=1');
-  const items = data.items || [];
+  const data = await apiFetch(buildAdminEndpoint('/api/catalog?all=1'));
+  adminCatalogCache = data.items || [];
 
-  list.innerHTML = items
-    .map(
-      (item) => `
-      <article class="card">
-        <img src="${escapeHtml(resolveAssetUrl(item.image_url))}" alt="${escapeHtml(item.name)}" />
-        <header>
-          <div class="card-meta-row">
-            <span class="badge-tag">${item.active ? '🟢 Activo' : '⚪ Oculto'}</span>
-            <span class="badge-tag">${escapeHtml(item.slug)}</span>
-          </div>
-          <h3>${escapeHtml(item.name)}</h3>
-          <p class="tagline">$${Number(item.price).toLocaleString('es-MX')} ${escapeHtml(item.currency)} / ${escapeHtml(item.billing_cycle)}</p>
-        </header>
-        <div class="card-content">
-          <p style="margin:0; font-size:0.86rem; color:var(--text-muted);">${escapeHtml(item.description)}</p>
-        </div>
-        <footer>
-          <button type="button" class="btn btn-outline btn-sm btn-edit-cat" data-id="${item.id}">✏️ Editar</button>
-          <button type="button" class="btn btn-danger btn-sm btn-del-cat" data-id="${item.id}">🗑️ Eliminar</button>
-        </footer>
-      </article>
-    `
-    )
-    .join('');
+  const countBadge = document.getElementById('catalog-items-count');
+  if (countBadge) {
+    countBadge.textContent = `${adminCatalogCache.length} ${adminCatalogCache.length === 1 ? 'item' : 'items'}`;
+  }
 
-  list.querySelectorAll('.btn-edit-cat').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const item = items.find((i) => i.id === Number(btn.dataset.id));
-      if (!item) return;
-      document.getElementById('item-id').value = item.id;
-      document.getElementById('item-name').value = item.name;
-      document.getElementById('item-type').value = item.type || 'service';
-      document.getElementById('item-badge').value = item.badge || '';
-      document.getElementById('item-price').value = item.price;
-      document.getElementById('item-currency').value = item.currency || 'MXN';
-      document.getElementById('item-cycle').value = item.billing_cycle || 'mensual';
-      document.getElementById('item-setup').value = item.setup_fee || 0;
-      document.getElementById('item-tagline').value = item.tagline || '';
-      document.getElementById('item-description').value = item.description || '';
-      document.getElementById('item-features').value = (item.features || []).join('\n');
-      document.getElementById('item-image-url').value = item.image_url || '/assets/service-bots.svg';
-      document.getElementById('item-active').checked = Boolean(item.active);
-      document.getElementById('catalog-form-title').textContent = `✏️ Editando: ${item.name}`;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-  });
+  const searchInput = document.getElementById('catalog-search-input');
+  const filterTerm = searchInput?.value?.trim() || '';
 
-  list.querySelectorAll('.btn-del-cat').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const id = Number(btn.dataset.id);
-      await apiFetch(`/api/catalog/${id}`, { method: 'DELETE' });
-      await loadAdminCatalog();
-      await loadPublicCatalog();
-    });
-  });
+  renderAdminCatalogList(filterTerm);
+
+  if (selectedCatalogItemId) {
+    const found = adminCatalogCache.find((it) => it.id === selectedCatalogItemId);
+    if (found) {
+      renderProductDetail(found);
+    } else {
+      selectedCatalogItemId = null;
+      renderProductDetail(null);
+    }
+  } else {
+    renderProductDetail(null);
+  }
 }
 
 async function loadAdminOrders() {
   const tbody = document.getElementById('orders-tbody');
   if (!tbody) return;
-  const data = await apiFetch('/api/orders');
+  const data = await apiFetch(buildAdminEndpoint('/api/orders'));
   const orders = data.orders || [];
 
   const headerOrdersCount = document.getElementById('header-orders-count');
@@ -1615,7 +2085,7 @@ async function loadAdminOrders() {
 
   tbody.querySelectorAll('.order-status-select').forEach((sel) => {
     sel.addEventListener('change', async () => {
-      await apiFetch(`/api/orders/${sel.dataset.id}`, {
+      await apiFetch(buildAdminEndpoint(`/api/orders/${sel.dataset.id}`), {
         method: 'PATCH',
         body: JSON.stringify({ status: sel.value })
       });
@@ -1630,7 +2100,7 @@ async function loadWhatsAppStatus() {
   if (!container) return;
 
   try {
-    const data = await apiFetch('/api/channels/whatsapp/status');
+    const data = await apiFetch(buildAdminEndpoint('/api/channels/whatsapp/status'));
     if (badge) badge.textContent = (data.state || 'close').toUpperCase();
 
     if (data.state === 'open') {
@@ -1686,18 +2156,21 @@ async function loadAdminSettings() {
 async function loadAdminConversations() {
   const box = document.getElementById('conversations-list');
   if (!box) return;
-  const data = await apiFetch('/api/conversations');
-  const convs = data.conversations || [];
+  const data = await apiFetch(buildAdminEndpoint('/api/conversations'));
+  const convs = (data.conversations || []).filter((c) => !c.hidden);
   if (!convs.length) {
-    box.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">Sin conversaciones registradas aún.</p>';
+    box.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">Sin conversaciones visibles registradas aún.</p>';
     return;
   }
   box.innerHTML = convs
     .map(
       (c) => `
-      <div style="padding:0.7rem; background:var(--bg-dark); border:1px solid var(--border-color); border-radius:10px;">
-        <div style="display:flex; justify-content:space-between; font-size:0.8rem;">
-          <strong>[${escapeHtml(c.channel.toUpperCase())}] ${escapeHtml(c.sender_name || c.sender_id)}</strong>
+      <div style="padding:0.7rem; background:var(--bg-dark); border:1px solid ${c.is_priority ? 'rgba(250, 204, 21, 0.55)' : 'var(--border-color)'}; border-radius:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; font-size:0.8rem;">
+          <strong>
+            [${escapeHtml(c.channel.toUpperCase())}] ${escapeHtml(c.sender_name || c.sender_id)}
+            ${c.is_priority ? '<span class="badge-tag" style="margin-left:0.35rem; background:rgba(250,204,21,0.18); color:#fde047;">⭐ Lista Blanca</span>' : ''}
+          </strong>
           <span style="color:var(--text-muted);">${escapeHtml(c.updated_at)}</span>
         </div>
         <div style="font-size:0.82rem; color:#cbd5e1; margin-top:0.25rem;">${escapeHtml(c.last_message || '')}</div>
@@ -1710,6 +2183,10 @@ async function loadAdminConversations() {
 async function loadAdminAccounts() {
   const tbody = document.getElementById('accounts-tbody');
   if (!tbody) return;
+  if (!currentAdminMeta?.is_superadmin) {
+    tbody.innerHTML = '';
+    return;
+  }
 
   try {
     const data = await apiFetch('/api/admin/accounts');
@@ -1726,20 +2203,259 @@ async function loadAdminAccounts() {
 
     tbody.innerHTML = accounts
       .map((acc) => {
-        const roleLabel = acc.role === 'operator' ? 'Operador de Ventas' : 'Administrador';
+        const isMaster = acc.role === 'superadmin' || String(acc.email || '').toLowerCase() === 'fraustop@outlook.com';
+        const roleLabel = isMaster
+          ? '👑 SuperAdmin (Bot 0)'
+          : acc.role === 'operator'
+            ? 'Operador'
+            : 'Admin Estándar';
+        const instBadge = acc.assigned_instance_id
+          ? `<span class="badge-tag badge-tag-custom" style="margin-left:0.35rem;">${escapeHtml(acc.assigned_instance_id)}</span>`
+          : '';
+        const expText = acc.subscription_expires_at
+          ? `<div style="font-size:0.74rem; color:var(--text-muted);">Vigencia: ${escapeHtml(new Date(acc.subscription_expires_at).toLocaleDateString('es-MX'))}</div>`
+          : '';
+        const delBtn = !isMaster && acc.uid
+          ? `<button type="button" class="btn btn-outline btn-sm btn-del-account" data-uid="${escapeHtml(acc.uid)}" data-email="${escapeHtml(acc.email)}" style="margin-top:0.3rem; border-color:rgba(244,63,94,0.45); color:#fda4af;">Eliminar</button>`
+          : '';
         return `
           <tr>
             <th scope="row">${escapeHtml(acc.display_name || acc.email)}</th>
-            <td>${escapeHtml(acc.email)}</td>
-            <td><span class="badge-tag">${escapeHtml(roleLabel)}</span></td>
+            <td>${escapeHtml(acc.email)}${expText}</td>
+            <td><span class="badge-tag">${escapeHtml(roleLabel)}</span>${instBadge}</td>
             <td>${escapeHtml(acc.created_by || 'Firebase Auth')}</td>
-            <td style="font-size:0.8rem; color:var(--text-muted);">${escapeHtml(acc.created_at || '—')}</td>
+            <td style="font-size:0.8rem; color:var(--text-muted);">
+              <div>${escapeHtml(acc.created_at || '—')}</div>
+              ${delBtn}
+            </td>
           </tr>
         `;
       })
       .join('');
+
+    tbody.querySelectorAll('.btn-del-account').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(`¿Eliminar la cuenta admin ${btn.dataset.email}?`)) return;
+        await apiFetch(`/api/admin/accounts/${encodeURIComponent(btn.dataset.uid)}`, { method: 'DELETE' });
+        await loadAdminAccounts();
+      });
+    });
   } catch (err) {
     tbody.innerHTML = `<tr><th scope="row">—</th><td colspan="4" style="color:#fda4af;">Error cargando cuentas: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function loadAdminPromotions() {
+  const list = document.getElementById('admin-promotions-list');
+  if (!list) return;
+  try {
+    const data = await apiFetch(buildAdminEndpoint('/api/promotions?all=1'));
+    const promos = data.promotions || [];
+    if (!promos.length) {
+      list.innerHTML = '<p style="color:var(--text-muted); font-size:0.86rem; margin:0;">No hay promociones activas en esta instancia. Crea una nueva arriba si deseas ofrecer descuentos reales en el bot.</p>';
+      return;
+    }
+
+    list.innerHTML = promos
+      .map(
+        (p) => `
+        <div class="promo-item-card" data-promo-id="${p.id}">
+          <div class="promo-item-head">
+            <div>
+              <strong>${escapeHtml(p.title)}</strong>
+              <span class="badge-tag badge-tag-accent" style="margin-left:0.35rem;">${escapeHtml(p.discount_text || 'Promo')}</span>
+              <span class="badge-tag ${p.sent_to_bot ? 'badge-tag-custom' : 'badge-status-dot-hidden'}" style="margin-left:0.25rem;">
+                ${p.sent_to_bot ? '🤖 En Bot' : 'Solo interfaz'}
+              </span>
+            </div>
+            ${p.promo_price != null ? `<strong style="color:var(--accent-emerald);">$${Number(p.promo_price).toLocaleString('es-MX')} MXN</strong>` : ''}
+          </div>
+          ${p.description ? `<p class="promo-item-desc">${escapeHtml(p.description)}</p>` : ''}
+          <div class="promo-item-actions">
+            <button type="button" class="btn btn-outline btn-sm btn-send-promo-bot" data-id="${p.id}">
+              ${p.sent_to_bot ? '✅ Reenviar a mi Bot' : '🤖 Enviar a mi Bot'}
+            </button>
+            <button type="button" class="btn btn-outline btn-sm btn-del-promo" data-id="${p.id}" style="border-color:rgba(244,63,94,0.45); color:#fda4af;">
+              🗑️ Eliminar
+            </button>
+          </div>
+        </div>
+      `
+      )
+      .join('');
+
+    list.querySelectorAll('.btn-send-promo-bot').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        await apiFetch(buildAdminEndpoint(`/api/promotions/${btn.dataset.id}/send-to-bot`), {
+          method: 'POST',
+          body: JSON.stringify({ sent_to_bot: true, active: true })
+        });
+        await loadAdminPromotions();
+      });
+    });
+
+    list.querySelectorAll('.btn-del-promo').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('¿Eliminar esta promoción?')) return;
+        await apiFetch(buildAdminEndpoint(`/api/promotions/${btn.dataset.id}`), { method: 'DELETE' });
+        await loadAdminPromotions();
+      });
+    });
+  } catch (err) {
+    list.innerHTML = `<p style="color:#fda4af; font-size:0.85rem;">Error cargando promociones: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function loadAdminContactRules() {
+  const whiteBox = document.getElementById('rules-whitelist');
+  const omBox = document.getElementById('rules-omission');
+  const blackBox = document.getElementById('rules-blacklist');
+  if (!whiteBox && !omBox && !blackBox) return;
+
+  try {
+    const data = await apiFetch(buildAdminEndpoint('/api/contact-rules'));
+    const rules = data.rules || [];
+    const renderBucket = (type, container, emptyText) => {
+      if (!container) return;
+      const subset = rules.filter((r) => r.list_type === type);
+      if (!subset.length) {
+        container.innerHTML = `<p style="color:var(--text-muted); font-size:0.82rem; margin:0;">${escapeHtml(emptyText)}</p>`;
+        return;
+      }
+      container.innerHTML = subset
+        .map(
+          (r) => `
+          <div class="rule-item-row">
+            <div>
+              <strong>${escapeHtml(r.contact_value)}</strong>
+              ${r.label ? `<div class="rule-item-label">${escapeHtml(r.label)}</div>` : ''}
+            </div>
+            <button type="button" class="btn btn-outline btn-sm btn-del-rule" data-id="${r.id}" aria-label="Quitar regla" style="border-color:rgba(244,63,94,0.45); color:#fda4af;">
+              Quitar
+            </button>
+          </div>
+        `
+        )
+        .join('');
+    };
+
+    renderBucket('whitelist', whiteBox, 'Sin números en Lista Blanca.');
+    renderBucket('omission', omBox, 'Sin contactos en Omisiones.');
+    renderBucket('blacklist', blackBox, 'Sin contactos en Lista Negra.');
+
+    document.querySelectorAll('.btn-del-rule').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        await apiFetch(buildAdminEndpoint(`/api/contact-rules/${btn.dataset.id}`), { method: 'DELETE' });
+        await loadAdminContactRules();
+      });
+    });
+  } catch (err) {
+    if (whiteBox) whiteBox.innerHTML = `<p style="color:#fda4af;">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function loadAdminVipInstances() {
+  const list = document.getElementById('vip-instances-list');
+  if (!list || !currentAdminMeta?.is_superadmin) return;
+  try {
+    const data = await apiFetch('/api/vip-instances');
+    const items = data.vip_instances || [];
+    if (!items.length) {
+      list.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">No hay folios VIP registrados aún.</p>';
+      return;
+    }
+    list.innerHTML = items
+      .map(
+        (v) => `
+        <div class="vip-item-card">
+          <div class="vip-item-head">
+            <div>
+              <span class="badge-tag badge-tag-accent">${escapeHtml(v.folio)}</span>
+              <strong style="margin-left:0.35rem;">${escapeHtml(v.business_name)}</strong>
+            </div>
+            <strong style="color:var(--accent-emerald);">$${Number(v.monthly_price || 0).toLocaleString('es-MX')} MXN/mes</strong>
+          </div>
+          <div class="vip-item-meta">
+            ${v.client_name ? `<span>Titular: ${escapeHtml(v.client_name)}</span>` : ''}
+            ${v.client_contact ? `<span>· ${escapeHtml(v.client_contact)}</span>` : ''}
+            ${v.admin_email ? `<span>· Admin: ${escapeHtml(v.admin_email)}</span>` : ''}
+          </div>
+          <div class="vip-item-links">
+            ${v.server_url ? `<a href="${escapeHtml(v.server_url)}" target="_blank" rel="noopener noreferrer">Servidor Dedicado ↗</a>` : ''}
+            ${v.custom_admin_url ? `<a href="${escapeHtml(v.custom_admin_url)}" target="_blank" rel="noopener noreferrer">Admin Personalizado ↗</a>` : ''}
+          </div>
+          ${v.notes ? `<p style="font-size:0.8rem; color:var(--text-muted); margin:0.35rem 0 0;">${escapeHtml(v.notes)}</p>` : ''}
+          <div style="display:flex; justify-content:flex-end; margin-top:0.5rem;">
+            <button type="button" class="btn btn-outline btn-sm btn-del-vip" data-folio="${escapeHtml(v.folio)}" style="border-color:rgba(244,63,94,0.45); color:#fda4af;">
+              Eliminar VIP
+            </button>
+          </div>
+        </div>
+      `
+      )
+      .join('');
+
+    list.querySelectorAll('.btn-del-vip').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(`¿Eliminar registro VIP ${btn.dataset.folio}?`)) return;
+        await apiFetch(`/api/vip-instances/${encodeURIComponent(btn.dataset.folio)}`, { method: 'DELETE' });
+        await loadAdminVipInstances();
+      });
+    });
+  } catch (err) {
+    list.innerHTML = `<p style="color:#fda4af;">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function loadAdminProspects() {
+  const box = document.getElementById('admin-prospects-list');
+  if (!box || !currentAdminMeta?.is_superadmin) return;
+  try {
+    const data = await apiFetch('/api/prospects');
+    const prospects = data.prospects || [];
+    if (!prospects.length) {
+      box.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">La base de prospectos está vacía (se archivan aquí cuando las 50 instancias rotan sin haber pagado).</p>';
+      return;
+    }
+    box.innerHTML = prospects
+      .map(
+        (p) => `
+        <div class="prospect-item-row">
+          <div>
+            <strong>${escapeHtml(p.business_name || 'Sin empresa')}</strong>
+            <span class="badge-tag" style="margin-left:0.35rem;">${escapeHtml(p.recovery_code || p.prospect_id)}</span>
+            ${p.last_instance_id ? `<span class="badge-tag badge-tag-custom" style="margin-left:0.25rem;">Ex-${escapeHtml(p.last_instance_id)}</span>` : ''}
+            <div style="font-size:0.82rem; color:var(--text-muted); margin-top:0.2rem;">
+              ${escapeHtml(p.client_name || '')} · ${escapeHtml(p.client_contact || '')} · Estado: ${escapeHtml(p.status || 'archived')}
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline btn-sm btn-recover-prospect" data-contact="${escapeHtml(p.client_contact || p.recovery_code || '')}">
+            ♻️ Recuperar en Bot Libre
+          </button>
+        </div>
+      `
+      )
+      .join('');
+
+    box.querySelectorAll('.btn-recover-prospect').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const res = await apiFetch('/api/instances/recover', {
+          method: 'POST',
+          body: JSON.stringify({ query: btn.dataset.contact })
+        });
+        if (res?.ok && res.instance) {
+          clientInstanceId = res.instance.instance_id;
+          localStorage.setItem('servibot_client_instance_id', clientInstanceId);
+          await loadClientProvisionedInstance({ populateForm: true });
+          await loadAdminProspects();
+          alert(`Prospecto restaurado en instancia ${res.instance.instance_id}`);
+        } else {
+          alert(res?.error || 'No se pudo recuperar el prospecto.');
+        }
+      });
+    });
+  } catch (err) {
+    box.innerHTML = `<p style="color:#fda4af;">${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -1867,13 +2583,32 @@ function setupEventListeners() {
     loadAllAdminData();
   });
 
-  // Crear nueva cuenta dentro de Admin (sin cerrar sesión actual)
+  // Selector de Bot / Instancia exclusivo para SuperAdmin (fraustop@outlook.com)
+  document.getElementById('admin-instance-switcher')?.addEventListener('change', async (e) => {
+    adminSelectedInstanceId = e.target.value || 'servibot-00';
+    const instLabel = document.getElementById('admin-instance-label');
+    if (instLabel) instLabel.textContent = `Base activa en panel: ${adminSelectedInstanceId}`;
+    selectedCatalogItemId = null;
+    await Promise.all([
+      loadAdminCatalog(),
+      loadAdminPromotions(),
+      loadAdminContactRules(),
+      loadAdminOrders(),
+      loadWhatsAppStatus(),
+      loadAdminConversations(),
+      refreshHealth()
+    ]);
+  });
+
+  // Crear nueva cuenta dentro de Admin (solo SuperAdmin)
   document.getElementById('create-account-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const displayName = document.getElementById('new-acc-name').value.trim();
     const email = document.getElementById('new-acc-email').value.trim();
     const role = document.getElementById('new-acc-role').value;
     const password = document.getElementById('new-acc-password').value;
+    const assignedInstanceId = document.getElementById('account-instance-select')?.value || 'servibot-01';
+    const subscriptionDays = Number(document.getElementById('account-sub-days')?.value || 30);
     const createBtn = document.getElementById('btn-create-account');
 
     setFeedback('create-account-feedback', '');
@@ -1885,7 +2620,14 @@ function setupEventListeners() {
     try {
       const res = await apiFetch('/api/admin/accounts', {
         method: 'POST',
-        body: JSON.stringify({ displayName, email, role, password })
+        body: JSON.stringify({
+          displayName,
+          email,
+          role,
+          password,
+          assigned_instance_id: assignedInstanceId,
+          subscription_days: subscriptionDays
+        })
       });
 
       if (!res.ok) {
@@ -1895,10 +2637,12 @@ function setupEventListeners() {
 
       setFeedback(
         'create-account-feedback',
-        `✅ Cuenta creada en Firebase Auth: ${res.account?.email || email}`,
+        `✅ Cuenta creada en Firebase Auth: ${res.account?.email || email} → Instancia ${assignedInstanceId} (${subscriptionDays} días)`,
         true
       );
       document.getElementById('create-account-form')?.reset();
+      const subDaysInput = document.getElementById('account-sub-days');
+      if (subDaysInput) subDaysInput.value = '30';
       resetPasswordToggle('btn-toggle-new-pw', 'new-acc-password');
       await loadAdminAccounts();
     } catch (err) {
@@ -2009,6 +2753,81 @@ function setupEventListeners() {
     resetWizardForNewBot();
   });
 
+  document.getElementById('btn-locked-go-admin')?.addEventListener('click', () => {
+    showView('admin');
+    document.getElementById('auth-email')?.focus({ preventScroll: true });
+  });
+
+  document.getElementById('btn-locked-new-instance')?.addEventListener('click', () => {
+    resetWizardForNewBot();
+  });
+
+  document.getElementById('btn-wizard-recover')?.addEventListener('click', async () => {
+    const input = document.getElementById('wizard-recover-input');
+    const query = input?.value?.trim() || '';
+    setFeedback('wizard-recover-status', '');
+    if (!query) {
+      setFeedback('wizard-recover-status', 'Ingresa tu teléfono, correo o código de recuperación.', false);
+      input?.focus();
+      return;
+    }
+
+    const btn = document.getElementById('btn-wizard-recover');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Buscando...';
+    }
+    try {
+      const res = await apiFetch('/api/instances/recover', {
+        method: 'POST',
+        body: JSON.stringify({ query })
+      });
+
+      if (res?.locked || res?.statusCode === 423) {
+        renderLockedWizardState(res);
+        setFeedback('wizard-recover-status', res.message || res.error || 'Instancia contratada y bloqueada para uso público.', false);
+        goToWizardStep(3, { focusHeading: true });
+        return;
+      }
+
+      if (!res?.ok || !res.instance) {
+        setFeedback('wizard-recover-status', res?.error || 'No se encontró configuración previa para ese dato.', false);
+        return;
+      }
+
+      const inst = { ...res.instance, catalog: Array.isArray(res.catalog) ? res.catalog : [] };
+      clientInstanceId = inst.instance_id;
+      provisionedInstance = inst;
+      activeBotMode = 'custom';
+      activeChatInstanceId = inst.instance_id;
+      localStorage.setItem('servibot_client_instance_id', clientInstanceId);
+
+      clearLockedWizardBanner();
+      populateWizardForm(inst);
+      syncSimulatorHeaderLabel(inst);
+      renderWizardSummary(inst);
+      updateCheckoutPricing();
+
+      const box = document.getElementById('chat-messages');
+      if (box) {
+        const greeting =
+          inst.welcome_message ||
+          `¡Hola! Soy ${inst.display_name} de ${inst.business_name}. ¿En qué te ayudo hoy?`;
+        box.innerHTML = `<div class="chat-bubble assistant is-custom-bot">${buildAssistantIdentityHeader('custom', inst)}${escapeHtml(greeting)}</div>`;
+      }
+
+      setFeedback('wizard-recover-status', `✅ Configuración recuperada en instancia ${inst.instance_id}.`, true);
+      goToWizardStep(3, { focusHeading: true });
+    } catch (err) {
+      setFeedback('wizard-recover-status', `Error recuperando instancia: ${err.message}`, false);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Recuperar Bot';
+      }
+    }
+  });
+
   document.getElementById('servibot-wizard-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (wizardCurrentStep === 1) {
@@ -2041,7 +2860,8 @@ function setupEventListeners() {
       tone: document.getElementById('cfg-tone')?.value.trim() || '',
       ai_soul: soulInput.value.trim(),
       system_prompt: document.getElementById('cfg-system-prompt')?.value.trim() || '',
-      welcome_message: document.getElementById('cfg-welcome-message')?.value.trim() || ''
+      welcome_message: document.getElementById('cfg-welcome-message')?.value.trim() || '',
+      initial_products: document.getElementById('cfg-initial-products')?.value.trim() || ''
     };
 
     if (saveBtn) {
@@ -2055,18 +2875,26 @@ function setupEventListeners() {
         body: JSON.stringify(payload)
       });
 
+      if (res?.locked || res?.statusCode === 423) {
+        renderLockedWizardState(res);
+        setFeedback('instance-save-status', res.message || res.error || 'Esta instancia ya fue pagada y quedó bloqueada en la vista pública.', false);
+        goToWizardStep(3, { focusHeading: true });
+        return;
+      }
+
       if (!res.ok || !res.instance) {
         setFeedback('instance-save-status', res.error || 'No se pudo configurar tu ServiBot.', false);
         return;
       }
 
-      const inst = res.instance;
+      const inst = { ...res.instance, catalog: Array.isArray(res.catalog) ? res.catalog : [] };
       clientInstanceId = inst.instance_id;
       activeBotMode = 'custom';
       activeChatInstanceId = inst.instance_id;
       provisionedInstance = inst;
       localStorage.setItem('servibot_client_instance_id', clientInstanceId);
 
+      clearLockedWizardBanner();
       const idHidden = document.getElementById('cfg-instance-id');
       if (idHidden) idHidden.value = inst.instance_id;
 
@@ -2186,6 +3014,27 @@ function setupEventListeners() {
       return;
     }
 
+    if (provisionedInstance.locked_for_public) {
+      renderLockedWizardState(provisionedInstance);
+      return;
+    }
+
+    const adminEmailInput = document.getElementById('checkout-admin-email');
+    const adminPasswordInput = document.getElementById('checkout-admin-password');
+    const admin_email = adminEmailInput?.value?.trim() || '';
+    const temp_password = adminPasswordInput?.value || '';
+
+    if (admin_email && temp_password.length < 6) {
+      setFeedback('checkout-feedback', 'Ingresa una contraseña de al menos 6 caracteres para activar tu Admin Estándar.', false);
+      adminPasswordInput?.focus();
+      return;
+    }
+    if (temp_password && !admin_email) {
+      setFeedback('checkout-feedback', 'Ingresa el correo electrónico con el que entrarás a tu Admin Estándar.', false);
+      adminEmailInput?.focus();
+      return;
+    }
+
     const btn = document.getElementById('btn-confirm-checkout');
     setFeedback('checkout-feedback', '');
     resetCheckoutMpCta();
@@ -2196,7 +3045,7 @@ function setupEventListeners() {
         name: `ServiBot Configurado (${provisionedInstance.display_name || provisionedInstance.instance_id})`,
         price: 1500,
         currency: 'MXN',
-        billing_cycle: 'único'
+        billing_cycle: 'mensual'
       }
     ];
 
@@ -2207,7 +3056,7 @@ function setupEventListeners() {
           name: chk.dataset.label || chk.dataset.name || 'Servicio opcional',
           price: Number(chk.value || chk.dataset.price || 0),
           currency: 'MXN',
-          billing_cycle: 'único'
+          billing_cycle: 'mensual'
         });
       }
     });
@@ -2229,6 +3078,10 @@ function setupEventListeners() {
       const data = await apiFetch('/api/orders', {
         method: 'POST',
         body: JSON.stringify({
+          instance_id: 'servibot-00',
+          target_instance_id: provisionedInstance.instance_id,
+          admin_email,
+          temp_password,
           customer_name:
             provisionedInstance.client_name ||
             document.getElementById('cfg-client-name')?.value?.trim() ||
@@ -2381,10 +3234,50 @@ function setupEventListeners() {
     reader.readAsDataURL(file);
   });
 
-  // Guardar Producto / Servicio en Admin
-  document.getElementById('catalog-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  // Botones para crear nuevo producto (cabecera del listado y estado vacío)
+  document.getElementById('btn-open-create-catalog')?.addEventListener('click', () => openCatalogModal('create'));
+  document.getElementById('btn-empty-create-catalog')?.addEventListener('click', () => openCatalogModal('create'));
+
+  // Botón editar producto seleccionado
+  document.getElementById('btn-edit-selected-item')?.addEventListener('click', () => {
+    const item = adminCatalogCache.find((it) => it.id === selectedCatalogItemId);
+    if (item) {
+      openCatalogModal('edit', item);
+    }
+  });
+
+  // Botón enviar producto seleccionado al Bot aislado de esta instancia
+  document.getElementById('btn-send-selected-to-bot')?.addEventListener('click', async () => {
+    const item = adminCatalogCache.find((it) => it.id === selectedCatalogItemId);
+    if (!item) return;
+    await apiFetch(buildAdminEndpoint(`/api/catalog/${item.id}/send-to-bot`), {
+      method: 'POST',
+      body: JSON.stringify({ sent_to_bot: true, active: true })
+    });
+    await loadAdminCatalog();
+    await loadPublicCatalog();
+  });
+
+  // Botón eliminar producto seleccionado
+  document.getElementById('btn-delete-selected-item')?.addEventListener('click', async () => {
+    const item = adminCatalogCache.find((it) => it.id === selectedCatalogItemId);
+    if (!item) return;
+    if (!confirm(`¿Deseas eliminar "${item.name}" del catálogo? Esta acción no se puede deshacer.`)) return;
+    await apiFetch(buildAdminEndpoint(`/api/catalog/${item.id}`), { method: 'DELETE' });
+    selectedCatalogItemId = null;
+    await loadAdminCatalog();
+    await loadPublicCatalog();
+  });
+
+  // Filtro de búsqueda en tiempo real sobre el listado
+  document.getElementById('catalog-search-input')?.addEventListener('input', (e) => {
+    renderAdminCatalogList(e.target.value.trim());
+  });
+
+  async function saveCatalogFormItem(forceSendToBot = null) {
     const id = document.getElementById('item-id').value;
+    const sentCheckbox = document.getElementById('item-sent-to-bot');
+    const sentToBot = forceSendToBot !== null ? forceSendToBot : Boolean(sentCheckbox ? sentCheckbox.checked : true);
     const payload = {
       name: document.getElementById('item-name').value.trim(),
       type: document.getElementById('item-type').value,
@@ -2397,33 +3290,166 @@ function setupEventListeners() {
       description: document.getElementById('item-description').value.trim(),
       features: document.getElementById('item-features').value,
       image_url: document.getElementById('item-image-url').value.trim(),
-      active: document.getElementById('item-active').checked
+      active: document.getElementById('item-active').checked,
+      sent_to_bot: sentToBot
     };
 
+    let res;
     if (id) {
-      await apiFetch(`/api/catalog/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      res = await apiFetch(buildAdminEndpoint(`/api/catalog/${id}`), { method: 'PUT', body: JSON.stringify(payload) });
     } else {
-      await apiFetch('/api/catalog', { method: 'POST', body: JSON.stringify(payload) });
+      res = await apiFetch(buildAdminEndpoint('/api/catalog'), { method: 'POST', body: JSON.stringify(payload) });
     }
 
+    if (res?.item?.id) {
+      selectedCatalogItemId = res.item.id;
+    }
+
+    document.getElementById('catalog-modal')?.close();
     resetCatalogForm();
     await loadAdminCatalog();
     await loadPublicCatalog();
+  }
+
+  // Guardar Producto / Servicio en Admin (Modal)
+  document.getElementById('catalog-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await saveCatalogFormItem(null);
   });
 
-  document.getElementById('btn-cancel-edit')?.addEventListener('click', resetCatalogForm);
+  // Guardar y Enviar directamente al Bot
+  document.getElementById('btn-save-send-to-bot')?.addEventListener('click', async () => {
+    const form = document.getElementById('catalog-form');
+    if (form && !form.reportValidity()) return;
+    await saveCatalogFormItem(true);
+  });
 
-  function resetCatalogForm() {
-    document.getElementById('item-id').value = '';
-    document.getElementById('catalog-form')?.reset();
-    document.getElementById('item-image-url').value = '/assets/service-bots.svg';
-    document.getElementById('catalog-form-title').textContent = '➕ Crear o Editar Producto / Servicio';
+  // Promociones reales en interfaz aislada por Bot
+  async function savePromotionFormItem(sentToBot) {
+    const title = document.getElementById('promo-title')?.value.trim() || '';
+    if (!title) return;
+    const discount_text = document.getElementById('promo-discount')?.value.trim() || '';
+    const rawPrice = document.getElementById('promo-price')?.value;
+    const promo_price = rawPrice !== '' && rawPrice != null ? Number(rawPrice) : null;
+    const description = document.getElementById('promo-desc')?.value.trim() || '';
+
+    await apiFetch(buildAdminEndpoint('/api/promotions'), {
+      method: 'POST',
+      body: JSON.stringify({
+        title,
+        discount_text,
+        promo_price,
+        description,
+        active: true,
+        sent_to_bot: Boolean(sentToBot)
+      })
+    });
+
+    document.getElementById('promotion-form')?.reset();
+    await loadAdminPromotions();
+  }
+
+  document.getElementById('promotion-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await savePromotionFormItem(false);
+  });
+
+  document.getElementById('btn-save-send-promo')?.addEventListener('click', async () => {
+    const form = document.getElementById('promotion-form');
+    if (form && !form.reportValidity()) return;
+    await savePromotionFormItem(true);
+  });
+
+  // Listas de Control: Lista Blanca, Omisiones y Lista Negra
+  document.getElementById('contact-rule-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const contact_value = document.getElementById('rule-contact-value')?.value.trim() || '';
+    const list_type = document.getElementById('rule-list-type')?.value || 'whitelist';
+    const label = document.getElementById('rule-label')?.value.trim() || '';
+    if (!contact_value) return;
+
+    await apiFetch(buildAdminEndpoint('/api/contact-rules'), {
+      method: 'POST',
+      body: JSON.stringify({ contact_value, list_type, label })
+    });
+
+    document.getElementById('contact-rule-form')?.reset();
+    await loadAdminContactRules();
+  });
+
+  // Registro de Folios VIP en Servidores Dedicados (solo SuperAdmin)
+  document.getElementById('vip-instance-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const folio = document.getElementById('vip-folio')?.value.trim() || '';
+    const monthly_price = Number(document.getElementById('vip-price')?.value || 0);
+    const business_name = document.getElementById('vip-business')?.value.trim() || '';
+    const client_name = document.getElementById('vip-client-name')?.value.trim() || '';
+    const client_contact = document.getElementById('vip-client-contact')?.value.trim() || '';
+    const server_url = document.getElementById('vip-server-url')?.value.trim() || '';
+    const custom_admin_url = document.getElementById('vip-admin-url')?.value.trim() || '';
+    const admin_email = document.getElementById('vip-admin-email')?.value.trim() || '';
+    const rawApiConfig = document.getElementById('vip-api-config')?.value.trim() || '{}';
+    const notes = document.getElementById('vip-notes')?.value.trim() || '';
+
+    let api_config = {};
+    try {
+      api_config = rawApiConfig ? JSON.parse(rawApiConfig) : {};
+    } catch {
+      setFeedback('vip-feedback', 'El JSON de APIs específicas no tiene formato válido.', false);
+      return;
+    }
+
+    const res = await apiFetch('/api/vip-instances', {
+      method: 'POST',
+      body: JSON.stringify({
+        folio,
+        monthly_price,
+        business_name,
+        client_name,
+        client_contact,
+        server_url,
+        custom_admin_url,
+        admin_email,
+        api_config,
+        notes
+      })
+    });
+
+    if (!res?.ok) {
+      setFeedback('vip-feedback', res?.error || 'No se pudo guardar el folio VIP.', false);
+      return;
+    }
+
+    setFeedback('vip-feedback', `✅ Folio VIP ${res.vip?.folio || ''} guardado.`, true);
+    document.getElementById('vip-instance-form')?.reset();
+    await loadAdminVipInstances();
+  });
+
+  document.getElementById('btn-cancel-edit')?.addEventListener('click', () => {
+    resetCatalogForm();
+    document.getElementById('catalog-modal')?.close();
+  });
+
+  // Light-dismiss fallback para el modal de catálogo (modern-web-guidance `light-dismiss-a-dialog`)
+  const catModal = document.getElementById('catalog-modal');
+  if (catModal && !('closedBy' in HTMLDialogElement.prototype)) {
+    catModal.addEventListener('click', (event) => {
+      if (event.target !== catModal) return;
+      const rect = catModal.getBoundingClientRect();
+      const isInside = (
+        rect.top <= event.clientY &&
+        event.clientY <= rect.top + rect.height &&
+        rect.left <= event.clientX &&
+        event.clientX <= rect.left + rect.width
+      );
+      if (!isInside) catModal.close();
+    });
   }
 
   // Controles de Canales (WhatsApp, Correo, Teams)
   document.getElementById('btn-wa-refresh')?.addEventListener('click', loadWhatsAppStatus);
   document.getElementById('btn-wa-logout')?.addEventListener('click', async () => {
-    await apiFetch('/api/channels/whatsapp/logout', { method: 'POST' });
+    await apiFetch(buildAdminEndpoint('/api/channels/whatsapp/logout'), { method: 'POST' });
     setTimeout(loadWhatsAppStatus, 1800);
   });
 
@@ -2433,7 +3459,7 @@ function setupEventListeners() {
     if (outBox) outBox.textContent = 'Enviando evento MESSAGES_UPSERT por Evolution (:10001 -> :10000 -> Python -> Ollama :10002)...';
     const phone = document.getElementById('sim-wa-phone').value;
     const text = document.getElementById('sim-wa-text').value;
-    const res = await apiFetch('/api/channels/whatsapp/simulate', {
+    const res = await apiFetch(buildAdminEndpoint('/api/channels/whatsapp/simulate'), {
       method: 'POST',
       body: JSON.stringify({ phone, name: 'Cliente WhatsApp', text })
     });
@@ -2462,7 +3488,7 @@ function setupEventListeners() {
     if (outBox) outBox.textContent = 'Procesando correo entrante con Python Worker + Ollama :10002...';
     const fromEmail = document.getElementById('sim-email-from').value.trim();
     const body = document.getElementById('sim-email-body').value.trim();
-    const res = await apiFetch('/api/channels/email/simulate', {
+    const res = await apiFetch(buildAdminEndpoint('/api/channels/email/simulate'), {
       method: 'POST',
       body: JSON.stringify({
         fromEmail,
@@ -2493,7 +3519,7 @@ function setupEventListeners() {
     if (outBox) outBox.textContent = 'Enviando payload al webhook de Microsoft Teams (/api/channels/teams/webhook)...';
     const user = document.getElementById('sim-teams-user').value.trim();
     const text = document.getElementById('sim-teams-text').value.trim();
-    const res = await apiFetch('/api/channels/teams/webhook', {
+    const res = await apiFetch(buildAdminEndpoint('/api/channels/teams/webhook'), {
       method: 'POST',
       body: JSON.stringify({
         from: { id: 'teams-corp-01', name: user },
@@ -2549,7 +3575,7 @@ function setupEventListeners() {
   });
 }
 
-function handleMercadoPagoReturn() {
+async function handleMercadoPagoReturn() {
   try {
     const params = new URLSearchParams(window.location.search);
     const mpStatus = params.get('mp_status') || params.get('collection_status') || '';
@@ -2559,11 +3585,11 @@ function handleMercadoPagoReturn() {
     const statusMap = {
       approved: {
         ok: true,
-        msg: `✅ ¡Pago aprobado en Mercado Pago${orderCode ? ` para el pedido ${orderCode}` : ''}! Tu ServiBot está listo para activarse.`
+        msg: `✅ ¡Pago aprobado en Mercado Pago${orderCode ? ` para el pedido ${orderCode}` : ''}! Activando tu Admin Estándar por 30 días naturales.`
       },
       pending: {
         ok: true,
-        msg: `⏳ Pago en proceso en Mercado Pago${orderCode ? ` (${orderCode})` : ''}. En cuanto se acredite te notificaremos.`
+        msg: `⏳ Pago en proceso en Mercado Pago${orderCode ? ` (${orderCode})` : ''}. En cuanto se acredite activaremos tu instancia.`
       },
       in_process: {
         ok: true,
@@ -2578,16 +3604,43 @@ function handleMercadoPagoReturn() {
     const info = statusMap[mpStatus];
     if (!info) return;
 
-    goToSlide(3, { instant: true });
+    const offerIdx = Math.max(0, document.querySelectorAll('#public-carousel-track .carousel-slide').length - 1);
+    carouselController?.goToSlide(offerIdx, { instant: true });
     goToWizardStep(3);
-    toggleCheckoutPanel(true);
-    setFeedback('checkout-feedback', info.msg, info.ok);
+
+    let finalMsg = info.msg;
+    if (mpStatus === 'approved' && orderCode) {
+      const confirmRes = await apiFetch('/api/orders/confirm-payment', {
+        method: 'POST',
+        body: JSON.stringify({
+          order_code: orderCode,
+          mp_status: mpStatus,
+          payment_id: params.get('payment_id') || params.get('collection_id') || ''
+        })
+      });
+      if (confirmRes?.ok && (confirmRes.activated || confirmRes.locked || confirmRes.instance?.locked_for_public)) {
+        const exp = confirmRes.subscription_expires_at || confirmRes.instance?.subscription_expires_at || '';
+        const expLabel = exp ? ` hasta el ${new Date(exp).toLocaleDateString('es-MX')}` : '';
+        finalMsg = `✅ ¡Pago confirmado (${orderCode})! Tu Admin Estándar quedó activo por 30 días naturales${expLabel} y tu instancia ya quedó bloqueada e inaccesible en la vista pública.`;
+        renderLockedWizardState({
+          instance_id: confirmRes.target_instance_id || confirmRes.instance?.instance_id || clientInstanceId,
+          subscription_expires_at: exp,
+          message: finalMsg
+        });
+      } else {
+        toggleCheckoutPanel(true);
+      }
+    } else {
+      toggleCheckoutPanel(true);
+    }
+
+    setFeedback('checkout-feedback', finalMsg, info.ok);
 
     const box = document.getElementById('chat-messages');
     if (box) {
       const bubble = document.createElement('div');
-      bubble.className = 'chat-bubble assistant';
-      bubble.textContent = info.msg;
+      bubble.className = 'chat-bubble assistant is-official-bot';
+      bubble.innerHTML = `${buildAssistantIdentityHeader('official', null)}${escapeHtml(finalMsg)}`;
       box.appendChild(bubble);
       box.scrollTop = box.scrollHeight;
     }
@@ -2601,7 +3654,7 @@ function handleMercadoPagoReturn() {
   await resolveInitialApiBase();
   setupEventListeners();
   await Promise.all([loadClientProvisionedInstance({ populateForm: true }), loadPublicCatalog()]);
-  handleMercadoPagoReturn();
+  await handleMercadoPagoReturn();
   await refreshHealth();
   setInterval(refreshHealth, 12000);
   setInterval(() => {

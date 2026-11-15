@@ -80,9 +80,15 @@
             </button>
           </li>
           <li class="admin-nav-item hidden">
+            <button type="button" class="nav-btn admin-tab-nav" data-tab="tab-lists">
+              <span class="nav-icon" aria-hidden="true">🛡️</span>
+              <span>Listas</span>
+            </button>
+          </li>
+          <li class="admin-nav-item hidden" id="nav-item-accounts" data-superadmin-only="1">
             <button type="button" class="nav-btn admin-tab-nav" data-tab="tab-accounts">
               <span class="nav-icon" aria-hidden="true">👤</span>
-              <span>Cuentas</span>
+              <span>Cuentas y VIP</span>
             </button>
           </li>
           <li class="admin-nav-item nav-divider hidden" aria-hidden="true"></li>
@@ -406,6 +412,25 @@
                       <p class="wizard-pane-sub">Elige tu giro para sugerirte una configuración base o escribe tus datos directamente.</p>
                     </header>
 
+                    <div class="wizard-recover-box" id="wizard-recover-box">
+                      <div class="wizard-recover-info">
+                        <strong>🔄 ¿Ya habías configurado un bot aquí antes?</strong>
+                        <span>Ingresa tu teléfono WhatsApp, correo o folio (ej. <code>servibot-04</code>) para retomar tu instancia o recuperar tu borrador desde la base de prospectos.</span>
+                      </div>
+                      <div class="wizard-recover-controls">
+                        <input
+                          type="text"
+                          id="wizard-recover-input"
+                          placeholder="Ej. +5215512345678, correo o servibot-04"
+                          autocomplete="off"
+                        />
+                        <button type="button" class="btn btn-outline btn-sm" id="btn-wizard-recover">
+                          Retomar mi Bot
+                        </button>
+                      </div>
+                      <div id="wizard-recover-status" class="auth-feedback" role="status" aria-live="polite"></div>
+                    </div>
+
                     <div class="preset-group">
                       <span class="preset-label" id="giro-presets-label">Giro o industria (opcional, rellena ideas iniciales):</span>
                       <div class="preset-chips-row" id="preset-giro-chips" role="group" aria-labelledby="giro-presets-label">
@@ -558,6 +583,18 @@
                       </div>
                     </div>
 
+                    <div class="field">
+                      <label for="cfg-initial-products">Catálogo inicial de productos/servicios de tu negocio (exclusivo para tu Bot)</label>
+                      <textarea
+                        id="cfg-initial-products"
+                        name="initial_products"
+                        rows="3"
+                        placeholder="Escribe un producto o servicio por línea con formato Nombre | Precio | Descripción&#10;Ej.: Corte Clásico | 250 | Corte + peinado profesional&#10;Limpieza Dental | 600 | Profilaxis ultrasónica completa"
+                        aria-describedby="cfg-products-help"
+                      ></textarea>
+                      <span id="cfg-products-help" class="field-hint">Tu bot usará únicamente estos productos y nunca verá servicios de otros bots ni del proyecto principal.</span>
+                    </div>
+
                     <div class="wizard-live-preview" aria-live="polite">
                       <div class="wizard-preview-label">🤖 Vista previa en tiempo real de tu Bot Creado</div>
                       <div class="wizard-preview-bubble-row">
@@ -596,7 +633,25 @@
                     </div>
 
                     <div class="wizard-step3-grid">
-                      <div class="wizard-summary-box" id="wizard-created-card">
+                      <div id="wizard-locked-banner" class="wizard-locked-banner hidden" hidden>
+                      <div class="wizard-locked-icon" aria-hidden="true">🔒</div>
+                      <div class="wizard-locked-body">
+                        <strong id="wizard-locked-title">Instancia Activada · Plan Mensual (30 Días Naturales)</strong>
+                        <p id="wizard-locked-desc">
+                          Esta instancia ya realizó su pago y quedó bloqueada e inaccesible para edición o chat en la interfaz pública. Administra tu catálogo, promociones y listas desde tu Panel Admin Estándar.
+                        </p>
+                        <div class="wizard-locked-actions">
+                          <button type="button" class="btn btn-primary btn-sm" id="btn-locked-go-admin">
+                            🔐 Ir a Mi Admin Estándar
+                          </button>
+                          <button type="button" class="btn btn-outline btn-sm" id="btn-locked-new-instance">
+                            ➕ Configurar Otra Instancia Nueva
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="wizard-summary-box" id="wizard-created-card">
                         <div class="custom-bot-card-head">
                           <span class="bot-emoji-avatar" aria-hidden="true">🤖</span>
                           <div>
@@ -702,7 +757,39 @@
                             </label>
                           </div>
 
-                          <div class="checkout-total-box" aria-live="polite">
+                          <div class="checkout-admin-access-box" id="checkout-admin-access-box">
+                        <div class="checkout-admin-title">
+                          🔐 Acceso para tu Panel Admin Estándar (30 días naturales al pagar)
+                        </div>
+                        <p class="checkout-admin-sub">
+                          Al confirmar tu pago en Mercado Pago se activará tu Admin Estándar por 30 días y tu instancia quedará bloqueada en el sitio público.
+                        </p>
+                        <div class="cfg-two-col">
+                          <div class="field">
+                            <label for="checkout-admin-email">Correo para ingresar a tu Admin</label>
+                            <input
+                              type="email"
+                              id="checkout-admin-email"
+                              name="checkout_admin_email"
+                              placeholder="tu-correo@negocio.com"
+                              autocomplete="email"
+                            />
+                          </div>
+                          <div class="field">
+                            <label for="checkout-admin-password">Contraseña Admin (mín. 6 caracteres)</label>
+                            <input
+                              type="password"
+                              id="checkout-admin-password"
+                              name="checkout_admin_password"
+                              minlength="6"
+                              placeholder="••••••"
+                              autocomplete="new-password"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="checkout-total-box" aria-live="polite">
                             <div class="checkout-tax-row">
                               <span>Subtotal sin impuestos:</span>
                               <span id="checkout-subtotal-amount">$2,500 pesos</span>
@@ -950,97 +1037,140 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
 
       <!-- Panel de Administración Completo (navegación en encabezado full-width) -->
       <div id="admin-dashboard" class="admin-shell hidden">
-        <!-- TAB 1: GESTIÓN DE CATÁLOGO -->
+        <!-- TAB 1: GESTIÓN DE PRODUCTOS Y SERVICIOS (MASTER-DETAIL) -->
+        <div id="admin-role-banner" class="admin-role-banner hidden">
+          <div class="admin-role-info">
+            <span class="badge-tag" id="admin-role-badge">Cargando rol...</span>
+            <strong id="admin-instance-label">Instancia: —</strong>
+            <span id="admin-expiry-badge" class="admin-expiry-badge"></span>
+          </div>
+          <div id="admin-super-controls" class="admin-super-controls hidden">
+            <label for="admin-instance-switcher" style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap;">Administrar Bot:</label>
+            <select id="admin-instance-switcher" class="form-select-inline"></select>
+          </div>
+        </div>
+
         <div id="tab-catalog" class="admin-tab-pane">
-          <div class="panel-card">
-            <h3 id="catalog-form-title" style="margin-top:0;">➕ Crear o Editar Producto / Servicio</h3>
-            <form id="catalog-form">
-              <input type="hidden" id="item-id" value="" />
-              <div class="form-grid">
-                <div class="field">
-                  <label for="item-name">Nombre del Servicio o Producto *</label>
-                  <input type="text" id="item-name" placeholder="Ej. Bot Autónomo Empresarial" required />
+          <div class="products-master-detail">
+            <!-- PANEL IZQUIERDO: LISTADO DE PRODUCTOS -->
+            <aside class="products-sidebar" aria-label="Catálogo de productos y servicios">
+              <div class="products-sidebar-header">
+                <div class="products-sidebar-title-row">
+                  <h3 class="products-sidebar-title">Productos y Servicios</h3>
+                  <span class="badge-tag" id="catalog-items-count">0 items</span>
                 </div>
-                <div class="field">
-                  <label for="item-type">Tipo</label>
-                  <select id="item-type">
-                    <option value="service">Servicio</option>
-                    <option value="product">Producto</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="item-badge">Insignia Destacada</label>
-                  <input type="text" id="item-badge" placeholder="Ej. Más Vendido / Nuevo" />
-                </div>
+                <button type="button" class="btn btn-primary btn-sm btn-new-product" id="btn-open-create-catalog">
+                  ➕ Nuevo Producto
+                </button>
               </div>
 
-              <div class="form-grid">
-                <div class="field">
-                  <label for="item-price">Precio Comercial *</label>
-                  <input type="number" id="item-price" step="0.01" placeholder="2490" required />
-                </div>
-                <div class="field">
-                  <label for="item-currency">Moneda</label>
-                  <select id="item-currency">
-                    <option value="MXN">MXN (Pesos Mexicanos)</option>
-                    <option value="USD">USD (Dólares)</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="item-cycle">Ciclo de Cobro</label>
-                  <select id="item-cycle">
-                    <option value="mensual">Mensual</option>
-                    <option value="unico">Pago Único</option>
-                    <option value="anual">Anual</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="item-setup">Costo de Activación Inicial (Opcional)</label>
-                  <input type="number" id="item-setup" step="0.01" value="0" />
-                </div>
+              <!-- Filtro rápido de productos -->
+              <div class="products-search-box">
+                <input type="search" id="catalog-search-input" placeholder="Buscar por nombre o tipo..." aria-label="Buscar producto o servicio" />
               </div>
 
-              <div class="field">
-                <label for="item-tagline">Subtítulo Comercial Corto</label>
-                <input type="text" id="item-tagline" placeholder="Ej. Atención automatizada 24/7 sin costo por token" />
+              <!-- Lista scrolleable de productos -->
+              <div id="admin-catalog-list" class="products-list-group" role="listbox" aria-label="Productos registrados">
+                <!-- Se inyecta dinámicamente con JavaScript -->
+              </div>
+            </aside>
+
+            <!-- PANEL DERECHO: DETALLE DEL PRODUCTO SELECCIONADO -->
+            <section class="products-detail-panel" id="product-detail-panel" aria-label="Detalle del producto" aria-live="polite">
+              <!-- ESTADO VACÍO (cuando ningún elemento está seleccionado) -->
+              <div id="catalog-detail-empty" class="product-detail-empty">
+                <div class="product-detail-empty-icon" aria-hidden="true">📦</div>
+                <h3>Detalle de Producto o Servicio</h3>
+                <p>Selecciona un producto o servicio de la lista a la izquierda para consultar sus detalles, especificaciones y precios, o crea uno nuevo para tu catálogo comercial.</p>
+                <button type="button" class="btn btn-primary" id="btn-empty-create-catalog">
+                  ➕ Crear Nuevo Producto o Servicio
+                </button>
               </div>
 
-              <div class="field">
-                <label for="item-description">Descripción Completa (Usada también por el Bot IA para vender) *</label>
-                <textarea id="item-description" rows="3" placeholder="Describe detalladamente qué incluye y cómo ayuda al cliente..." required></textarea>
-              </div>
-
-              <div class="field">
-                <label for="item-features">Características Incluidas (Una por línea)</label>
-                <textarea id="item-features" rows="4" placeholder="Autocontestador WhatsApp sin tokens&#10;Integración con Correo y Teams&#10;Cierre de pedidos en automático"></textarea>
-              </div>
-
-              <div class="form-grid">
-                <div class="field">
-                  <label for="item-image-url">URL o Ruta de Imagen</label>
-                  <input type="text" id="item-image-url" value="/assets/service-bots.svg" />
+              <!-- VISTA DETALLE ACTIVA (se muestra cuando hay un producto seleccionado) -->
+              <div id="catalog-detail-view" class="product-detail-view hidden">
+                <div class="product-detail-header">
+                  <div class="product-detail-title-group">
+                    <div class="product-detail-tags">
+                      <span class="badge-tag" id="detail-type-badge">Servicio</span>
+                      <span class="badge-tag" id="detail-status-badge">🟢 Activo</span>
+                      <span class="badge-tag badge-tag-accent" id="detail-bot-badge">🤖 En Bot</span>
+                      <span class="badge-tag badge-tag-accent hidden" id="detail-highlight-badge"></span>
+                    </div>
+                    <h2 id="detail-title" class="product-detail-name">Nombre del producto</h2>
+                    <p id="detail-tagline" class="product-detail-tagline">Subtítulo comercial</p>
+                  </div>
+                  <div class="product-detail-actions">
+                    <button type="button" class="btn btn-primary btn-sm" id="btn-send-selected-to-bot">🤖 Enviar producto a mi Bot</button>
+                    <button type="button" class="btn btn-outline btn-sm" id="btn-edit-selected-item">✏️ Editar</button>
+                    <button type="button" class="btn btn-danger btn-sm" id="btn-delete-selected-item">🗑️ Eliminar</button>
+                  </div>
                 </div>
-                <div class="field">
-                  <label for="item-image-file">O Subir Imagen desde tu Equipo</label>
-                  <input type="file" id="item-image-file" accept="image/*" />
-                </div>
-              </div>
 
-              <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; margin-top:0.5rem;">
-                <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
-                  <input type="checkbox" id="item-active" checked />
-                  <span>Mostrar activo en catálogo público y disponible para el Bot</span>
-                </label>
-                <div style="display:flex; gap:0.6rem;">
-                  <button type="button" class="btn btn-outline" id="btn-cancel-edit">Limpiar Formulario</button>
-                  <button type="submit" class="btn btn-primary">💾 Guardar en Catálogo</button>
+                <div class="product-detail-body">
+                  <div class="product-showcase-card">
+                    <div class="product-showcase-img-box">
+                      <img id="detail-image" src="/assets/service-bots.svg" alt="Imagen del producto" />
+                    </div>
+                    <div class="product-pricing-info">
+                      <span class="product-pricing-label">Precio Comercial</span>
+                      <div class="product-price-row">
+                        <span class="product-price-val" id="detail-price">$0</span>
+                        <span class="product-price-cycle" id="detail-currency-cycle">MXN / mensual</span>
+                      </div>
+                      <div class="product-setup-row" id="detail-setup-row">
+                        <span class="product-setup-text" id="detail-setup-text">Activación inmediata incluida</span>
+                      </div>
+                      <div class="product-slug-row">
+                        <span class="product-slug-label">Identificador (slug):</span>
+                        <code id="detail-slug">slug</code>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="product-detail-section">
+                    <h4 class="product-section-title">📝 Descripción Comercial y Guía para el Bot IA</h4>
+                    <p id="detail-description" class="product-desc-text"></p>
+                  </div>
+
+                  <div class="product-detail-section" id="detail-features-section">
+                    <h4 class="product-section-title">✨ Características Incluidas</h4>
+                    <ul id="detail-features-list" class="product-features-list"></ul>
+                  </div>
                 </div>
               </div>
-            </form>
+            </section>
           </div>
 
-          <h3>Servicios y Productos Registrados</h3>
-          <div id="admin-catalog-list" class="catalog-grid"></div>
+          <div class="panel-card" style="margin-top: 1.5rem;">
+            <h3>🏷️ Promociones de este Bot</h3>
+            <p class="panel-desc" style="color:var(--text-muted); font-size:0.88rem; margin-top:-0.25rem;">
+              Crea promociones controladas y envíalas explícitamente a tu Bot. El Bot nunca inventará ofertas fuera de esta lista.
+            </p>
+            <form id="promotion-form" class="form-grid" style="margin-top:0.75rem;">
+              <div class="field">
+                <label for="promo-title">Título de la Promoción *</label>
+                <input type="text" id="promo-title" placeholder="Ej. Mes de Lanzamiento 10% OFF en Página Web" required />
+              </div>
+              <div class="field">
+                <label for="promo-discount">Descuento o Beneficio</label>
+                <input type="text" id="promo-discount" placeholder="Ej. 10% OFF o 1er mes incluido" />
+              </div>
+              <div class="field">
+                <label for="promo-price">Precio Promocional (opcional MXN)</label>
+                <input type="number" id="promo-price" min="0" step="0.01" placeholder="Opcional" />
+              </div>
+              <div class="field" style="grid-column: 1 / -1;">
+                <label for="promo-desc">Condiciones y Detalle Exacto</label>
+                <textarea id="promo-desc" rows="2" placeholder="Describe exactamente qué incluye, vigencia y condiciones..."></textarea>
+              </div>
+              <div style="grid-column: 1 / -1; display:flex; gap:0.65rem; flex-wrap:wrap; justify-content:flex-end;">
+                <button type="submit" class="btn btn-outline btn-sm">💾 Guardar Borrador</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btn-save-send-promo">🤖 Guardar y Enviar Promoción a mi Bot</button>
+              </div>
+            </form>
+            <div id="admin-promotions-list" class="promotions-admin-list" style="margin-top:1rem;"></div>
+          </div>
         </div>
 
         <!-- TAB 2: PEDIDOS CERRADOS -->
@@ -1231,8 +1361,57 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
           </div>
         </div>
 
-        <!-- TAB 5: CUENTAS DE ADMINISTRACIÓN -->
-        <div id="tab-accounts" class="admin-tab-pane hidden">
+        <!-- TAB 5: LISTAS DE CONTROL (BLANCA / OMISIONES / NEGRA) -->
+        <div id="tab-lists" class="admin-tab-pane hidden">
+          <div class="panel-card">
+            <h3>🛡️ Control de Contactos: Lista Blanca, Omisiones y Lista Negra</h3>
+            <p class="panel-desc" style="color:var(--text-muted); font-size:0.88rem; margin-top:-0.25rem;">
+              Estas reglas aplican estrictamente al Bot seleccionado (aisladas por base de datos).
+            </p>
+            <form id="contact-rule-form" class="form-grid" style="margin-top:0.75rem;">
+              <div class="field">
+                <label for="rule-contact-value">Teléfono o Identificador *</label>
+                <input type="text" id="rule-contact-value" placeholder="Ej. +5215512345678 o web-visitor" required />
+              </div>
+              <div class="field">
+                <label for="rule-list-type">Tipo de Lista *</label>
+                <select id="rule-list-type">
+                  <option value="whitelist">⭐ Lista Blanca (Respuesta prioritaria)</option>
+                  <option value="omission">🔕 Omisiones (No contestar · Visible)</option>
+                  <option value="blacklist">⛔ Lista Negra (No contestar · Ocultar mensajes)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="rule-label">Etiqueta / Nota</label>
+                <input type="text" id="rule-label" placeholder="Ej. Cliente VIP / Prospecto interno / Spam" />
+              </div>
+              <div style="grid-column: 1 / -1; display:flex; justify-content:flex-end;">
+                <button type="submit" class="btn btn-primary btn-sm">➕ Guardar en Lista</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="lists-columns-grid">
+            <div class="panel-card list-bucket-card list-bucket-white">
+              <h4>⭐ Lista Blanca (Prioridad)</h4>
+              <p class="list-bucket-hint">El bot atiende estos números primero en la cola y marca su conversación como prioritaria.</p>
+              <div id="rules-whitelist" class="rules-list-body"></div>
+            </div>
+            <div class="panel-card list-bucket-card list-bucket-omission">
+              <h4>🔕 Lista de Omisiones</h4>
+              <p class="list-bucket-hint">El bot recibe el mensaje en bandeja, pero NO responde al remitente.</p>
+              <div id="rules-omission" class="rules-list-body"></div>
+            </div>
+            <div class="panel-card list-bucket-card list-bucket-black">
+              <h4>⛔ Lista Negra (Bloqueo Total)</h4>
+              <p class="list-bucket-hint">El bot NO responde en lo absoluto y oculta mensajes/conversaciones entrantes.</p>
+              <div id="rules-blacklist" class="rules-list-body"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 6: CUENTAS, PROSPECTOS Y BOTS VIP (SOLO ADMIN 0: fraustop@outlook.com) -->
+        <div id="tab-accounts" class="admin-tab-pane hidden" data-superadmin-only="1">
           <div class="form-grid" style="grid-template-columns: minmax(300px, 420px) 1fr;">
             <div class="panel-card">
               <h3 style="margin-top:0;">➕ Crear Nueva Cuenta</h3>
@@ -1301,6 +1480,17 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
                   </div>
                 </div>
 
+                <div class="cfg-two-col">
+                  <div class="field">
+                    <label for="account-instance-select">Instancia Baileys Asignada</label>
+                    <select id="account-instance-select"></select>
+                  </div>
+                  <div class="field">
+                    <label for="account-sub-days">Vigencia Plan Estándar (días)</label>
+                    <input type="number" id="account-sub-days" min="1" max="365" value="30" />
+                  </div>
+                </div>
+
                 <div id="create-account-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
 
                 <button type="submit" class="btn btn-emerald" id="btn-create-account">Crear cuenta</button>
@@ -1324,6 +1514,72 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
                   <tbody id="accounts-tbody"></tbody>
                 </table>
               </div>
+            </div>
+          </div>
+
+          <div class="form-grid" style="grid-template-columns: minmax(320px, 460px) 1fr; margin-top: 1.5rem;">
+            <div class="panel-card">
+              <h3>👑 Registrar Bot VIP (Servidor Dedicado)</h3>
+              <p style="font-size:0.84rem; color:var(--text-muted); margin-top:-0.25rem;">
+                Los folios VIP operan en su propio servidor, base separada, Admin personalizado y APIs dedicadas.
+              </p>
+              <form id="vip-instance-form" style="margin-top:0.75rem;">
+                <div class="cfg-two-col">
+                  <div class="field">
+                    <label for="vip-folio">Folio VIP</label>
+                    <input type="text" id="vip-folio" placeholder="Ej. VIP-001 (auto si vacío)" />
+                  </div>
+                  <div class="field">
+                    <label for="vip-price">Costo Mensual (MXN)</label>
+                    <input type="number" id="vip-price" min="0" step="100" value="5000" />
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="vip-business">Empresa / Proyecto *</label>
+                  <input type="text" id="vip-business" placeholder="Ej. Corporativo Delta SA" required />
+                </div>
+                <div class="cfg-two-col">
+                  <div class="field">
+                    <label for="vip-client-name">Cliente Titular</label>
+                    <input type="text" id="vip-client-name" placeholder="Nombre del titular" />
+                  </div>
+                  <div class="field">
+                    <label for="vip-client-contact">Contacto</label>
+                    <input type="text" id="vip-client-contact" placeholder="WhatsApp / Teléfono" />
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="vip-server-url">URL Servidor Dedicado Separado *</label>
+                  <input type="url" id="vip-server-url" placeholder="https://vip-cliente.midominio.com" required />
+                </div>
+                <div class="cfg-two-col">
+                  <div class="field">
+                    <label for="vip-admin-url">URL Admin Personalizado</label>
+                    <input type="url" id="vip-admin-url" placeholder="https://admin-vip.midominio.com" />
+                  </div>
+                  <div class="field">
+                    <label for="vip-admin-email">Correo Admin VIP</label>
+                    <input type="email" id="vip-admin-email" placeholder="admin@corporativo.com" />
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="vip-api-config">APIs Específicas del Proyecto (JSON)</label>
+                  <textarea id="vip-api-config" rows="2" placeholder='{"crm_webhook": "https://...", "erp_api": "..."}'>{}</textarea>
+                </div>
+                <div class="field">
+                  <label for="vip-notes">Notas Técnicas</label>
+                  <input type="text" id="vip-notes" placeholder="Instancia aislada y SLA dedicado" />
+                </div>
+                <div id="vip-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
+                <button type="submit" class="btn btn-primary btn-sm">👑 Guardar Folio VIP</button>
+              </form>
+            </div>
+
+            <div class="panel-card">
+              <h3>🌐 Folios VIP Activos y Prospectos (Rotación 1–50)</h3>
+              <div id="vip-instances-list" class="vip-list-container" style="margin-bottom:1.25rem;"></div>
+              <h4 style="margin:1rem 0 0.5rem; font-size:0.95rem; color:var(--text-secondary);">🔄 Base de Datos de Prospectos Archivados</h4>
+              <div id="admin-prospects-list" class="prospects-list-container"></div>
             </div>
           </div>
         </div>
@@ -1365,6 +1621,108 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
         <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:1rem;">
           <button type="button" class="btn btn-outline" id="btn-close-order-modal">Cancelar</button>
           <button type="submit" class="btn btn-emerald">✅ Confirmar Pedido</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Native <dialog> Modal para Crear / Editar Producto per modern-web-guidance `dialog` -->
+  <dialog id="catalog-modal" class="product-form-modal" closedby="any" aria-labelledby="catalog-form-title">
+    <div class="dialog-inner">
+      <div class="dialog-header">
+        <h2 id="catalog-form-title">➕ Crear Producto / Servicio</h2>
+        <form method="dialog">
+          <button type="submit" class="btn btn-outline btn-sm" aria-label="Cerrar ventana">✕</button>
+        </form>
+      </div>
+      <form id="catalog-form">
+        <input type="hidden" id="item-id" value="" />
+        <div class="form-grid">
+          <div class="field">
+            <label for="item-name">Nombre del Servicio o Producto *</label>
+            <input type="text" id="item-name" placeholder="Ej. Bot Autónomo Empresarial" required />
+          </div>
+          <div class="field">
+            <label for="item-type">Tipo</label>
+            <select id="item-type">
+              <option value="service">Servicio</option>
+              <option value="product">Producto</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="item-badge">Insignia Destacada</label>
+            <input type="text" id="item-badge" placeholder="Ej. Más Vendido / Nuevo" />
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="item-price">Precio Comercial *</label>
+            <input type="number" id="item-price" step="0.01" placeholder="2490" required />
+          </div>
+          <div class="field">
+            <label for="item-currency">Moneda</label>
+            <select id="item-currency">
+              <option value="MXN">MXN (Pesos Mexicanos)</option>
+              <option value="USD">USD (Dólares)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="item-cycle">Ciclo de Cobro</label>
+            <select id="item-cycle">
+              <option value="mensual">Mensual</option>
+              <option value="unico">Pago Único</option>
+              <option value="anual">Anual</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="item-setup">Costo de Activación Inicial (Opcional)</label>
+            <input type="number" id="item-setup" step="0.01" value="0" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="item-tagline">Subtítulo Comercial Corto</label>
+          <input type="text" id="item-tagline" placeholder="Ej. Atención automatizada 24/7 sin costo por token" />
+        </div>
+
+        <div class="field">
+          <label for="item-description">Descripción Completa (Usada también por el Bot IA para vender) *</label>
+          <textarea id="item-description" rows="3" placeholder="Describe detalladamente qué incluye y cómo ayuda al cliente..." required></textarea>
+        </div>
+
+        <div class="field">
+          <label for="item-features">Características Incluidas (Una por línea)</label>
+          <textarea id="item-features" rows="4" placeholder="Autocontestador WhatsApp sin tokens&#10;Integración con Correo y Teams&#10;Cierre de pedidos en automático"></textarea>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="item-image-url">URL o Ruta de Imagen</label>
+            <input type="text" id="item-image-url" value="/assets/service-bots.svg" />
+          </div>
+          <div class="field">
+            <label for="item-image-file">O Subir Imagen desde tu Equipo</label>
+            <input type="file" id="item-image-file" accept="image/*" />
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--metal-border);">
+          <div style="display:flex; flex-direction:column; gap:0.45rem;">
+            <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
+              <input type="checkbox" id="item-active" checked />
+              <span>Mostrar activo en catálogo</span>
+            </label>
+            <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
+              <input type="checkbox" id="item-sent-to-bot" checked />
+              <span>Disponible para que el Bot IA lo cotice</span>
+            </label>
+          </div>
+          <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+            <button type="button" class="btn btn-outline" id="btn-cancel-edit">Cancelar</button>
+            <button type="submit" class="btn btn-outline" id="btn-save-catalog">💾 Solo Guardar</button>
+            <button type="button" class="btn btn-primary" id="btn-save-send-to-bot">🤖 Guardar y Enviar a mi Bot</button>
+          </div>
         </div>
       </form>
     </div>

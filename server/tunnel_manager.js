@@ -48,6 +48,23 @@ async function startCloudflareTunnel(port = 10000) {
     return { state: tunnelState, publicUrl: '' };
   }
 
+  if (cfg.mode === 'cloudfront' && cfg.public_url) {
+    if (tunnelProcess) {
+      try {
+        tunnelProcess.kill();
+      } catch {
+        // ignore
+      }
+      tunnelProcess = null;
+    }
+    currentTunnelUrl = cfg.public_url.trim().replace(/\/+$/, '');
+    tunnelState = 'running';
+    lastTunnelLog = `Amazon CloudFront HTTPS activo -> ${currentTunnelUrl}`;
+    updatePublicFrontendTunnelJson(currentTunnelUrl);
+    console.log(`[CloudFront] Endpoint HTTPS persistente activo: ${currentTunnelUrl} -> http://127.0.0.1:${port}`);
+    return { state: tunnelState, publicUrl: currentTunnelUrl };
+  }
+
   if (tunnelProcess) {
     try {
       tunnelProcess.kill();
@@ -127,10 +144,16 @@ async function startCloudflareTunnel(port = 10000) {
 
 function getTunnelStatus() {
   const cfg = getSetting('tunnel_config', {});
+  const mode =
+    cfg.mode === 'cloudfront'
+      ? 'aws_cloudfront'
+      : cfg.tunnel_token
+        ? 'named_token'
+        : 'quick_trycloudflare';
   return {
     state: tunnelState,
     publicUrl: currentTunnelUrl || cfg.public_url || '',
-    mode: cfg.tunnel_token ? 'named_token' : 'quick_trycloudflare',
+    mode,
     hasToken: Boolean(cfg.tunnel_token),
     lastLog: lastTunnelLog
   };

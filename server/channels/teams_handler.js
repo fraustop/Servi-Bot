@@ -76,11 +76,9 @@ async function handleTeamsWebhook(req, res, runPythonSalesAgent) {
   if (!rawText) {
     return res.json({
       type: 'message',
-      text: '¡Hola! Soy **Servi-Bot** en Microsoft Teams. Pregúntame por nuestros **Bots Autónomos** o **Interfaz de Catálogo Dinámico**.'
+      text: '¡Hola! Soy **Servi-Bot** en Microsoft Teams. Pregúntame por nuestros servicios de Bot Configurado, Página Web o Soporte Técnico 24/7.'
     });
   }
-
-  logTeamsEvent('teams_in', `De ${senderName} (${senderId}): ${rawText}`);
 
   const agentResult = await runPythonSalesAgent({
     channel: 'teams',
@@ -88,6 +86,28 @@ async function handleTeamsWebhook(req, res, runPythonSalesAgent) {
     sender_name: senderName,
     message: rawText
   });
+
+  if (agentResult?.blacklisted) {
+    return res.json({
+      type: 'message',
+      text: '',
+      servibot: agentResult
+    });
+  }
+
+  logTeamsEvent('teams_in', `De ${senderName} (${senderId}): ${rawText}`);
+
+  if (agentResult?.omitted) {
+    logTeamsEvent(
+      'teams_omitted',
+      `Mensaje de ${senderName} (${senderId}) omitido por regla de lista.`
+    );
+    return res.json({
+      type: 'message',
+      text: '',
+      servibot: agentResult
+    });
+  }
 
   const replyText = agentResult?.reply || 'Gracias por escribirnos por Microsoft Teams.';
   logTeamsEvent('teams_out', `Respuesta IA para ${senderName}: ${replyText.slice(0, 120)}...`);

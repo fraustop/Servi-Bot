@@ -7,16 +7,23 @@ const QRCode = require('qrcode');
 
 const EVOLUTION_PORT = Number(process.env.EVOLUTION_PORT || 10001);
 const MAIN_SERVER_WEBHOOK = process.env.MAIN_WEBHOOK_URL || 'http://127.0.0.1:10000/api/webhooks/evolution';
-const BASE_AUTH_DIR = path.join(__dirname, '..', 'auth_info_baileys');
+const BASE_AUTH_DIR = process.env.SERVIBOT_AUTH_DIR
+  ? path.resolve(process.env.SERVIBOT_AUTH_DIR)
+  : process.env.SERVIBOT_DATA_DIR
+    ? path.join(path.resolve(process.env.SERVIBOT_DATA_DIR), 'auth_info_baileys')
+    : path.join(__dirname, '..', 'auth_info_baileys');
 
-const INSTANCE_IDS = Array.from({ length: 10 }, (_, idx) => `servibot-${String(idx + 1).padStart(2, '0')}`);
+const INSTANCE_IDS = [
+  'servibot-00',
+  ...Array.from({ length: 50 }, (_, idx) => `servibot-${String(idx + 1).padStart(2, '0')}`)
+];
 
 const instances = new Map();
 for (let i = 0; i < INSTANCE_IDS.length; i += 1) {
   const instanceId = INSTANCE_IDS[i];
   instances.set(instanceId, {
     instanceId,
-    slotNumber: i + 1,
+    slotNumber: i,
     authDir: path.join(BASE_AUTH_DIR, instanceId),
     sock: null,
     state: 'close', // 'close' | 'connecting' | 'qr_ready' | 'open'
@@ -44,20 +51,31 @@ function recordEvent(type, detail, instanceId = 'system') {
 
 function resolveInstanceId(rawName) {
   const raw = String(rawName || '').trim().toLowerCase();
-  if (!raw || raw === 'servibot-main' || raw === 'default' || raw === 'main') {
-    return 'servibot-01';
+  if (
+    !raw ||
+    raw === 'servibot-00' ||
+    raw === 'servibot-0' ||
+    raw === '0' ||
+    raw === '00' ||
+    raw === 'bot-0' ||
+    raw === 'servibot-main' ||
+    raw === 'default' ||
+    raw === 'main'
+  ) {
+    return 'servibot-00';
   }
   if (instances.has(raw)) {
     return raw;
   }
-  const numMatch = raw.match(/^(\d{1,2})$/);
+  const numMatch = raw.match(/^(?:servibot-)?(\d{1,2})$/);
   if (numMatch) {
     const num = Number(numMatch[1]);
-    if (num >= 1 && num <= 10) {
+    if (num === 0) return 'servibot-00';
+    if (num >= 1 && num <= 50) {
       return `servibot-${String(num).padStart(2, '0')}`;
     }
   }
-  return 'servibot-01';
+  return 'servibot-00';
 }
 
 function hasRegisteredSession(authDir) {
@@ -74,11 +92,11 @@ function hasRegisteredSession(authDir) {
 
 /**
  * Migra la sesión previa almacenada directamente en `auth_info_baileys/creds.json`
- * hacia `auth_info_baileys/servibot-01/` para conservar la conexión existente.
+ * hacia `auth_info_baileys/servibot-00/` para conservar la conexión oficial de Bot 0.
  */
 function migrateLegacyRootSession() {
   const rootCreds = path.join(BASE_AUTH_DIR, 'creds.json');
-  const firstInstDir = path.join(BASE_AUTH_DIR, 'servibot-01');
+  const firstInstDir = path.join(BASE_AUTH_DIR, 'servibot-00');
   const firstCreds = path.join(firstInstDir, 'creds.json');
 
   if (!fs.existsSync(rootCreds) || fs.existsSync(firstCreds)) {
@@ -95,8 +113,8 @@ function migrateLegacyRootSession() {
         path.join(firstInstDir, entry.name)
       );
     }
-    recordEvent('session_migrated', 'Sesión WhatsApp existente migrada a servibot-01', 'servibot-01');
-    console.log('[Evolution:10001] Sesión previa migrada exitosamente a auth_info_baileys/servibot-01');
+    recordEvent('session_migrated', 'Sesión WhatsApp existente migrada a servibot-00', 'servibot-00');
+    console.log('[Evolution:10001] Sesión previa migrada exitosamente a auth_info_baileys/servibot-00');
   } catch (err) {
     console.error('[Evolution:10001] Error migrando sesión previa:', err.message);
   }
@@ -323,7 +341,6 @@ async function initBaileysInstance(rawInstanceId, forceNew = false) {
         if (!text.trim()) continue;
 
         const pushName = msg.pushName || remoteJid.split('@')[0];
-        recordEvent('message_in', `[${inst.instanceId}] De ${pushName} (${remoteJid}): ${text}`, inst.instanceId);
 
         const webhookResponse = await forwardToMainWebhook({
           event: 'messages.upsert',
@@ -335,7 +352,20 @@ async function initBaileysInstance(rawInstanceId, forceNew = false) {
           }
         });
 
-        if (webhookResponse && webhookResponse.reply && inst.sock && inst.state === 'open') {
+        if (webhookResponse?.blacklisted) {
+          continue;
+        }
+
+        recordEvent('message_in', `[${inst.instanceId}] De ${pushName} (${remoteJid}): ${text}`, inst.instanceId);
+
+        if (
+          webhookResponse &&
+          webhookResponse.reply &&
+          !webhookResponse.ignored &&
+          !webhookResponse.omitted &&
+          inst.sock &&
+          inst.state === 'open'
+        ) {
           await inst.sock.sendMessage(remoteJid, { text: webhookResponse.reply });
           recordEvent('message_out', `[${inst.instanceId}] Para ${remoteJid}: ${webhookResponse.reply.slice(0, 120)}...`, inst.instanceId);
         }
@@ -359,11 +389,11 @@ function startEvolutionServer() {
   app.use(express.json({ limit: '5mb' }));
 
   app.get('/', (req, res) => {
-    const primary = instances.get('servibot-01');
+    const primary = instances.get('servibot-00');
     const summaryList = INSTANCE_IDS.map((id) => serializeInstance(instances.get(id)));
     res.json({
       status: 200,
-      service: 'Servi-Bot Evolution API Multi-Instance Engine (10 Instancias Baileys)',
+      service: 'Servi-Bot Evolution API Multi-Instance Engine (Bot 0 + 50 Instancias Baileys)',
       port: EVOLUTION_PORT,
       instanceCount: INSTANCE_IDS.length,
       instance: primary.instanceId,
@@ -511,14 +541,13 @@ function startEvolutionServer() {
 
   app.post('/webhook/simulate', async (req, res) => {
     const {
-      instance = 'servibot-01',
+      instance = 'servibot-00',
       phone = '5218112345678',
       name = 'Prospecto WhatsApp',
       text = 'Hola, ¿qué servicios de bots ofrecen?'
     } = req.body || {};
     const instanceId = resolveInstanceId(instance);
     const jid = phone.includes('@') ? phone : `${phone.replace(/\D/g, '')}@s.whatsapp.net`;
-    recordEvent('simulated_in', `[${instanceId}] Simulación WA de ${name} (${jid}): ${text}`, instanceId);
 
     const webhookResult = await forwardToMainWebhook({
       event: 'messages.upsert',
@@ -531,7 +560,11 @@ function startEvolutionServer() {
       }
     });
 
-    if (webhookResult?.reply) {
+    if (!webhookResult?.blacklisted) {
+      recordEvent('simulated_in', `[${instanceId}] Simulación WA de ${name} (${jid}): ${text}`, instanceId);
+    }
+
+    if (webhookResult?.reply && !webhookResult?.omitted && !webhookResult?.blacklisted) {
       recordEvent('simulated_out', `[${instanceId}] Respuesta IA para ${jid}: ${webhookResult.reply.slice(0, 120)}...`, instanceId);
     }
 
@@ -540,7 +573,7 @@ function startEvolutionServer() {
 
   return new Promise((resolve) => {
     const server = app.listen(EVOLUTION_PORT, '0.0.0.0', () => {
-      console.log(`[Evolution] Backend WhatsApp Multi-Instancia (10 slots Baileys) activo en http://127.0.0.1:${EVOLUTION_PORT}`);
+      console.log(`[Evolution] Backend WhatsApp Multi-Instancia (Bot 0 + 50 slots Baileys) activo en http://127.0.0.1:${EVOLUTION_PORT}`);
       // Auto-conectar únicamente las instancias que ya tienen una sesión registrada en disco
       for (const instId of INSTANCE_IDS) {
         const inst = instances.get(instId);
