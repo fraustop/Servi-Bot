@@ -4765,85 +4765,107 @@ dialog.product-form-modal .dialog-inner {
 /* Fondo principal de la aplicación en modo claro */
 [data-theme="light"],
 [data-theme="light"] body {
-  background-color: #f8fafc !important;
+  background-color: #f1f5f9 !important;
   background-image:
-    radial-gradient(ellipse 70% 45% at 15% 0%, rgba(2, 132, 199, 0.05), transparent 58%),
+    radial-gradient(ellipse 70% 45% at 15% 0%, rgba(2, 132, 199, 0.04), transparent 58%),
     radial-gradient(ellipse 65% 45% at 88% 100%, rgba(37, 211, 102, 0.04), transparent 58%),
-    linear-gradient(165deg, #f8fafc 0%, #ffffff 54%, #f1f5f9 100%) !important;
+    linear-gradient(165deg, #f8fafc 0%, #edf2f7 54%, #f1f5f9 100%) !important;
   color: #0f172a !important;
 }
 
-/* Encabezado superior del carrusel */
+/* ==========================================================================
+   ENCABEZADO PRINCIPAL (GRIS GRAFITO METÁLICO CON TIPOGRAFÍA DE ALTO CONTRASTE)
+   ========================================================================== */
 [data-theme="light"] .carousel-topbar {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
-  border-bottom: 1px solid #cbd5e1 !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  background: linear-gradient(180deg, #242c38 0%, #151b23 100%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18) !important;
 }
 
 [data-theme="light"] .carousel-brand .brand-title {
-  color: #0f172a !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] .carousel-brand .brand-subtitle {
-  color: #0369a1 !important;
+  color: #38bdf8 !important;
+  font-weight: 600 !important;
 }
 
-/* Botones de navegación y utilidades en topbar */
+/* SELECTOR DE SECCIONES CON GLOSS Y PROFUNDIDAD */
+[data-theme="light"] .carousel-markers {
+  background: rgba(15, 23, 42, 0.65) !important;
+  padding: 3px !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(255, 255, 255, 0.08) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+}
+
 [data-theme="light"] .carousel-markers button {
-  background: #f1f5f9 !important;
-  border: 1px solid #cbd5e1 !important;
-  color: #475569 !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: #94a3b8 !important;
+  font-weight: 600 !important;
+  padding: 0.35rem 0.85rem !important;
+  border-radius: 9px !important;
+  transition: all 0.2s ease !important;
 }
 
 [data-theme="light"] .carousel-markers button:hover {
-  background: #e2e8f0 !important;
-  color: #0f172a !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #f8fafc !important;
 }
 
 [data-theme="light"] .carousel-markers button.is-active,
 [data-theme="light"] .carousel-markers button[aria-current="true"] {
-  background: #ffffff !important;
-  border-color: #0284c7 !important;
-  color: #0f172a !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.08) 48%, rgba(0, 0, 0, 0.18) 52%, rgba(0, 0, 0, 0.08) 100%), linear-gradient(135deg, #0284c7, #0369a1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  color: #ffffff !important;
   font-weight: 700 !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.6), inset 0 -1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(2, 132, 199, 0.45) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) !important;
 }
 
+/* Botones de utilidades en topbar grafito */
 [data-theme="light"] .btn-topbar-theme,
 [data-theme="light"] .btn-topbar-user,
 [data-theme="light"] .btn-topbar-admin,
 [data-theme="light"] .btn-topbar-sim {
-  background: #f1f5f9 !important;
-  border: 1px solid #cbd5e1 !important;
-  color: #0f172a !important;
+  background: rgba(255, 255, 255, 0.09) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  color: #f8fafc !important;
 }
 
 [data-theme="light"] .btn-topbar-theme:hover,
 [data-theme="light"] .btn-topbar-user:hover,
 [data-theme="light"] .btn-topbar-admin:hover,
 [data-theme="light"] .btn-topbar-sim:hover {
-  background: #e2e8f0 !important;
-  border-color: #94a3b8 !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  color: #ffffff !important;
 }
 
 [data-theme="light"] .btn-topbar-user {
-  color: #0369a1 !important;
-  background: rgba(2, 132, 199, 0.08) !important;
-  border-color: rgba(2, 132, 199, 0.3) !important;
+  color: #38bdf8 !important;
+  background: rgba(56, 189, 248, 0.14) !important;
+  border-color: rgba(56, 189, 248, 0.35) !important;
 }
 
 [data-theme="light"] .btn-topbar-sim.is-custom-mode {
-  background: rgba(126, 34, 206, 0.08) !important;
-  border-color: rgba(126, 34, 206, 0.35) !important;
-  color: #6b21a8 !important;
+  background: rgba(168, 85, 247, 0.18) !important;
+  border-color: rgba(168, 85, 247, 0.4) !important;
+  color: #d8b4fe !important;
 }
 
 /* Flechas laterales del carrusel */
 [data-theme="light"] .carousel-arrow {
   background: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   color: #0f172a !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12) !important;
 }
 
 [data-theme="light"] .carousel-arrow:hover:not(:disabled) {
@@ -4852,7 +4874,7 @@ dialog.product-form-modal .dialog-inner {
 }
 
 /* ==========================================================================
-   SECCIÓN DE DESCRIPCIÓN (DIAPOSITIVAS 1, 2 Y 3 EN MODO CLARO)
+   SECCIÓN DE DESCRIPCIÓN (3 TARJETAS BLANCAS DE ALTO CONTRASTE Y BOTONES INTERNOS)
    ========================================================================== */
 [data-theme="light"] .carousel-section,
 [data-theme="light"] .carousel-viewport,
@@ -4863,14 +4885,18 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .carousel-slide.slide-description {
   background: transparent !important;
+}
+
+[data-theme="light"] .desc-story-grid {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 20px !important;
+  padding: clamp(1.2rem, 2.8vw, 2.25rem) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.04) !important;
   color: #0f172a !important;
 }
 
 [data-theme="light"] .slide-inner-hero {
-  color: #0f172a !important;
-}
-
-[data-theme="light"] .desc-story-grid {
   color: #0f172a !important;
 }
 
@@ -4903,11 +4929,13 @@ dialog.product-form-modal .dialog-inner {
   font-weight: 700 !important;
 }
 
+/* BOTONES INTERNOS DE LAS TARJETAS DE DESCRIPCIÓN */
 [data-theme="light"] .desc-step-pill {
-  background: #f1f5f9 !important;
+  background: #f8fafc !important;
   border: 1px solid #cbd5e1 !important;
-  color: #475569 !important;
+  color: #334155 !important;
   font-weight: 600 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
 }
 
 [data-theme="light"] .desc-step-pill:hover {
@@ -4917,29 +4945,37 @@ dialog.product-form-modal .dialog-inner {
 }
 
 [data-theme="light"] .desc-step-pill[aria-current="true"] {
-  background: linear-gradient(135deg, rgba(37, 211, 102, 0.18), rgba(0, 120, 212, 0.18)) !important;
-  border-color: #16a34a !important;
-  color: #0f172a !important;
+  background: #16a34a !important;
+  border-color: #15803d !important;
+  color: #ffffff !important;
   font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3) !important;
 }
 
 [data-theme="light"] .desc-autoplay-toggle {
-  background: rgba(2, 132, 199, 0.1) !important;
-  border: 1px solid rgba(2, 132, 199, 0.35) !important;
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
   color: #0369a1 !important;
   font-weight: 600 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme="light"] .desc-autoplay-toggle:hover {
+  background: #e2e8f0 !important;
+  border-color: #0284c7 !important;
+  color: #0284c7 !important;
 }
 
 [data-theme="light"] .desc-autoplay-toggle[data-paused="true"] {
-  background: rgba(217, 119, 6, 0.1) !important;
-  border-color: rgba(217, 119, 6, 0.35) !important;
+  background: rgba(217, 119, 6, 0.12) !important;
+  border-color: rgba(217, 119, 6, 0.4) !important;
   color: #b45309 !important;
 }
 
 [data-theme="light"] .desc-visual-card {
   background: #ffffff !important;
   border: 1px solid #cbd5e1 !important;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08) !important;
 }
 
 [data-theme="light"] .desc-visual-caption {
@@ -4952,36 +4988,36 @@ dialog.product-form-modal .dialog-inner {
    CONFIGURADOR: HEADER, RIBBON Y PESTAÑAS CUADRADAS
    ========================================================================== */
 [data-theme="light"] .configurator-sticky-header {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
-  border-bottom: 1px solid #cbd5e1 !important;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
+  background: linear-gradient(180deg, #242c38 0%, #151b23 100%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
 }
 
 [data-theme="light"] .configurator-heading-left {
-  color: #0f172a !important;
+  color: #ffffff !important;
   font-weight: 700 !important;
 }
 
-/* Pestañas inactivas del ribbon del configurador */
+/* Pestañas inactivas del ribbon en encabezado grafito */
 [data-theme="light"] .wizard-tab-square,
 [data-theme="light"] .wizard-step-btn {
-  background: #f1f5f9 !important;
-  border: 1px solid #cbd5e1 !important;
-  color: #334155 !important;
+  background: rgba(255, 255, 255, 0.09) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .wizard-tab-square:hover:not(:disabled),
 [data-theme="light"] .wizard-step-btn:hover:not(:disabled) {
-  background: #e2e8f0 !important;
-  border-color: #94a3b8 !important;
-  color: #0f172a !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  color: #ffffff !important;
 }
 
 [data-theme="light"] .wizard-tab-square .wizard-step-num,
 [data-theme="light"] .wizard-step-btn .wizard-step-num {
-  background: #e2e8f0 !important;
-  border: 1px solid #cbd5e1 !important;
-  color: #475569 !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
 }
 
 /* Pestaña ACTIVA / SELECCIONADA en el ribbon */
@@ -4990,10 +5026,10 @@ dialog.product-form-modal .dialog-inner {
 [data-theme="light"] .wizard-step-btn[aria-current="step"],
 [data-theme="light"] .wizard-tab-square[aria-current="step"],
 [data-theme="light"] .wizard-tab-square.is-active {
-  background: #ffffff !important;
-  border-color: #0284c7 !important;
-  color: #0284c7 !important;
-  box-shadow: inset 0 2px 0 0 #0284c7, 0 4px 12px rgba(2, 132, 199, 0.15) !important;
+  background: linear-gradient(135deg, #0284c7, #0369a1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 4px 14px rgba(2, 132, 199, 0.5) !important;
   font-weight: 700 !important;
 }
 
@@ -5002,17 +5038,17 @@ dialog.product-form-modal .dialog-inner {
 [data-theme="light"] .wizard-step-btn[aria-current="step"] .wizard-step-num,
 [data-theme="light"] .wizard-tab-square[aria-current="step"] .wizard-step-num,
 [data-theme="light"] .wizard-tab-square.is-active .wizard-step-num {
-  background: #0284c7 !important;
-  border-color: #0284c7 !important;
-  color: #ffffff !important;
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #0369a1 !important;
 }
 
 /* Pestaña COMPLETADA / DONE en el ribbon */
 [data-theme="light"] .wizard-step-item.is-done .wizard-tab-square,
 [data-theme="light"] .wizard-step-item.is-done .wizard-step-btn {
-  background: rgba(37, 211, 102, 0.1) !important;
-  border-color: #16a34a !important;
-  color: #15803d !important;
+  background: rgba(37, 211, 102, 0.18) !important;
+  border-color: rgba(37, 211, 102, 0.5) !important;
+  color: #72f099 !important;
   box-shadow: none !important;
 }
 
@@ -5024,12 +5060,111 @@ dialog.product-form-modal .dialog-inner {
 }
 
 /* ==========================================================================
-   CONFIGURADOR: FORMULARIO, CAMPOS E INPUTS
+   BOTONES GLOBALES .btn-outline Y VARIANTES (CORRECCIÓN CRÍTICA DE CONTRASTE)
+   ========================================================================== */
+[data-theme="light"] .btn-outline {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] .btn-outline:hover:not(:disabled) {
+  background: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+  transform: translateY(-1px);
+}
+
+[data-theme="light"] .btn-outline:active {
+  background: #e2e8f0 !important;
+}
+
+/* BOTÓN ESPECÍFICO: RETOMAR MI BOT */
+[data-theme="light"] #btn-wizard-recover {
+  background: linear-gradient(135deg, #0284c7, #0369a1) !important;
+  border: 1px solid #0284c7 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25) !important;
+}
+
+[data-theme="light"] #btn-wizard-recover:hover {
+  background: linear-gradient(135deg, #0369a1, #075985) !important;
+  border-color: #075985 !important;
+  color: #ffffff !important;
+}
+
+/* BOTÓN ESPECÍFICO: RESTABLECER POR DEFECTO EN REGLAS Y OPCIONES */
+[data-theme="light"] #btn-reset-quick-opts {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #475569 !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] #btn-reset-quick-opts:hover {
+  background: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+/* BOTONCITOS DE TACHITAS Y ELIMINAR EN REGLAS Y OPCIONES */
+[data-theme="light"] .btn-del-quick-opt {
+  background: #ffffff !important;
+  border: 1px solid #fecaca !important;
+  color: #dc2626 !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .btn-del-quick-opt:hover {
+  background: #fee2e2 !important;
+  border-color: #ef4444 !important;
+  color: #991b1b !important;
+}
+
+/* BOTONCITOS DE ELIMINAR EN EL CATÁLOGO */
+[data-theme="light"] .btn-del-catalog-item {
+  background: #ffffff !important;
+  border: 1px solid #fecaca !important;
+  color: #dc2626 !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] .btn-del-catalog-item:hover {
+  background: #fee2e2 !important;
+  border-color: #ef4444 !important;
+  color: #991b1b !important;
+}
+
+/* ==========================================================================
+   CONFIGURADOR: FORMULARIO, RECOVER BOX Y CAMPOS
    ========================================================================== */
 [data-theme="light"] .configurator-form-card {
   background: #ffffff !important;
   border: 1px solid #cbd5e1 !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] .wizard-recover-box {
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] .wizard-recover-info strong {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .wizard-recover-info span {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .wizard-recover-input,
+[data-theme="light"] #wizard-recover-input {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
 }
 
 [data-theme="light"] .prospect-gate-card {
@@ -5112,61 +5247,6 @@ dialog.product-form-modal .dialog-inner {
   box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.18) !important;
 }
 
-[data-theme="light"] .wizard-recover-box {
-  background: #f8fafc !important;
-  border: 1px solid #cbd5e1 !important;
-}
-
-[data-theme="light"] .wizard-recover-info strong {
-  color: #0f172a !important;
-}
-
-[data-theme="light"] .wizard-recover-info span {
-  color: #475569 !important;
-}
-
-[data-theme="light"] .wizard-live-preview {
-  background: linear-gradient(155deg, #f5f3ff 0%, #faf5ff 100%) !important;
-  border: 1px solid #d8b4fe !important;
-  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.08) !important;
-}
-
-[data-theme="light"] .wizard-preview-label {
-  color: #7e22ce !important;
-}
-
-[data-theme="light"] .wizard-preview-bubble strong {
-  color: #0f172a !important;
-}
-
-[data-theme="light"] .wizard-preview-bubble p {
-  color: #334155 !important;
-}
-
-[data-theme="light"] .wizard-summary-card {
-  background: #f8fafc !important;
-  border: 1px solid #cbd5e1 !important;
-}
-
-[data-theme="light"] .wizard-summary-meta {
-  color: #b45309 !important;
-}
-
-[data-theme="light"] .wizard-pricing-card {
-  background: #ffffff !important;
-  border: 1px solid #cbd5e1 !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important;
-}
-
-[data-theme="light"] .simulator-highlight-banner {
-  background: rgba(37, 211, 102, 0.1) !important;
-  border: 1px solid rgba(37, 211, 102, 0.35) !important;
-}
-
-[data-theme="light"] .sim-banner-badge {
-  color: #15803d !important;
-}
-
 /* ==========================================================================
    ALMA E IA: MASTER-DETAIL EN MODO CLARO
    ========================================================================== */
@@ -5225,26 +5305,27 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .quick-opt-row {
   background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 [data-theme="light"] .quick-opt-badge {
   background: rgba(37, 211, 102, 0.12) !important;
   color: #15803d !important;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] .quick-opt-prompt-preview {
-  color: #475569 !important;
+  color: #334155 !important;
 }
 
 [data-theme="light"] .quick-opt-form-card {
   background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 [data-theme="light"] .schedule-day-row {
   background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 [data-theme="light"] .schedule-day-label {
@@ -5271,22 +5352,24 @@ dialog.product-form-modal .dialog-inner {
 [data-theme="light"] .catalog-add-card,
 [data-theme="light"] .faq-add-card {
   background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 [data-theme="light"] .catalog-item-card,
 [data-theme="light"] .faq-item-card {
   background: #ffffff !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
 }
 
 [data-theme="light"] .catalog-item-title {
   color: #0f172a !important;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] .catalog-item-price {
   color: #16a34a !important;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] .catalog-item-desc {
@@ -5300,6 +5383,7 @@ dialog.product-form-modal .dialog-inner {
 [data-theme="light"] .catalog-item-badge {
   background: #f1f5f9 !important;
   color: #475569 !important;
+  border: 1px solid #cbd5e1 !important;
 }
 
 [data-theme="light"] .faq-item-q {
@@ -5312,6 +5396,46 @@ dialog.product-form-modal .dialog-inner {
 
 [data-theme="light"] .faq-item-a {
   color: #334155 !important;
+}
+
+/* ==========================================================================
+   PASO 3: SIMULADOR Y COSTO (TARJETA DE TU BOT CREADO Y BOTONES INTERNOS)
+   ========================================================================== */
+[data-theme="light"] .wizard-summary-box,
+[data-theme="light"] #wizard-created-card {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] #wizard-created-card h4,
+[data-theme="light"] #wizard-summary-title {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] #wizard-summary-meta {
+  color: #0369a1 !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] #wizard-summary-soul {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .wizard-pricing-card {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] .simulator-highlight-banner {
+  background: rgba(37, 211, 102, 0.1) !important;
+  border: 1px solid rgba(37, 211, 102, 0.35) !important;
+}
+
+[data-theme="light"] .sim-banner-badge {
+  color: #15803d !important;
 }
 
 /* ==========================================================================
