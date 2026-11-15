@@ -1152,9 +1152,9 @@ body.is-admin-session .container {
   margin: 0;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1.5px solid #cbd5e1;
-  background: #ffffff;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  background: linear-gradient(160deg, #131822, #090c12);
+  box-shadow: var(--shadow-metallic), 0 0 36px -14px rgba(0, 120, 212, 0.35);
 }
 
 .desc-visual-card img {
@@ -1163,7 +1163,7 @@ body.is-admin-session .container {
   block-size: auto;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--metal-border);
 }
 
 .desc-visual-caption {
@@ -1173,8 +1173,8 @@ body.is-admin-session .container {
   padding: 0.72rem 1rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #1e293b;
-  background: #f8fafc;
+  color: var(--text-secondary);
+  background: rgba(8, 11, 16, 0.94);
 }
 
 .carousel-slide.slide-configurator {
@@ -3245,7 +3245,7 @@ article.card > footer {
 .field input,
 .field select,
 .field textarea {
-  background: var(--bg-dark);
+  background: #141c2b;
   border: 1px solid var(--metal-border-strong);
   color: var(--text-main);
   padding: 0.65rem 0.85rem;
@@ -4915,20 +4915,33 @@ dialog.product-form-modal .dialog-inner {
 }
 
 /* ==========================================================================
-   SECCIÓN DE DESCRIPCIÓN (3 TARJETAS BLANCAS DE ALTO CONTRASTE Y BOTONES INTERNOS)
+   SECCIÓN DE DESCRIPCIÓN Y ESCENARIO: FONDO CLARO INTEGRAL (CERO FONDOS NEGROS)
    ========================================================================== */
+/* El escenario completo y el carrusel en modo claro tienen fondo claro luminoso y decorativo */
+[data-theme="light"] .public-stage,
+[data-theme="light"] .carousel,
 [data-theme="light"] .carousel-section,
 [data-theme="light"] .carousel-viewport,
 [data-theme="light"] .carousel-track,
-[data-theme="light"] .carousel-slide {
-  background: transparent !important;
-}
-
+[data-theme="light"] .carousel-slide,
 [data-theme="light"] .carousel-slide.slide-description {
-  background: transparent !important;
+  background-color: #f1f5f9 !important;
+  background-image:
+    radial-gradient(ellipse 70% 45% at 15% 0%, rgba(2, 132, 199, 0.05), transparent 58%),
+    radial-gradient(ellipse 65% 45% at 88% 100%, rgba(37, 211, 102, 0.05), transparent 58%),
+    linear-gradient(165deg, #f8fafc 0%, #edf2f7 54%, #f1f5f9 100%) !important;
 }
 
-.desc-story-grid,
+/* Base lateral y dock en modo claro nunca negros */
+[data-theme="light"] .simulator-dock,
+[data-theme="light"] .bot-widget-panel,
+[data-theme="light"] .sim-lateral-tab {
+  background: #ffffff !important;
+  border-inline-start: 1px solid #cbd5e1 !important;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Tarjeta de historia en MODO CLARO exclusivamente */
 [data-theme="light"] .desc-story-grid {
   background: #ffffff !important;
   background-image:
@@ -4939,6 +4952,16 @@ dialog.product-form-modal .dialog-inner {
   padding: clamp(1.2rem, 2.8vw, 2.25rem) !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.04) !important;
   color: #0f172a !important;
+}
+
+/* Tarjeta de historia en MODO OSCURO: fondo oscuro profundo y letras perfectamente legibles */
+[data-theme="dark"] .desc-story-grid,
+:root:not([data-theme="light"]) .desc-story-grid {
+  background: linear-gradient(160deg, #131822 0%, #0d1117 75%, #101520 100%) !important;
+  border: 1px solid rgba(88, 166, 255, 0.28) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  color: #f0f6fc !important;
 }
 
 [data-theme="light"] .slide-inner-hero {
@@ -5017,7 +5040,7 @@ dialog.product-form-modal .dialog-inner {
   color: #b45309 !important;
 }
 
-.desc-visual-card,
+/* Tarjeta visual en MODO CLARO */
 [data-theme="light"] .desc-visual-card {
   background: #ffffff !important;
   border: 1.5px solid #cbd5e1 !important;
@@ -5026,12 +5049,28 @@ dialog.product-form-modal .dialog-inner {
   overflow: hidden !important;
 }
 
-.desc-visual-caption,
 [data-theme="light"] .desc-visual-caption {
   background: #f8fafc !important;
   color: #1e293b !important;
   font-weight: 600 !important;
   border-top: 1px solid #e2e8f0 !important;
+}
+
+/* Tarjeta visual en MODO OSCURO */
+[data-theme="dark"] .desc-visual-card,
+:root:not([data-theme="light"]) .desc-visual-card {
+  background: linear-gradient(160deg, #131822 0%, #090c12 100%) !important;
+  border: 1px solid rgba(88, 166, 255, 0.35) !important;
+  box-shadow: var(--shadow-metallic), 0 0 36px -14px rgba(0, 120, 212, 0.35) !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+}
+
+[data-theme="dark"] .desc-visual-caption,
+:root:not([data-theme="light"]) .desc-visual-caption {
+  background: rgba(8, 11, 16, 0.94) !important;
+  color: #94a3b8 !important;
+  border-top: 1px solid var(--metal-border) !important;
 }
 
 /* ==========================================================================
@@ -5342,12 +5381,22 @@ dialog.product-form-modal .dialog-inner {
   font-weight: 700 !important;
 }
 
+/* CAMPOS DE ENTRADA EN MODO CLARO: FONDO GRIS CLARO ELEGANTE EN LUGAR DE NEGRO O BLANCO PLANO */
 [data-theme="light"] input,
 [data-theme="light"] textarea,
-[data-theme="light"] select {
-  background: #ffffff !important;
+[data-theme="light"] select,
+[data-theme="light"] .field input,
+[data-theme="light"] .field textarea,
+[data-theme="light"] .field select,
+[data-theme="light"] .prospect-gate-card input,
+[data-theme="light"] .configurator-form-card input,
+[data-theme="light"] .configurator-form-card select,
+[data-theme="light"] .configurator-form-card textarea {
+  background: #f1f5f9 !important;
   color: #0f172a !important;
-  border: 1px solid #cbd5e1 !important;
+  border: 1.5px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04) !important;
 }
 
 [data-theme="light"] input::placeholder,
