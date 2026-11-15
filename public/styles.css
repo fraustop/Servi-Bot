@@ -3934,3 +3934,454 @@ dialog.product-form-modal .dialog-inner {
   gap: 1rem;
 }
 
+/* ==================== TAB: ALMA DEL BOT (PERSONALIDAD E IA) ==================== */
+.bot-soul-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.bot-soul-header {
+  background: linear-gradient(135deg, rgba(20, 27, 40, 0.95), rgba(12, 16, 24, 0.95));
+  border: 1px solid var(--metal-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.bot-soul-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.bot-soul-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bot-soul-subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  max-width: 820px;
+  line-height: 1.45;
+}
+
+.bot-soul-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 960px) {
+  .bot-soul-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bot-soul-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.bot-soul-card {
+  background: linear-gradient(175deg, #121722, #0b0e14);
+  border: 1px solid var(--metal-border);
+  border-radius: var(--radius-lg);
+  padding: 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.soul-card-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.soul-card-desc {
+  margin: -0.5rem 0 0.25rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.soul-template-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed var(--metal-border);
+  border-radius: var(--radius-md);
+}
+
+.soul-template-btn {
+  font-size: 0.75rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid var(--metal-border-strong);
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+
+.soul-template-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-main);
+  border-color: var(--outlook-blue-bright);
+}
+
+.bot-soul-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(135deg, rgba(20, 27, 40, 0.95), rgba(12, 16, 24, 0.95));
+  border: 1px solid var(--metal-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.bot-soul-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+/* ==================== FILTRO PREVIO OBLIGATORIO DE IDENTIFICACIÓN (PROSPECT GATE) ==================== */
+.prospect-gate-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.prospect-gate-card {
+  background: linear-gradient(150deg, rgba(17, 24, 39, 0.85) 0%, rgba(10, 15, 26, 0.95) 100%);
+  border: 1px solid var(--metal-border-strong);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem 1.6rem;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(8px);
+}
+
+.prospect-gate-head {
+  text-align: center;
+  margin-bottom: 1.4rem;
+}
+
+.prospect-gate-title {
+  font-family: var(--font-serif);
+  font-size: 1.55rem;
+  margin: 0.5rem 0 0.35rem;
+  color: #ffffff;
+}
+
+.prospect-gate-sub {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 0 auto;
+  max-width: 480px;
+}
+
+/* Botón Google con estilo oficial */
+.btn-google-auth {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 46px;
+  padding: 0.7rem 1.25rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #ffffff;
+  color: #1f2937;
+  font-family: inherit;
+  font-size: 0.94rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  transition: transform 0.14s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.btn-google-auth:hover {
+  background: #f8fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24);
+}
+
+.btn-google-auth:focus-visible {
+  outline: 2px solid var(--outlook-blue-bright);
+  outline-offset: 2px;
+}
+
+.google-logo-svg {
+  flex: 0 0 auto;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 1.2rem 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--metal-border);
+}
+
+.auth-divider span {
+  padding: 0 0.85rem;
+}
+
+.prospect-auth-mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  background: rgba(11, 15, 25, 0.7);
+  padding: 0.3rem;
+  border-radius: 10px;
+  border: 1px solid var(--metal-border);
+  margin-bottom: 1.1rem;
+}
+
+.prospect-toggle-btn {
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  padding: 0.5rem 0.75rem;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.prospect-toggle-btn.is-active {
+  background: linear-gradient(135deg, rgba(30, 58, 95, 0.95), rgba(16, 36, 68, 0.95));
+  color: #ffffff;
+  border: 1px solid var(--outlook-blue-bright);
+  box-shadow: 0 2px 8px rgba(0, 120, 212, 0.25);
+}
+
+/* Tarjeta Destacada de Aviso Celular / WhatsApp */
+.prospect-phone-notice {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  padding: 0.9rem 1.05rem;
+  margin: 1rem 0;
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  border-radius: 12px;
+}
+
+.prospect-phone-notice .notice-icon {
+  font-size: 1.4rem;
+  flex: 0 0 auto;
+  line-height: 1;
+  margin-top: 0.1rem;
+}
+
+.prospect-phone-notice .notice-text {
+  font-size: 0.84rem;
+  color: #cbd5e1;
+  line-height: 1.45;
+}
+
+.prospect-phone-notice .notice-text strong {
+  display: block;
+  color: #38bdf8;
+  margin-bottom: 0.25rem;
+  font-size: 0.88rem;
+}
+
+.prospect-phone-notice .notice-text p {
+  margin: 0;
+}
+
+.prospect-terms-consent {
+  margin: 0.85rem 0 1.15rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.consent-checkbox-label {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.consent-checkbox-label input[type="checkbox"] {
+  margin-top: 0.15rem;
+  flex: 0 0 auto;
+  inline-size: 17px;
+  block-size: 17px;
+  accent-color: var(--wa-green);
+}
+
+.link-terms-modal {
+  color: #38bdf8;
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.link-terms-modal:hover {
+  color: #7dd3fc;
+}
+
+.prospect-contact-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+/* Barra superior de cliente verificado en el Wizard */
+.prospect-verified-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.15rem;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.32);
+}
+
+.prospect-verified-info {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.prospect-avatar-icon {
+  font-size: 1.2rem;
+}
+
+.prospect-verified-text {
+  font-size: 0.85rem;
+  color: #e2e8f0;
+}
+
+.prospect-verified-text strong {
+  color: #6ee7b7;
+}
+
+.prospect-verified-text code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #a7f3d0;
+}
+
+.prospect-verified-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Modal de Términos y Condiciones */
+.terms-modal {
+  max-inline-size: 780px;
+  max-block-size: 85vh;
+}
+
+.terms-modal-body {
+  max-block-size: 60vh;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #cbd5e1;
+}
+
+.terms-modal-body h4 {
+  color: #38bdf8;
+  margin: 1.1rem 0 0.35rem;
+  font-size: 1rem;
+}
+
+.terms-modal-body p {
+  margin: 0 0 0.75rem;
+}
+
+/* Footer público */
+.public-site-footer {
+  margin-top: 3.5rem;
+  padding: 1.75rem 1.5rem;
+  border-top: 1px solid var(--metal-border);
+  background: rgba(10, 14, 23, 0.65);
+}
+
+.footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.footer-links {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.footer-links a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.footer-links a:hover {
+  color: #38bdf8;
+}
+
+
+

@@ -723,6 +723,25 @@ function seedDatabase() {
       outgoing_webhook_secret: '',
       notify_new_orders: true
     },
+    telegram_config: {
+      enabled: false,
+      bot_name: 'Servi-Bot Telegram',
+      bot_username: '',
+      bot_token: '',
+      notify_new_orders: true
+    },
+    instagram_config: {
+      enabled: false,
+      account_username: '',
+      access_token: '',
+      auto_reply_comments: true
+    },
+    tiktok_config: {
+      enabled: false,
+      account_username: '',
+      client_key: '',
+      auto_reply_comments: true
+    },
     tunnel_config: {
       enabled: true,
       mode: 'quick',

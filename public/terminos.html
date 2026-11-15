@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Términos y Condiciones del Servicio · Servi-Bot</title>
+  <link rel="icon" type="image/png" href="/assets/servibot-logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .legal-page-shell {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+      color: var(--text-main, #f1f5f9);
+      line-height: 1.7;
+    }
+    .legal-header {
+      border-bottom: 1px solid var(--metal-border, #334155);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .legal-header h1 {
+      font-family: var(--font-serif, "Instrument Serif", serif);
+      font-size: 2.2rem;
+      margin: 0.5rem 0 0.35rem;
+      color: #ffffff;
+    }
+    .legal-header .legal-meta {
+      font-size: 0.85rem;
+      color: var(--text-muted, #94a3b8);
+    }
+    .legal-nav-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: #38bdf8;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.88rem;
+      margin-bottom: 1rem;
+    }
+    .legal-nav-back:hover {
+      text-decoration: underline;
+    }
+    .legal-section {
+      margin-bottom: 2.2rem;
+    }
+    .legal-section h2 {
+      font-size: 1.25rem;
+      color: #38bdf8;
+      margin-bottom: 0.65rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .legal-section h3 {
+      font-size: 1.05rem;
+      color: #e2e8f0;
+      margin: 1rem 0 0.4rem;
+    }
+    .legal-section p, .legal-section li {
+      font-size: 0.94rem;
+      color: #cbd5e1;
+    }
+    .legal-section ul {
+      padding-left: 1.35rem;
+      margin: 0.5rem 0 1rem;
+    }
+    .legal-highlight-box {
+      background: rgba(14, 165, 233, 0.08);
+      border: 1px solid rgba(14, 165, 233, 0.35);
+      border-radius: 12px;
+      padding: 1.1rem 1.25rem;
+      margin: 1.2rem 0;
+    }
+    .legal-highlight-box strong {
+      color: #7dd3fc;
+    }
+    .legal-footer {
+      border-top: 1px solid var(--metal-border, #334155);
+      padding-top: 1.5rem;
+      margin-top: 3rem;
+      font-size: 0.82rem;
+      color: var(--text-muted, #94a3b8);
+      text-align: center;
+    }
+  </style>
+</head>
+<body style="background: var(--bg-dark, #0b1120);">
+  <main class="legal-page-shell">
+    <a href="/" class="legal-nav-back">← Volver al sitio principal de Servi-Bot</a>
+
+    <header class="legal-header">
+      <div style="display: flex; align-items: center; gap: 0.6rem;">
+        <img src="/assets/servibot-logo.png" alt="Servi-Bot" width="36" height="36" />
+        <span class="badge-tag badge-tag-accent">Documento Legal Oficial</span>
+      </div>
+      <h1>Términos y Condiciones de Uso del Servicio</h1>
+      <p class="legal-meta">Última actualización: Noviembre 2026 · Válido para los Estados Unidos Mexicanos y operaciones internacionales.</p>
+    </header>
+
+    <article>
+      <section class="legal-section">
+        <h2>1. Identificación y Aceptación</h2>
+        <p>
+          El presente documento establece los Términos y Condiciones que rigen el acceso y uso de la plataforma <strong>Servi-Bot</strong> (en adelante, "la Plataforma" o "Servi-Bot"), accesible mediante el dominio web oficial y sus servicios asociados de asistentes inteligentes autónomos.
+        </p>
+        <p>
+          Al crear una cuenta mediante Firebase Authentication (sea con proveedor Google o mediante correo electrónico y contraseña), registrar sus datos de contacto o configurar un asistente ServiBot, usted (el "Usuario" o "Cliente") manifiesta su conformidad expresa y sin reservas con la totalidad de estas cláusulas.
+        </p>
+      </section>
+
+      <section class="legal-section">
+        <h2>2. Descripción del Servicio y Plataforma Tecnológica</h2>
+        <p>
+          Servi-Bot provee una solución integral de automatización comercial, atención inteligente y cierre de pedidos que incluye:
+        </p>
+        <ul>
+          <li><strong>Asistentes de Inteligencia Artificial (ServiBot):</strong> Motores de lenguaje configurables según el catálogo, reglas, listas de contactos y tono de comunicación del cliente.</li>
+          <li><strong>Canales Multicanal Integrados:</strong> Conexión con WhatsApp (mediante Baileys / Evolution API sin costo por token), Correo Electrónico (Outlook / Microsoft 365 / IMAP / SMTP) y Microsoft Teams.</li>
+          <li><strong>Catálogo Interactivo y Sistema de Pedidos:</strong> Gestión de productos y servicios con cálculo impositivo aplicable y procesamiento de pagos vía Mercado Pago México.</li>
+          <li><strong>Aislamiento Estricto de Datos:</strong> Cada instancia cuenta con su propia base de datos SQLite aislada, garantizando que la información comercial, cotizaciones y conversaciones de un cliente jamás sean compartidas ni visibles por otros bots.</li>
+        </ul>
+      </section>
+
+      <section class="legal-section">
+        <h2>3. Registro de Cuenta y Verificación de Contacto</h2>
+        <p>
+          Para configurar y conservar un ServiBot personalizado, el Usuario debe completar el filtro de identificación mediante Firebase Auth.
+        </p>
+        <p>
+          Si el registro se efectúa mediante <strong>Google Sign-In</strong>, la Plataforma pre-cargará los datos asociados a dicha cuenta (nombre y correo electrónico) para su confirmación y solicitará el número de celular correspondiente. Si el registro se efectúa con correo y contraseña, el Usuario deberá capturar obligatoriamente su nombre, número de celular y nombre comercial.
+        </p>
+      </section>
+
+      <section class="legal-section">
+        <h2>4. Consentimiento Expreso de Mensajería y Notificaciones Móviles</h2>
+        <div class="legal-highlight-box">
+          <p>
+            <strong>📲 Cláusula Esencial de Mensajería y WhatsApp:</strong><br />
+            Al proporcionar su número de teléfono celular y aceptar estos términos, usted <strong>autoriza expresamente a Servi-Bot</strong> a utilizar dicho número para el envío periódico de mensajes informativos, notificaciones operativas, confirmaciones de órdenes de pago, alertas de vinculación de su bot, recordatorios de vigencia de suscripción y actualizaciones del servicio mediante WhatsApp o mensajería electrónica directa.
+          </p>
+        </div>
+        <p>
+          Servi-Bot se compromete a no realizar spam ni ceder su información telefónica a terceros para fines ajenos a la operación y seguimiento de su asistente virtual y los servicios contratados.
+        </p>
+      </section>
+
+      <section class="legal-section">
+        <h2>5. Esquema de Costos, Facturación e Impuestos (México)</h2>
+        <p>
+          Las tarifas vigentes se expresan en Pesos Mexicanos (MXN) más el Impuesto al Valor Agregado (IVA) del 16% correspondiente a la legislación fiscal mexicana:
+        </p>
+        <ul>
+          <li><strong>Servicio de Bot Configurado:</strong> \$1,500.00 MXN mensuales más IVA (\$240.00 MXN) = <strong>\$1,740.00 MXN</strong>.</li>
+          <li><strong>Página Web con Reconfiguración Mensual (Opcional):</strong> \$300.00 MXN mensuales más IVA.</li>
+          <li><strong>Soporte Técnico y Entrenamiento 24/7 (Opcional):</strong> \$200.00 MXN mensuales más IVA.</li>
+          <li><strong>Catálogo Virtual Dinámico (Opcional):</strong> \$500.00 MXN mensuales más IVA.</li>
+          <li><strong>Paquete Completo con Opcionales:</strong> \$2,500.00 MXN más IVA (\$400.00 MXN) = <strong>\$2,900.00 MXN</strong>.</li>
+        </ul>
+        <p>
+          Al procesarse el pago a través de Mercado Pago, la instancia del cliente activa su <strong>Admin Estándar</strong> con una vigencia de <strong>30 días naturales</strong> y queda bloqueada e inaccesible para edición o chat en la interfaz pública general, protegiendo su exclusividad.
+        </p>
+      </section>
+
+      <section class="legal-section">
+        <h2>6. Uso Aceptable y Prohibiciones</h2>
+        <p>El Usuario se compromete a no utilizar la Plataforma ni sus bots para:</p>
+        <ul>
+          <li>Envío masivo de mensajes no solicitados (spam) que contravengan las políticas de WhatsApp, Meta o leyes de telecomunicaciones.</li>
+          <li>Promover actividades ilícitas, fraudulentas, difamatorias o lesivas a derechos de terceros.</li>
+          <li>Intentar vulnerar el aislamiento de las bases de datos de otros usuarios o ejecutar ingeniería inversa sobre la infraestructura del servidor.</li>
+        </ul>
+      </section>
+
+      <section class="legal-section">
+        <h2>7. Privacidad y Protección de Datos Personales (LFPDPPP)</h2>
+        <p>
+          De conformidad con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (México), Servi-Bot tratará sus datos personales (nombre, teléfono celular, correo electrónico y datos de facturación) únicamente con el propósito de proveer, configurar, personalizar y dar soporte al servicio contratado.
+        </p>
+        <p>
+          El titular podrá ejercer sus derechos de Acceso, Rectificación, Cancelación y Oposición (ARCO) dirigiendo una solicitud mediante los canales oficiales de soporte o desde la configuración de su cuenta.
+        </p>
+      </section>
+
+      <section class="legal-section">
+        <h2>8. Soporte, Disponibilidad y Modificaciones</h2>
+        <p>
+          Servi-Bot realiza esfuerzos continuos para mantener una disponibilidad ininterrumpida de sus servicios en la infraestructura en la nube. Las actualizaciones o ajustes en estos Términos y Condiciones serán publicados en este mismo enlace y entrarán en vigor a partir de su publicación en línea.
+        </p>
+      </section>
+    </article>
+
+    <footer class="legal-footer">
+      <p>© 2026 Servi-Bot · Inteligencia Artificial y Automatización Comercial para Negocios.</p>
+      <p><a href="/" class="legal-nav-back" style="margin-top:0.5rem;">Volver a configurar mi ServiBot</a></p>
+    </footer>
+  </main>
+</body>
+</html>

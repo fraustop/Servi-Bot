@@ -3,8 +3,12 @@ import {
   getAuth,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   sendPasswordResetEmail,
-  signOut
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+  updateProfile
 } from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js';
 
 // Configuración del proyecto Firebase: servi-bot-cic (Servi-Bot)
@@ -62,6 +66,165 @@ let mobileSimTriggerEl = null;
 let wizardCurrentStep = 1;
 let webSenderId = localStorage.getItem('servibot_sender_id') || `web-${Math.floor(10000 + Math.random() * 90000)}`;
 localStorage.setItem('servibot_sender_id', webSenderId);
+
+let prospectProfile = (() => {
+  try {
+    return JSON.parse(localStorage.getItem('servibot_prospect_profile') || 'null');
+  } catch {
+    return null;
+  }
+})();
+let prospectAuthMode = 'register';
+
+function setProspectAuthMode(mode) {
+  prospectAuthMode = mode === 'login' ? 'login' : 'register';
+  const tabReg = document.getElementById('tab-btn-register');
+  const tabLog = document.getElementById('tab-btn-login');
+  const nameField = document.getElementById('field-prospect-name');
+  const submitBtn = document.getElementById('btn-prospect-submit-auth');
+  const title = document.querySelector('#prospect-gate-auth .prospect-gate-title');
+
+  if (tabReg) {
+    tabReg.classList.toggle('is-active', prospectAuthMode === 'register');
+    tabReg.setAttribute('aria-selected', prospectAuthMode === 'register');
+  }
+  if (tabLog) {
+    tabLog.classList.toggle('is-active', prospectAuthMode === 'login');
+    tabLog.setAttribute('aria-selected', prospectAuthMode === 'login');
+  }
+  if (nameField) {
+    nameField.classList.toggle('hidden', prospectAuthMode === 'login');
+    if (prospectAuthMode === 'login') nameField.setAttribute('hidden', '');
+    else nameField.removeAttribute('hidden');
+  }
+  if (submitBtn) {
+    submitBtn.textContent = prospectAuthMode === 'register' ? 'Crear Cuenta y Continuar →' : 'Iniciar Sesión →';
+  }
+  if (title) {
+    title.textContent = prospectAuthMode === 'register' ? 'Identifícate para crear tu ServiBot' : 'Inicia sesión para tu ServiBot';
+  }
+  setFeedback('prospect-auth-feedback', '');
+}
+
+function showProspectContactStep(user, isEditing = false) {
+  const gateShell = document.getElementById('prospect-gate-shell');
+  const gateAuth = document.getElementById('prospect-gate-auth');
+  const gateContact = document.getElementById('prospect-gate-contact');
+  const unlocked = document.getElementById('wizard-unlocked-content');
+  if (!gateShell || !gateContact) return;
+
+  gateShell.classList.remove('hidden');
+  gateShell.removeAttribute('hidden');
+  gateAuth?.classList.add('hidden');
+  gateAuth?.setAttribute('hidden', '');
+  gateContact.classList.remove('hidden');
+  gateContact.removeAttribute('hidden');
+  unlocked?.classList.add('hidden');
+  unlocked?.setAttribute('hidden', '');
+
+  const isGoogle = Boolean(user.providerData?.some((p) => p.providerId === 'google.com'));
+  const heading = document.getElementById('prospect-contact-heading');
+  const sub = document.getElementById('prospect-contact-sub');
+
+  if (heading && sub) {
+    if (isGoogle) {
+      heading.textContent = 'Confirma tus datos de contacto detectados de Google';
+      sub.textContent = `Detectamos tu cuenta de Google (${user.email}). Por favor verifica tus datos e indícanos tu número de celular para asociarlo a tu ServiBot:`;
+    } else {
+      heading.textContent = 'Completa tus datos de contacto';
+      sub.textContent = `Para crear y asociar tu ServiBot a tu cuenta (${user.email}), completa tus datos y número de celular para darte seguimiento:`;
+    }
+  }
+
+  const nameInput = document.getElementById('prospect-input-name');
+  const emailInput = document.getElementById('prospect-input-email');
+  const phoneInput = document.getElementById('prospect-input-phone');
+  const bizInput = document.getElementById('prospect-input-business');
+  const termsChk = document.getElementById('prospect-terms-checkbox');
+
+  if (emailInput) emailInput.value = user.email || '';
+  if (nameInput && (!nameInput.value || isEditing)) {
+    nameInput.value = prospectProfile?.name || user.displayName || '';
+  }
+  if (phoneInput && (!phoneInput.value || isEditing)) {
+    phoneInput.value = prospectProfile?.phone || user.phoneNumber || '';
+  }
+  if (bizInput && (!bizInput.value || isEditing)) {
+    bizInput.value = prospectProfile?.business || '';
+  }
+  if (termsChk && isEditing) {
+    termsChk.checked = true;
+  }
+  setFeedback('prospect-contact-feedback', '');
+}
+
+function unlockWizardWithProspect(profile) {
+  const gateShell = document.getElementById('prospect-gate-shell');
+  const unlocked = document.getElementById('wizard-unlocked-content');
+  if (!gateShell || !unlocked) return;
+
+  gateShell.classList.add('hidden');
+  gateShell.setAttribute('hidden', '');
+  unlocked.classList.remove('hidden');
+  unlocked.removeAttribute('hidden');
+
+  const barName = document.getElementById('bar-prospect-name');
+  const barBiz = document.getElementById('bar-prospect-business');
+  const barPhone = document.getElementById('bar-prospect-phone');
+  if (barName) barName.textContent = profile.name || 'Cliente';
+  if (barBiz) barBiz.textContent = profile.business || 'Empresa';
+  if (barPhone) barPhone.textContent = profile.phone || '';
+
+  // Pre-llenar paso 1 del wizard si está vacío o difiere
+  const cfgName = document.getElementById('cfg-client-name');
+  const cfgContact = document.getElementById('cfg-client-contact');
+  const cfgBiz = document.getElementById('cfg-business-name');
+  if (cfgName && (!cfgName.value.trim() || cfgName.value.trim() === 'Mariana López')) {
+    cfgName.value = profile.name;
+  }
+  if (cfgContact && (!cfgContact.value.trim() || cfgContact.value.trim() === '8112345678')) {
+    cfgContact.value = profile.phone;
+  }
+  if (cfgBiz && (!cfgBiz.value.trim() || cfgBiz.value.trim() === 'Clínica Dental Sonrisa Norte')) {
+    cfgBiz.value = profile.business;
+  }
+}
+
+function syncProspectGateUI() {
+  const gateShell = document.getElementById('prospect-gate-shell');
+  const gateAuth = document.getElementById('prospect-gate-auth');
+  const gateContact = document.getElementById('prospect-gate-contact');
+  const unlocked = document.getElementById('wizard-unlocked-content');
+  if (!gateShell) return;
+
+  if (!currentUser) {
+    gateShell.classList.remove('hidden');
+    gateShell.removeAttribute('hidden');
+    gateAuth?.classList.remove('hidden');
+    gateAuth?.removeAttribute('hidden');
+    gateContact?.classList.add('hidden');
+    gateContact?.setAttribute('hidden', '');
+    unlocked?.classList.add('hidden');
+    unlocked?.setAttribute('hidden', '');
+    setProspectAuthMode(prospectAuthMode);
+    return;
+  }
+
+  // Hay usuario autenticado con Firebase Auth
+  const hasValidProfile = Boolean(
+    prospectProfile &&
+      prospectProfile.uid === currentUser.uid &&
+      prospectProfile.phone &&
+      prospectProfile.business &&
+      prospectProfile.name
+  );
+
+  if (hasValidProfile) {
+    unlockWizardWithProspect(prospectProfile);
+  } else {
+    showProspectContactStep(currentUser);
+  }
+}
 
 function buildAdminEndpoint(endpoint) {
   if (!currentAdminMeta?.is_superadmin || !adminSelectedInstanceId) return endpoint;
@@ -339,7 +502,23 @@ function showView(which, { syncUrl = true } = {}) {
     viewAdmin?.classList.remove('hidden');
     syncHeaderAndNavigation();
     if (currentUser) {
-      loadAllAdminData();
+      apiFetch('/api/admin/me').then((me) => {
+        const gate = document.getElementById('auth-gate');
+        const dash = document.getElementById('admin-dashboard');
+        if (me?.ok) {
+          gate?.classList.add('hidden');
+          dash?.classList.remove('hidden');
+          setFeedback('auth-status-msg', '');
+          syncAdminRoleUI(me);
+          syncHeaderAndNavigation();
+          switchAdminTab(activeAdminTab);
+          loadAllAdminData();
+        } else {
+          gate?.classList.remove('hidden');
+          dash?.classList.add('hidden');
+          setFeedback('auth-status-msg', me?.error || 'Tu cuenta no tiene rol de Administrador. Si eres cliente, regresa al inicio.', false);
+        }
+      });
     } else {
       setFeedback('auth-status-msg', '');
       requestAnimationFrame(() => document.getElementById('auth-email')?.focus());
@@ -348,6 +527,7 @@ function showView(which, { syncUrl = true } = {}) {
     viewAdmin?.classList.add('hidden');
     viewPublic?.classList.remove('hidden');
     syncHeaderAndNavigation();
+    syncProspectGateUI();
     loadPublicCatalog();
     loadClientProvisionedInstance({ populateForm: !provisionedInstance });
     requestAnimationFrame(() => carouselController?.syncActiveSlideInstant());
@@ -704,6 +884,8 @@ function switchAdminTab(tabId) {
     refreshHealth();
   } else if (activeAdminTab === 'tab-orders' && currentUser) {
     loadAdminOrders();
+  } else if (activeAdminTab === 'tab-bot-soul' && currentUser) {
+    loadAdminBotSoul();
   }
 }
 
@@ -1596,6 +1778,14 @@ function mapFirebaseAuthError(err) {
     case 'auth/user-not-found':
     case 'auth/wrong-password':
       return 'Correo o contraseña incorrectos. Verifica tus datos o solicita un restablecimiento.';
+    case 'auth/email-already-in-use':
+      return 'Este correo ya cuenta con una cuenta registrada. Cambia a "Ya tengo cuenta" para iniciar sesión o inicia con Google.';
+    case 'auth/weak-password':
+      return 'La contraseña es muy débil. Debe tener al menos 6 caracteres.';
+    case 'auth/popup-closed-by-user':
+      return 'Se cerró la ventana de inicio de sesión de Google antes de completar la autorización.';
+    case 'auth/cancelled-popup-request':
+      return 'Operación de inicio de sesión cancelada.';
     case 'auth/invalid-email':
       return 'El formato del correo electrónico no es válido.';
     case 'auth/user-disabled':
@@ -1741,26 +1931,32 @@ onAuthStateChanged(auth, async (user) => {
   const dash = document.getElementById('admin-dashboard');
 
   if (user) {
-    const me = await apiFetch('/api/admin/me');
-    if (!me?.ok || me?.statusCode === 403) {
-      currentAdminMeta = null;
-      adminSelectedInstanceId = '';
-      currentUser = null;
-      await signOut(auth).catch(() => {});
-      gate?.classList.remove('hidden');
-      dash?.classList.add('hidden');
-      setFeedback('auth-status-msg', me?.error || 'Esta cuenta no tiene acceso habilitado al panel Admin.', false);
+    if (activeView === 'admin') {
+      const me = await apiFetch('/api/admin/me');
+      if (!me?.ok || me?.statusCode === 403) {
+        currentAdminMeta = null;
+        adminSelectedInstanceId = '';
+        gate?.classList.remove('hidden');
+        dash?.classList.add('hidden');
+        setFeedback(
+          'auth-status-msg',
+          me?.error || 'Esta cuenta está registrada pero no tiene rol de Administrador. Si deseas crear o configurar tu bot, regresa al inicio.',
+          false
+        );
+        syncHeaderAndNavigation();
+      } else {
+        gate?.classList.add('hidden');
+        dash?.classList.remove('hidden');
+        setFeedback('auth-status-msg', '');
+        syncAdminRoleUI(me);
+        syncHeaderAndNavigation();
+        switchAdminTab(activeAdminTab);
+        await loadAllAdminData();
+      }
+    } else {
       syncHeaderAndNavigation();
-      return;
+      syncProspectGateUI();
     }
-
-    gate?.classList.add('hidden');
-    dash?.classList.remove('hidden');
-    setFeedback('auth-status-msg', '');
-    syncAdminRoleUI(me);
-    syncHeaderAndNavigation();
-    switchAdminTab(activeAdminTab);
-    await loadAllAdminData();
   } else {
     currentAdminMeta = null;
     adminSelectedInstanceId = '';
@@ -1768,6 +1964,7 @@ onAuthStateChanged(auth, async (user) => {
     gate?.classList.remove('hidden');
     dash?.classList.add('hidden');
     syncHeaderAndNavigation();
+    syncProspectGateUI();
   }
 });
 
@@ -1782,6 +1979,7 @@ async function loadAllAdminData() {
     loadWhatsAppStatus(),
     loadMicrosoftChannelStatus(),
     loadAdminConversations(),
+    loadAdminBotSoul(),
     refreshHealth()
   ];
   if (currentAdminMeta?.is_superadmin) {
@@ -2129,94 +2327,143 @@ async function loadWhatsAppStatus() {
   }
 }
 
-async function loadMicrosoftChannelStatus() {
-  const statusBox = document.getElementById('ms-connection-status');
-  const badge = document.getElementById('ms-state-badge');
-  const loginBtn = document.getElementById('btn-ms-oauth-login');
-  const loginLabel = document.getElementById('btn-ms-oauth-label');
-  const logoutBtn = document.getElementById('btn-ms-oauth-logout');
-  if (!statusBox) return;
-
-  try {
-    const data = await apiFetch(buildAdminEndpoint('/api/channels/microsoft/status'));
-    if (!data?.ok) throw new Error(data?.error || 'No se pudo consultar el estado de Microsoft.');
-
-    const isConnected = Boolean(data.connected);
-    if (badge) {
-      badge.textContent = isConnected ? 'CONECTADO' : 'SIN VINCULAR';
-      badge.className = isConnected ? 'badge-tag badge-status-dot-active' : 'badge-tag';
-    }
-
-    if (isConnected) {
-      const connDate = data.connected_at ? new Date(data.connected_at).toLocaleString('es-MX') : 'Activo';
-      statusBox.className = 'ms-connection-status is-connected';
-      statusBox.innerHTML = `
-        <div class="ms-channel-pills">
-          <span class="badge-tag badge-status-dot-active">📧 Outlook Mail: ${data.outlook_enabled ? 'Conectado' : 'Inactivo'}</span>
-          <span class="badge-tag badge-status-dot-active">👥 Microsoft Teams: ${data.teams_enabled ? 'Conectado' : 'Inactivo'}</span>
-        </div>
-        <div class="ms-connected-account">
-          <strong>✅ Cuenta Microsoft vinculada (${escapeHtml(data.instance_id || adminSelectedInstanceId || 'servibot-00')}):</strong>
-          <span>${escapeHtml(data.account_name || data.account_email)} (${escapeHtml(data.account_email)})</span>
-          <small>Vinculado: ${escapeHtml(connDate)} · OAuth 2.0 (${escapeHtml(data.provider || 'microsoft_oauth2')})</small>
-        </div>
-      `;
-      if (loginLabel) loginLabel.textContent = 'Reconectar o cambiar cuenta Microsoft';
-      if (logoutBtn) {
-        logoutBtn.classList.remove('hidden');
-        logoutBtn.removeAttribute('hidden');
-      }
-    } else {
-      statusBox.className = 'ms-connection-status';
-      statusBox.innerHTML = `
-        <div class="ms-channel-pills">
-          <span class="badge-tag">📧 Outlook Mail: Pendiente</span>
-          <span class="badge-tag">👥 Microsoft Teams: Pendiente</span>
-        </div>
-        <p style="margin:0.45rem 0 0; font-size:0.82rem; color:var(--text-muted);">
-          Autoriza tu cuenta de Microsoft (@outlook.com, @hotmail.com o Microsoft 365) en aplicación externa para activar Outlook y Teams en 1 paso.
-        </p>
-      `;
-      if (loginLabel) loginLabel.textContent = 'Iniciar sesión con Microsoft · Conectar Outlook y Teams';
-      if (logoutBtn) {
-        logoutBtn.classList.add('hidden');
-        logoutBtn.setAttribute('hidden', '');
-      }
-    }
-    if (loginBtn) loginBtn.disabled = false;
-  } catch (err) {
-    if (badge) {
-      badge.textContent = 'ERROR';
-      badge.className = 'badge-tag badge-status-dot-hidden';
-    }
-    statusBox.className = 'ms-connection-status';
-    statusBox.innerHTML = `<p style="margin:0; color:#fda4af; font-size:0.84rem;">Error consultando estado Microsoft: ${escapeHtml(err.message)}</p>`;
-  }
+async function loadChannelsStatus() {
+  await Promise.all([
+    loadWhatsAppStatus(),
+    loadAdminSettings()
+  ]);
 }
+const loadMicrosoftChannelStatus = loadChannelsStatus;
 
 async function loadAdminSettings() {
   try {
     const data = await apiFetch('/api/settings');
     if (!data.ok) return;
 
+    // 1. Correo Electrónico (IMAP / SMTP con usuario y contraseña)
     const em = data.email_config || {};
-    const imapEl = document.getElementById('cfg-imap-host');
-    const smtpEl = document.getElementById('cfg-smtp-host');
-    const userEl = document.getElementById('cfg-email-user');
-    const passEl = document.getElementById('cfg-email-pass');
-    const enabledEl = document.getElementById('cfg-email-enabled');
-    if (imapEl) imapEl.value = em.imap_host || 'outlook.office365.com';
-    if (smtpEl) smtpEl.value = em.smtp_host || 'smtp.office365.com';
-    if (userEl) userEl.value = em.user || '';
-    if (passEl) passEl.value = em.pass || '';
-    if (enabledEl) enabledEl.checked = Boolean(em.enabled);
+    const imapHostEl = document.getElementById('cfg-imap-host');
+    const imapPortEl = document.getElementById('cfg-imap-port');
+    const smtpHostEl = document.getElementById('cfg-smtp-host');
+    const smtpPortEl = document.getElementById('cfg-smtp-port');
+    const emailUserEl = document.getElementById('cfg-email-user');
+    const emailPassEl = document.getElementById('cfg-email-pass');
+    const emailEnabledEl = document.getElementById('cfg-email-enabled');
+    const emailBadge = document.getElementById('email-state-badge');
 
+    if (imapHostEl) imapHostEl.value = em.imap_host || 'outlook.office365.com';
+    if (imapPortEl) imapPortEl.value = em.imap_port || 993;
+    if (smtpHostEl) smtpHostEl.value = em.smtp_host || 'smtp.office365.com';
+    if (smtpPortEl) smtpPortEl.value = em.smtp_port || 465;
+    if (emailUserEl) emailUserEl.value = em.user || '';
+    if (emailPassEl) emailPassEl.value = em.pass || '';
+    if (emailEnabledEl) emailEnabledEl.checked = Boolean(em.enabled);
+
+    if (emailBadge) {
+      if (em.enabled && em.user) {
+        emailBadge.textContent = 'ACTIVO (IMAP/SMTP)';
+        emailBadge.className = 'badge-tag badge-status-dot-active';
+      } else if (em.user) {
+        emailBadge.textContent = 'CREDENCIALES LISTAS';
+        emailBadge.className = 'badge-tag';
+      } else {
+        emailBadge.textContent = 'SIN CONFIGURAR';
+        emailBadge.className = 'badge-tag';
+      }
+    }
+
+    // 2. Microsoft Teams
     const tm = data.teams_config || {};
     const teamsNameEl = document.getElementById('cfg-teams-name');
     const teamsHookEl = document.getElementById('cfg-teams-webhook');
+    const teamsEnabledEl = document.getElementById('cfg-teams-enabled');
+    const teamsBadge = document.getElementById('teams-state-badge');
+
     if (teamsNameEl) teamsNameEl.value = tm.bot_display_name || 'Servi-Bot Teams';
     if (teamsHookEl) teamsHookEl.value = tm.incoming_webhook_url || '';
+    if (teamsEnabledEl) teamsEnabledEl.checked = tm.enabled !== false;
 
+    if (teamsBadge) {
+      const isTeamsActive = tm.enabled !== false;
+      teamsBadge.textContent = isTeamsActive ? 'ACTIVO' : 'PAUSADO';
+      teamsBadge.className = isTeamsActive ? 'badge-tag badge-status-dot-active' : 'badge-tag';
+    }
+
+    // 3. Telegram
+    const tg = data.telegram_config || {};
+    const tgNameEl = document.getElementById('cfg-telegram-name');
+    const tgUserEl = document.getElementById('cfg-telegram-username');
+    const tgTokenEl = document.getElementById('cfg-telegram-token');
+    const tgEnabledEl = document.getElementById('cfg-telegram-enabled');
+    const tgBadge = document.getElementById('tg-state-badge');
+
+    if (tgNameEl) tgNameEl.value = tg.bot_name || 'Servi-Bot Telegram';
+    if (tgUserEl) tgUserEl.value = tg.bot_username || '';
+    if (tgTokenEl) tgTokenEl.value = tg.bot_token || '';
+    if (tgEnabledEl) tgEnabledEl.checked = Boolean(tg.enabled);
+
+    if (tgBadge) {
+      if (tg.enabled && tg.bot_token) {
+        tgBadge.textContent = 'BOT EN LÍNEA';
+        tgBadge.className = 'badge-tag badge-status-dot-active';
+      } else if (tg.bot_token) {
+        tgBadge.textContent = 'CONFIGURADO';
+        tgBadge.className = 'badge-tag';
+      } else {
+        tgBadge.textContent = 'SIN VINCULAR';
+        tgBadge.className = 'badge-tag';
+      }
+    }
+
+    // 4. Instagram (Comentarios)
+    const ig = data.instagram_config || {};
+    const igUserEl = document.getElementById('cfg-instagram-user');
+    const igTokenEl = document.getElementById('cfg-instagram-token');
+    const igEnabledEl = document.getElementById('cfg-instagram-enabled');
+    const igBadge = document.getElementById('ig-state-badge');
+
+    if (igUserEl) igUserEl.value = ig.account_username || '';
+    if (igTokenEl) igTokenEl.value = ig.access_token || '';
+    if (igEnabledEl) igEnabledEl.checked = Boolean(ig.enabled);
+
+    if (igBadge) {
+      if (ig.enabled && ig.account_username) {
+        igBadge.textContent = 'RESPONDIENDO COMENTARIOS';
+        igBadge.className = 'badge-tag badge-status-dot-active';
+      } else if (ig.account_username) {
+        igBadge.textContent = 'CONFIGURADO';
+        igBadge.className = 'badge-tag';
+      } else {
+        igBadge.textContent = 'SIN VINCULAR';
+        igBadge.className = 'badge-tag';
+      }
+    }
+
+    // 5. TikTok (Comentarios)
+    const tt = data.tiktok_config || {};
+    const ttUserEl = document.getElementById('cfg-tiktok-user');
+    const ttKeyEl = document.getElementById('cfg-tiktok-key');
+    const ttEnabledEl = document.getElementById('cfg-tiktok-enabled');
+    const ttBadge = document.getElementById('tt-state-badge');
+
+    if (ttUserEl) ttUserEl.value = tt.account_username || '';
+    if (ttKeyEl) ttKeyEl.value = tt.client_key || '';
+    if (ttEnabledEl) ttEnabledEl.checked = Boolean(tt.enabled);
+
+    if (ttBadge) {
+      if (tt.enabled && tt.account_username) {
+        ttBadge.textContent = 'RESPONDIENDO VIDEOS';
+        ttBadge.className = 'badge-tag badge-status-dot-active';
+      } else if (tt.account_username) {
+        ttBadge.textContent = 'CONFIGURADO';
+        ttBadge.className = 'badge-tag';
+      } else {
+        ttBadge.textContent = 'SIN VINCULAR';
+        ttBadge.className = 'badge-tag';
+      }
+    }
+
+    // 6. Túnel Cloudflare
     const tun = data.tunnel_config || {};
     const pubUrlEl = document.getElementById('tunnel-public-url');
     const tokEl = document.getElementById('tunnel-token-input');
@@ -2425,6 +2672,45 @@ async function loadAdminContactRules() {
     });
   } catch (err) {
     if (whiteBox) whiteBox.innerHTML = `<p style="color:#fda4af;">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function loadAdminBotSoul() {
+  const instanceId = adminSelectedInstanceId || 'servibot-00';
+  const pill = document.getElementById('soul-instance-pill');
+  if (pill) pill.textContent = instanceId;
+
+  try {
+    const res = await apiFetch(`/api/instances/${encodeURIComponent(instanceId)}`);
+    if (!res.ok || !res.instance) {
+      throw new Error(res.error || 'No se pudo cargar la configuración de la instancia.');
+    }
+    const inst = res.instance;
+
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val ?? '';
+    };
+
+    setVal('soul-display-name', inst.display_name || '');
+    setVal('soul-business-name', inst.business_name || '');
+    setVal('soul-welcome-message', inst.welcome_message || '');
+    setVal('soul-tone', inst.tone || '');
+    setVal('soul-ai-soul', inst.ai_soul || '');
+    setVal('soul-system-prompt', inst.system_prompt || '');
+
+    // Sincronizar estado visual de los chips de tono
+    const currentTone = String(inst.tone || '').trim().toLowerCase();
+    document.querySelectorAll('#soul-tone-presets .preset-chip').forEach((btn) => {
+      const btnTone = String(btn.dataset.tone || '').trim().toLowerCase();
+      const isActive = currentTone && (currentTone === btnTone || currentTone.includes(btnTone.split(',')[0]));
+      btn.classList.toggle('is-selected', Boolean(isActive));
+      btn.setAttribute('aria-pressed', String(Boolean(isActive)));
+    });
+
+    setFeedback('bot-soul-feedback', '');
+  } catch (err) {
+    setFeedback('bot-soul-feedback', `⚠️ Error al cargar alma del bot: ${err.message}`, false);
   }
 }
 
@@ -2671,6 +2957,7 @@ function setupEventListeners() {
       loadWhatsAppStatus(),
       loadMicrosoftChannelStatus(),
       loadAdminConversations(),
+      loadAdminBotSoul(),
       refreshHealth()
     ]);
   });
@@ -2809,6 +3096,151 @@ function setupEventListeners() {
     });
   });
 
+  // --- FILTRO PREVIO: FIREBASE AUTH & CONFIRMACIÓN DE CONTACTO ---
+  const googleProvider = new GoogleAuthProvider();
+  googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+  document.getElementById('btn-prospect-google')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-prospect-google');
+    setFeedback('prospect-auth-feedback', '');
+    if (btn) btn.disabled = true;
+    try {
+      await signInWithPopup(auth, googleProvider);
+      syncProspectGateUI();
+    } catch (err) {
+      setFeedback('prospect-auth-feedback', mapFirebaseAuthError(err), false);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+
+  document.getElementById('tab-btn-register')?.addEventListener('click', () => {
+    setProspectAuthMode('register');
+  });
+
+  document.getElementById('tab-btn-login')?.addEventListener('click', () => {
+    setProspectAuthMode('login');
+  });
+
+  document.getElementById('form-prospect-auth')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setFeedback('prospect-auth-feedback', '');
+    const email = document.getElementById('input-prospect-email')?.value.trim();
+    const pass = document.getElementById('input-prospect-password')?.value;
+    const name = document.getElementById('input-prospect-auth-name')?.value.trim();
+    const submitBtn = document.getElementById('btn-prospect-submit-auth');
+
+    if (!email || !pass) {
+      setFeedback('prospect-auth-feedback', 'Ingresa tu correo y contraseña.', false);
+      return;
+    }
+    if (pass.length < 6) {
+      setFeedback('prospect-auth-feedback', 'La contraseña debe tener al menos 6 caracteres.', false);
+      return;
+    }
+
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      if (prospectAuthMode === 'register') {
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        if (name && cred?.user) {
+          await updateProfile(cred.user, { displayName: name }).catch(() => {});
+        }
+      } else {
+        await signInWithEmailAndPassword(auth, email, pass);
+      }
+      syncProspectGateUI();
+    } catch (err) {
+      setFeedback('prospect-auth-feedback', mapFirebaseAuthError(err), false);
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+
+  document.getElementById('form-prospect-contact')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setFeedback('prospect-contact-feedback', '');
+    const name = document.getElementById('prospect-input-name')?.value.trim();
+    const business = document.getElementById('prospect-input-business')?.value.trim();
+    const phone = document.getElementById('prospect-input-phone')?.value.trim();
+    const email = document.getElementById('prospect-input-email')?.value.trim();
+    const termsChecked = document.getElementById('prospect-terms-checkbox')?.checked;
+
+    if (!name) {
+      setFeedback('prospect-contact-feedback', 'Por favor ingresa tu nombre completo.', false);
+      document.getElementById('prospect-input-name')?.focus();
+      return;
+    }
+    if (!business) {
+      setFeedback('prospect-contact-feedback', 'Ingresa el nombre de tu empresa o marca.', false);
+      document.getElementById('prospect-input-business')?.focus();
+      return;
+    }
+    const digitsOnly = phone ? phone.replace(/\D/g, '') : '';
+    if (digitsOnly.length < 10) {
+      setFeedback('prospect-contact-feedback', 'Ingresa un número de celular válido a 10 dígitos (o con lada internacional).', false);
+      document.getElementById('prospect-input-phone')?.focus();
+      return;
+    }
+    if (!termsChecked) {
+      setFeedback('prospect-contact-feedback', 'Debes aceptar los Términos y Condiciones y autorizar el uso de tu celular para notificaciones sobre tu bot.', false);
+      return;
+    }
+
+    if (!currentUser) {
+      setFeedback('prospect-contact-feedback', 'Tu sesión expiró. Por favor identifícate nuevamente.', false);
+      syncProspectGateUI();
+      return;
+    }
+
+    const isGoogle = Boolean(currentUser.providerData?.some((p) => p.providerId === 'google.com'));
+    prospectProfile = {
+      uid: currentUser.uid,
+      email: email || currentUser.email,
+      name,
+      business,
+      phone,
+      provider: isGoogle ? 'google' : 'password',
+      confirmedAt: new Date().toISOString()
+    };
+    localStorage.setItem('servibot_prospect_profile', JSON.stringify(prospectProfile));
+
+    if (currentUser.displayName !== name) {
+      updateProfile(currentUser, { displayName: name }).catch(() => {});
+    }
+
+    unlockWizardWithProspect(prospectProfile);
+  });
+
+  const handleProspectSignOut = async () => {
+    await signOut(auth);
+    prospectProfile = null;
+    localStorage.removeItem('servibot_prospect_profile');
+    syncProspectGateUI();
+  };
+
+  document.getElementById('btn-prospect-switch-account')?.addEventListener('click', handleProspectSignOut);
+  document.getElementById('btn-prospect-logout')?.addEventListener('click', handleProspectSignOut);
+  document.getElementById('btn-prospect-signout')?.addEventListener('click', handleProspectSignOut);
+
+  document.getElementById('btn-edit-prospect-data')?.addEventListener('click', () => {
+    if (currentUser) {
+      showProspectContactStep(currentUser, true);
+    }
+  });
+
+  const openTermsModal = (e) => {
+    e.preventDefault();
+    const dialog = document.getElementById('terms-modal');
+    if (dialog && typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    } else {
+      window.open('/terminos.html', '_blank', 'noopener');
+    }
+  };
+  document.getElementById('link-terms-open')?.addEventListener('click', openTermsModal);
+  document.getElementById('footer-terms-link')?.addEventListener('click', openTermsModal);
+
   document.getElementById('btn-wizard-next-1')?.addEventListener('click', () => {
     if (validateWizardStep1()) {
       goToWizardStep(2, { focusHeading: true });
@@ -2910,6 +3342,12 @@ function setupEventListeners() {
       return;
     }
 
+    if (!currentUser || !prospectProfile) {
+      setFeedback('instance-save-status', 'Por favor inicia sesión y confirma tus datos de contacto antes de crear tu ServiBot.', false);
+      syncProspectGateUI();
+      return;
+    }
+
     const saveBtn = document.getElementById('btn-save-instance');
     const displayInput = document.getElementById('cfg-display-name');
     const soulInput = document.getElementById('cfg-ai-soul');
@@ -2928,9 +3366,11 @@ function setupEventListeners() {
 
     const payload = {
       instance_id: clientInstanceId || document.getElementById('cfg-instance-id')?.value || '',
-      client_name: document.getElementById('cfg-client-name')?.value.trim() || '',
-      client_contact: document.getElementById('cfg-client-contact')?.value.trim() || '',
-      business_name: document.getElementById('cfg-business-name')?.value.trim() || '',
+      client_name: document.getElementById('cfg-client-name')?.value.trim() || prospectProfile?.name || '',
+      client_contact: document.getElementById('cfg-client-contact')?.value.trim() || prospectProfile?.phone || '',
+      business_name: document.getElementById('cfg-business-name')?.value.trim() || prospectProfile?.business || '',
+      admin_email: prospectProfile?.email || currentUser?.email || '',
+      firebase_uid: currentUser?.uid || prospectProfile?.uid || '',
       display_name: displayInput.value.trim(),
       tone: document.getElementById('cfg-tone')?.value.trim() || '',
       ai_soul: soulInput.value.trim(),
@@ -3544,118 +3984,204 @@ function setupEventListeners() {
     await refreshHealth();
   });
 
-  document.getElementById('btn-ms-oauth-login')?.addEventListener('click', async () => {
-    const loginBtn = document.getElementById('btn-ms-oauth-login');
-    const loginLabel = document.getElementById('btn-ms-oauth-label');
-    const prevLabel = loginLabel?.textContent || 'Iniciar sesión con Microsoft · Conectar Outlook y Teams';
-
-    const popup = window.open(
-      '',
-      'servibot_ms_oauth',
-      'width=520,height=700,resizable=yes,scrollbars=yes,status=yes'
-    );
-    if (popup && popup.document) {
-      try {
-        popup.document.write(
-          '<!DOCTYPE html><html><body style="margin:0;background:#0b1120;color:#e2e8f0;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;"><p>Conectando con Microsoft Identity Platform (Outlook + Teams)...</p></body></html>'
-        );
-      } catch {
-        // ignorar si otro origen tomó foco
-      }
-    }
-
-    if (loginBtn) loginBtn.disabled = true;
-    if (loginLabel) loginLabel.textContent = 'Abriendo inicio de sesión en Microsoft...';
-    if (outBox) outBox.textContent = 'Solicitando autorización externa a Microsoft 365 (Outlook + Teams)...';
-
-    try {
-      const initRes = await apiFetch(buildAdminEndpoint('/api/channels/microsoft/oauth/init'), {
-        method: 'POST',
-        body: JSON.stringify({
-          origin: window.location.origin,
-          login_hint: currentAdminMeta?.email || currentUser?.email || ''
-        })
-      });
-
-      if (!initRes?.ok || !initRes?.authUrl) {
-        if (popup && !popup.closed) popup.close();
-        if (outBox) outBox.textContent = JSON.stringify(initRes || { error: 'No se pudo iniciar OAuth de Microsoft.' }, null, 2);
-        return;
-      }
-
-      const expectedOrigin = new URL(initRes.authUrl, window.location.origin).origin;
-
-      if (popup && !popup.closed) {
-        popup.location.href = initRes.authUrl;
-        popup.focus();
-      } else {
-        window.open(initRes.authUrl, '_blank', 'noopener');
-      }
-
-      await new Promise((resolve) => {
-        let finished = false;
-        let closePoll = null;
-        let safetyTimeout = null;
-
-        const finish = async (msgPayload) => {
-          if (finished) return;
-          finished = true;
-          window.removeEventListener('message', onMsMessage);
-          if (closePoll) clearInterval(closePoll);
-          if (safetyTimeout) clearTimeout(safetyTimeout);
-          await loadMicrosoftChannelStatus();
-          if (outBox && msgPayload) {
-            outBox.textContent = JSON.stringify(msgPayload, null, 2);
-          }
-          resolve();
-        };
-
-        const onMsMessage = (ev) => {
-          if (ev.origin && ev.origin !== expectedOrigin && ev.origin !== window.location.origin) {
-            return;
-          }
-          const msgType = ev.data?.type;
-          if (msgType === 'SERVIBOT_MS_OAUTH_SUCCESS' || msgType === 'SERVIBOT_MS_OAUTH_ERROR') {
-            finish(ev.data);
-          }
-        };
-
-        window.addEventListener('message', onMsMessage);
-        closePoll = setInterval(() => {
-          if (!popup || popup.closed) {
-            finish(null);
-          }
-        }, 650);
-        safetyTimeout = setTimeout(() => finish(null), 180000);
-      });
-    } catch (err) {
-      if (popup && !popup.closed) popup.close();
-      if (outBox) outBox.textContent = `❌ Error al solicitar inicio de sesión con Microsoft: ${err.message}`;
-    } finally {
-      if (loginBtn) loginBtn.disabled = false;
-      await loadMicrosoftChannelStatus();
-      if (loginLabel && !loginLabel.textContent) {
-        loginLabel.textContent = prevLabel;
-      }
-    }
+  // Presets rápidos para completar servidores de Correo
+  document.getElementById('btn-email-preset-gmail')?.addEventListener('click', () => {
+    const imap = document.getElementById('cfg-imap-host');
+    const iport = document.getElementById('cfg-imap-port');
+    const smtp = document.getElementById('cfg-smtp-host');
+    const sport = document.getElementById('cfg-smtp-port');
+    if (imap) imap.value = 'imap.gmail.com';
+    if (iport) iport.value = 993;
+    if (smtp) smtp.value = 'smtp.gmail.com';
+    if (sport) sport.value = 465;
+    if (outBox) outBox.textContent = 'ℹ️ Servidores de Gmail cargados (IMAP 993 SSL, SMTP 465 SSL). Recuerda usar Contraseña de Aplicación de Google.';
   });
 
-  document.getElementById('btn-ms-oauth-logout')?.addEventListener('click', async () => {
-    const res = await apiFetch(buildAdminEndpoint('/api/channels/microsoft/disconnect'), { method: 'POST' });
+  document.getElementById('btn-email-preset-outlook')?.addEventListener('click', () => {
+    const imap = document.getElementById('cfg-imap-host');
+    const iport = document.getElementById('cfg-imap-port');
+    const smtp = document.getElementById('cfg-smtp-host');
+    const sport = document.getElementById('cfg-smtp-port');
+    if (imap) imap.value = 'outlook.office365.com';
+    if (iport) iport.value = 993;
+    if (smtp) smtp.value = 'smtp.office365.com';
+    if (sport) sport.value = 587;
+    if (outBox) outBox.textContent = 'ℹ️ Servidores de Outlook / Hotmail / Microsoft 365 cargados (IMAP 993, SMTP 587 STARTTLS).';
+  });
+
+  document.getElementById('btn-email-preset-yahoo')?.addEventListener('click', () => {
+    const imap = document.getElementById('cfg-imap-host');
+    const iport = document.getElementById('cfg-imap-port');
+    const smtp = document.getElementById('cfg-smtp-host');
+    const sport = document.getElementById('cfg-smtp-port');
+    if (imap) imap.value = 'imap.mail.yahoo.com';
+    if (iport) iport.value = 993;
+    if (smtp) smtp.value = 'smtp.mail.yahoo.com';
+    if (sport) sport.value = 465;
+    if (outBox) outBox.textContent = 'ℹ️ Servidores de Yahoo cargados (IMAP 993, SMTP 465).';
+  });
+
+  document.getElementById('btn-email-preset-custom')?.addEventListener('click', () => {
+    const imap = document.getElementById('cfg-imap-host');
+    const iport = document.getElementById('cfg-imap-port');
+    const smtp = document.getElementById('cfg-smtp-host');
+    const sport = document.getElementById('cfg-smtp-port');
+    if (imap) imap.value = 'mail.tuempresa.com';
+    if (iport) iport.value = 993;
+    if (smtp) smtp.value = 'mail.tuempresa.com';
+    if (sport) sport.value = 465;
+    if (outBox) outBox.textContent = 'ℹ️ Servidores corporativos / cPanel cargados. Sustituye tuempresa.com por tu dominio oficial.';
+  });
+
+  // Guardar configuración de Correo (IMAP / SMTP con Usuario y Contraseña)
+  document.getElementById('email-config-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (outBox) outBox.textContent = 'Guardando configuración de Correo Electrónico...';
+    const payload = {
+      imap_host: document.getElementById('cfg-imap-host')?.value.trim() || 'outlook.office365.com',
+      imap_port: Number(document.getElementById('cfg-imap-port')?.value || 993),
+      smtp_host: document.getElementById('cfg-smtp-host')?.value.trim() || 'smtp.office365.com',
+      smtp_port: Number(document.getElementById('cfg-smtp-port')?.value || 465),
+      user: document.getElementById('cfg-email-user')?.value.trim() || '',
+      pass: document.getElementById('cfg-email-pass')?.value.trim() || '',
+      enabled: Boolean(document.getElementById('cfg-email-enabled')?.checked)
+    };
+    const res = await apiFetch('/api/settings/email_config', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (outBox) outBox.textContent = res.ok ? '✅ Configuración de Correo Electrónico guardada con éxito en SQLite.' : `❌ Error: ${res.error}`;
+    await loadAdminSettings();
+  });
+
+  // Guardar configuración de Microsoft Teams
+  document.getElementById('teams-config-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (outBox) outBox.textContent = 'Guardando configuración de Microsoft Teams...';
+    const payload = {
+      bot_display_name: document.getElementById('cfg-teams-name')?.value.trim() || 'Servi-Bot Teams',
+      incoming_webhook_url: document.getElementById('cfg-teams-webhook')?.value.trim() || '',
+      enabled: Boolean(document.getElementById('cfg-teams-enabled')?.checked)
+    };
+    const res = await apiFetch('/api/settings/teams_config', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (outBox) outBox.textContent = res.ok ? '✅ Configuración de Microsoft Teams guardada con éxito.' : `❌ Error: ${res.error}`;
+    await loadAdminSettings();
+  });
+
+  // Guardar configuración de Telegram
+  document.getElementById('telegram-config-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (outBox) outBox.textContent = 'Guardando configuración de Telegram Bot...';
+    const payload = {
+      bot_name: document.getElementById('cfg-telegram-name')?.value.trim() || 'Servi-Bot Telegram',
+      bot_username: document.getElementById('cfg-telegram-username')?.value.trim() || '',
+      bot_token: document.getElementById('cfg-telegram-token')?.value.trim() || '',
+      enabled: Boolean(document.getElementById('cfg-telegram-enabled')?.checked)
+    };
+    const res = await apiFetch('/api/settings/telegram_config', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (outBox) outBox.textContent = res.ok ? '✅ Configuración de Telegram guardada con éxito.' : `❌ Error: ${res.error}`;
+    await loadAdminSettings();
+  });
+
+  // Guardar configuración de Instagram
+  document.getElementById('instagram-config-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (outBox) outBox.textContent = 'Guardando configuración de Instagram...';
+    const payload = {
+      account_username: document.getElementById('cfg-instagram-user')?.value.trim() || '',
+      access_token: document.getElementById('cfg-instagram-token')?.value.trim() || '',
+      enabled: Boolean(document.getElementById('cfg-instagram-enabled')?.checked)
+    };
+    const res = await apiFetch('/api/settings/instagram_config', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (outBox) outBox.textContent = res.ok ? '✅ Configuración de Instagram guardada con éxito.' : `❌ Error: ${res.error}`;
+    await loadAdminSettings();
+  });
+
+  // Guardar configuración de TikTok
+  document.getElementById('tiktok-config-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (outBox) outBox.textContent = 'Guardando configuración de TikTok...';
+    const payload = {
+      account_username: document.getElementById('cfg-tiktok-user')?.value.trim() || '',
+      client_key: document.getElementById('cfg-tiktok-key')?.value.trim() || '',
+      enabled: Boolean(document.getElementById('cfg-tiktok-enabled')?.checked)
+    };
+    const res = await apiFetch('/api/settings/tiktok_config', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (outBox) outBox.textContent = res.ok ? '✅ Configuración de TikTok guardada con éxito.' : `❌ Error: ${res.error}`;
+    await loadAdminSettings();
+  });
+
+  // Simulador de Mensaje de Telegram
+  document.getElementById('btn-sim-telegram')?.addEventListener('click', async () => {
+    if (outBox) outBox.textContent = 'Simulando mensaje entrante en Telegram (ejecutando IA Python)...';
+    const user = document.getElementById('sim-telegram-user')?.value.trim();
+    const text = document.getElementById('sim-telegram-text')?.value.trim();
+    const res = await apiFetch(buildAdminEndpoint('/api/channels/telegram/simulate'), {
+      method: 'POST',
+      body: JSON.stringify({ user, text })
+    });
     if (outBox) outBox.textContent = JSON.stringify(res, null, 2);
-    await loadMicrosoftChannelStatus();
+    await loadAdminOrders();
+    await loadAdminConversations();
+    await refreshHealth();
   });
 
+  // Simulador de Comentario en Instagram
+  document.getElementById('btn-sim-instagram')?.addEventListener('click', async () => {
+    if (outBox) outBox.textContent = 'Simulando comentario entrante en publicación de Instagram...';
+    const user = document.getElementById('sim-instagram-user')?.value.trim();
+    const postId = document.getElementById('sim-instagram-post')?.value.trim();
+    const comment = document.getElementById('sim-instagram-comment')?.value.trim();
+    const res = await apiFetch(buildAdminEndpoint('/api/channels/instagram/simulate'), {
+      method: 'POST',
+      body: JSON.stringify({ user, post_id: postId, comment })
+    });
+    if (outBox) outBox.textContent = JSON.stringify(res, null, 2);
+    await loadAdminOrders();
+    await loadAdminConversations();
+    await refreshHealth();
+  });
+
+  // Simulador de Comentario en TikTok
+  document.getElementById('btn-sim-tiktok')?.addEventListener('click', async () => {
+    if (outBox) outBox.textContent = 'Simulando comentario entrante en video de TikTok...';
+    const user = document.getElementById('sim-tiktok-user')?.value.trim();
+    const videoId = document.getElementById('sim-tiktok-video')?.value.trim();
+    const comment = document.getElementById('sim-tiktok-comment')?.value.trim();
+    const res = await apiFetch(buildAdminEndpoint('/api/channels/tiktok/simulate'), {
+      method: 'POST',
+      body: JSON.stringify({ user, video_id: videoId, comment })
+    });
+    if (outBox) outBox.textContent = JSON.stringify(res, null, 2);
+    await loadAdminOrders();
+    await loadAdminConversations();
+    await refreshHealth();
+  });
+
+  // Simulador de Correo Entrante
   document.getElementById('btn-sim-email')?.addEventListener('click', async () => {
     if (outBox) outBox.textContent = 'Procesando correo entrante con Python Worker + Ollama :10002...';
-    const fromEmail = document.getElementById('sim-email-from').value.trim();
-    const body = document.getElementById('sim-email-body').value.trim();
+    const fromEmail = document.getElementById('sim-email-from')?.value.trim() || 'cliente@pyme.com';
+    const subject = document.getElementById('sim-email-subject')?.value.trim() || 'Solicitud de Contratación Servi-Bot';
+    const body = document.getElementById('sim-email-body')?.value.trim() || '';
     const res = await apiFetch(buildAdminEndpoint('/api/channels/email/simulate'), {
       method: 'POST',
       body: JSON.stringify({
         fromEmail,
         fromName: 'Cliente Correo',
-        subject: 'Solicitud de Contratación Servi-Bot',
+        subject,
         body
       })
     });
@@ -3665,16 +4191,14 @@ function setupEventListeners() {
     await refreshHealth();
   });
 
+  // Simulador de Teams
   document.getElementById('btn-sim-teams')?.addEventListener('click', async () => {
-    if (outBox) outBox.textContent = 'Enviando payload al webhook de Microsoft Teams (/api/channels/teams/webhook)...';
-    const user = document.getElementById('sim-teams-user').value.trim();
-    const text = document.getElementById('sim-teams-text').value.trim();
-    const res = await apiFetch(buildAdminEndpoint('/api/channels/teams/webhook'), {
+    if (outBox) outBox.textContent = 'Enviando payload al canal de Microsoft Teams (/api/channels/teams/simulate)...';
+    const user = document.getElementById('sim-teams-user')?.value.trim();
+    const text = document.getElementById('sim-teams-text')?.value.trim();
+    const res = await apiFetch(buildAdminEndpoint('/api/channels/teams/simulate'), {
       method: 'POST',
-      body: JSON.stringify({
-        from: { id: 'teams-corp-01', name: user },
-        text
-      })
+      body: JSON.stringify({ user, text })
     });
     if (outBox) outBox.textContent = JSON.stringify(res, null, 2);
     await loadAdminOrders();
@@ -3722,6 +4246,148 @@ function setupEventListeners() {
     }
     await Promise.all([loadClientProvisionedInstance({ populateForm: true }), loadPublicCatalog()]);
     if (currentUser) await loadAllAdminData();
+  });
+
+  // ==================== SECCIÓN ALMA DEL BOT (PERSONALIDAD E IA) ====================
+  // 1. Guardar cambios del Alma e Instrucciones del Bot
+  document.getElementById('bot-soul-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const instanceId = adminSelectedInstanceId || 'servibot-00';
+    const saveBtn = document.getElementById('btn-save-bot-soul');
+
+    const displayName = document.getElementById('soul-display-name')?.value.trim();
+    const businessName = document.getElementById('soul-business-name')?.value.trim();
+    const welcomeMessage = document.getElementById('soul-welcome-message')?.value.trim();
+    const tone = document.getElementById('soul-tone')?.value.trim();
+    const aiSoul = document.getElementById('soul-ai-soul')?.value.trim();
+    const systemPrompt = document.getElementById('soul-system-prompt')?.value.trim();
+
+    if (!displayName) {
+      setFeedback('bot-soul-feedback', '⚠️ El nombre del asistente es obligatorio.', false);
+      return;
+    }
+    if (!businessName) {
+      setFeedback('bot-soul-feedback', '⚠️ El nombre de la empresa o marca es obligatorio.', false);
+      return;
+    }
+    if (!aiSoul) {
+      setFeedback('bot-soul-feedback', '⚠️ El propósito y alma de la IA (AI Soul) es obligatorio.', false);
+      return;
+    }
+
+    setFeedback('bot-soul-feedback', 'Guardando cambios en el alma del bot...', true);
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Guardando...';
+    }
+
+    try {
+      const res = await apiFetch(`/api/instances/${encodeURIComponent(instanceId)}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          display_name: displayName,
+          business_name: businessName,
+          welcome_message: welcomeMessage,
+          tone: tone || 'Profesional, cálido y enfocado en servicio',
+          ai_soul: aiSoul,
+          system_prompt: systemPrompt
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error(res.error || 'Error al guardar.');
+      }
+
+      setFeedback('bot-soul-feedback', '✅ ¡Alma, personalidad e instrucciones guardadas con éxito!', true);
+
+      // Sincronizar en memoria y en el encabezado del simulador
+      if (provisionedInstance && provisionedInstance.instance_id === instanceId) {
+        provisionedInstance = { ...provisionedInstance, ...res.instance };
+        syncSimulatorHeaderLabel(provisionedInstance);
+      }
+    } catch (err) {
+      setFeedback('bot-soul-feedback', `⚠️ Error al guardar: ${err.message}`, false);
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 Guardar Alma y Reglas del Bot';
+      }
+    }
+  });
+
+  // 2. Chips de selección rápida de tono para el alma
+  document.querySelectorAll('#soul-tone-presets .preset-chip').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const toneVal = btn.dataset.tone;
+      const toneInput = document.getElementById('soul-tone');
+      if (toneInput && toneVal) {
+        toneInput.value = toneVal;
+        document.querySelectorAll('#soul-tone-presets .preset-chip').forEach((b) => {
+          const isCurrent = b === btn;
+          b.classList.toggle('is-selected', isCurrent);
+          b.setAttribute('aria-pressed', String(isCurrent));
+        });
+      }
+    });
+  });
+
+  // 3. Plantillas rápidas para insertar en instrucciones y preguntas específicas
+  const appendToSystemPrompt = (snippet) => {
+    const area = document.getElementById('soul-system-prompt');
+    if (!area) return;
+    const current = area.value.trim();
+    area.value = current ? `${current}\n\n${snippet.trim()}` : snippet.trim();
+    area.focus();
+    area.scrollTop = area.scrollHeight;
+  };
+
+  document.getElementById('btn-tmpl-faq')?.addEventListener('click', () => {
+    appendToSystemPrompt(
+      `--- PREGUNTAS FRECUENTES (FAQ) ---\n` +
+      `- Horarios de atención: Lunes a Sábado de 9:00 a 19:00 hrs.\n` +
+      `- Ubicación: Av. Principal #123, Col. Centro.\n` +
+      `- Formas de pago: Tarjeta de débito/crédito, transferencia bancaria y efectivo.\n` +
+      `- Facturación: Emitimos factura fiscal (CFDI) dentro del mes de compra.`
+    );
+  });
+
+  document.getElementById('btn-tmpl-hours')?.addEventListener('click', () => {
+    appendToSystemPrompt(
+      `--- REGLAS DE ATENCIÓN Y CONTACTO ---\n` +
+      `- Si el cliente pregunta por cotización personalizada o agendar cita, solicita su nombre y teléfono para que un asesor le dé seguimiento.\n` +
+      `- Si escriben fuera de horario laboral, agradecer amablemente e indicar que su mensaje será atendido a primera hora del siguiente día hábil.`
+    );
+  });
+
+  document.getElementById('btn-tmpl-limits')?.addEventListener('click', () => {
+    appendToSystemPrompt(
+      `--- REGLAS ESTRICTAS Y PROHIBICIONES ---\n` +
+      `- NUNCA inventar precios, descuentos ni servicios que no estén explícitamente en el catálogo registrado.\n` +
+      `- Responder siempre con amabilidad, precisión y sin usar respuestas excesivamente largas (máximo 3 párrafos cortos).\n` +
+      `- Si no conoces la respuesta a una duda técnica muy específica, indica amablemente que consultarás con el equipo correspondiente.`
+    );
+  });
+
+  // 4. Botón "Probar en Simulador" desde el panel de Alma
+  document.getElementById('btn-soul-test-simulator')?.addEventListener('click', () => {
+    openMobileSimulator();
+    if (adminSelectedInstanceId && adminSelectedInstanceId !== 'servibot-00') {
+      setSimulatorBotMode('custom', { announceGreeting: true });
+    } else {
+      setSimulatorBotMode('official', { announceGreeting: true });
+    }
+  });
+
+  // 5. Botón de acceso directo en el encabezado del simulador
+  document.getElementById('btn-sim-edit-soul')?.addEventListener('click', () => {
+    if (currentUser) {
+      switchAdminTab('tab-bot-soul');
+      closeMobileSimulator();
+    } else {
+      closeMobileSimulator();
+      carouselController?.goToSlide?.(3, { instant: true });
+      goToWizardStep(2, { focusHeading: true });
+    }
   });
 }
 

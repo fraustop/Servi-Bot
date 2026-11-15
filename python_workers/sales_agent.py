@@ -19,6 +19,7 @@ import sqlite3
 import sys
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -40,7 +41,9 @@ DEFAULT_AWS_REGION = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT
 DEFAULT_BEDROCK_MODEL = os.environ.get("BEDROCK_MODEL_ID") or "us.amazon.nova-micro-v1:0"
 FALLBACK_BEDROCK_MODEL = os.environ.get("BEDROCK_FALLBACK_MODEL_ID") or "us.amazon.nova-lite-v1:0"
 
-DB_WRITE_LOCK = threading.Lock()
+# Un lock de escritura por archivo SQLite: los 51 bots ya no se serializan entre sí.
+_DB_WRITE_LOCKS = {}
+_DB_WRITE_LOCKS_GUARD = threading.Lock()
 _BEDROCK_CLIENTS = {}
 _BEDROCK_CLIENT_LOCK = threading.Lock()
 
@@ -69,11 +72,28 @@ def get_bedrock_client(region_name: str):
         return client
 
 
+class _BotConnection(sqlite3.Connection):
+    """sqlite3.Connection que recuerda su ruta para resolver el lock de escritura correcto."""
+
+    db_key = ""
+
+
+def _write_lock(conn: sqlite3.Connection) -> threading.Lock:
+    key = getattr(conn, "db_key", "") or "__default__"
+    with _DB_WRITE_LOCKS_GUARD:
+        lock = _DB_WRITE_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _DB_WRITE_LOCKS[key] = lock
+        return lock
+
+
 def get_db_connection(db_path: str) -> sqlite3.Connection:
     parent_dir = os.path.dirname(os.path.abspath(db_path))
     if parent_dir and not os.path.exists(parent_dir):
         os.makedirs(parent_dir, exist_ok=True)
-    conn = sqlite3.connect(db_path, timeout=15.0, check_same_thread=False)
+    conn = sqlite3.connect(db_path, timeout=15.0, check_same_thread=False, factory=_BotConnection)
+    conn.db_key = os.path.normcase(os.path.abspath(db_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA busy_timeout = 5000;")
@@ -289,7 +309,7 @@ def get_or_create_conversation(
 ) -> int:
     prio_val = 1 if is_priority else 0
     hidden_val = 1 if hidden else 0
-    with DB_WRITE_LOCK:
+    with _write_lock(conn):
         cur = conn.cursor()
         cur.execute(
             "SELECT id, sender_name, hidden FROM conversations WHERE channel = ? AND sender_id = ?",
@@ -324,7 +344,7 @@ def append_message(
     hidden: bool = False,
 ):
     hidden_val = 1 if hidden else 0
-    with DB_WRITE_LOCK:
+    with _write_lock(conn):
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO messages (conversation_id, role, content, metadata_json, hidden) VALUES (?, ?, ?, ?, ?)",
@@ -384,8 +404,39 @@ def create_order_in_db(
             }
         )
 
-    with DB_WRITE_LOCK:
+    with _write_lock(conn):
         cur = conn.cursor()
+        # Idempotencia (R1.5): si ya existe un pedido pending reciente (menos de 24h) para el mismo contacto e instancia, reutilizarlo
+        cur.execute(
+            """
+            SELECT id, order_code, total_amount, currency, items_json
+            FROM orders
+            WHERE customer_contact = ? AND instance_id = ? AND status = 'pending'
+              AND created_at >= datetime('now', '-24 hours', 'localtime')
+            ORDER BY id DESC LIMIT 1
+            """,
+            (customer_contact or "Sin contacto", instance_id),
+        )
+        existing = cur.fetchone()
+        if existing:
+            try:
+                cached_items = json.loads(existing["items_json"] or "[]")
+            except Exception:
+                cached_items = order_items
+            return {
+                "id": existing["id"],
+                "order_code": existing["order_code"],
+                "instance_id": instance_id,
+                "customer_name": customer_name,
+                "customer_contact": customer_contact,
+                "channel": channel,
+                "items": cached_items,
+                "total_amount": float(existing["total_amount"]),
+                "currency": existing["currency"],
+                "status": "pending",
+                "idempotent_reused": True,
+            }
+
         cur.execute(
             """
             INSERT INTO orders (
@@ -502,11 +553,43 @@ def build_system_prompt(
 
     parts.append(f"CATÁLOGO EXCLUSIVO DE {inst_id} (SQLite aislado):\n{catalog_block}")
     parts.append(f"PROMOCIONES ACTIVAS DE {inst_id} (SQLite aislado):\n{promo_block}")
-    parts.append("Responde siempre en español de forma clara y breve (máximo 3 párrafos cortos).")
+
+    # Directrices específicas según el tipo de canal
+    channel_clean = str(channel or '').strip().lower()
+    if channel_clean == "instagram":
+        parts.append(
+            "DIRECTRICES PARA COMENTARIOS EN INSTAGRAM:\n"
+            "- Estás respondiendo a un COMENTARIO público en Instagram (publicación o reel).\n"
+            "- Sé conciso, empático y profesional (máximo 1 o 2 oraciones).\n"
+            "- Resuelve la duda directamente con información oficial. Si el usuario desea contratar o requiere atención detallada, invítalo amablemente a enviar DM o escribir por el enlace de WhatsApp del perfil."
+        )
+    elif channel_clean == "tiktok":
+        parts.append(
+            "DIRECTRICES PARA COMENTARIOS EN TIKTOK:\n"
+            "- Estás respondiendo a un COMENTARIO público en TikTok.\n"
+            "- Sé dinámico, ágil, fresco y sumamente conciso (máximo 1 o 2 oraciones).\n"
+            "- Responde la pregunta con energía positiva e invita a consultar el enlace del perfil o WhatsApp para contratar o ver el catálogo completo."
+        )
+    elif channel_clean == "email":
+        parts.append(
+            "DIRECTRICES PARA CORREO ELECTRÓNICO:\n"
+            "- Estás redactando una respuesta formal por correo electrónico.\n"
+            "- Inicia con un saludo formal, presenta la información solicitada de forma clara y estructurada, y concluye con una despedida cordial y la firma de atención al cliente."
+        )
+    elif channel_clean in ("whatsapp", "telegram", "teams"):
+        parts.append(
+            f"DIRECTRICES PARA CHAT EN {channel_clean.upper()}:\n"
+            "- Estás atendiendo una conversación de mensajería directa en tiempo real.\n"
+            "- Mantén un diálogo ameno, claro y enfocado en resolver sus dudas y facilitar la contratación."
+        )
+
+    parts.append("Responde siempre en español de forma clara y breve.")
 
     if catalog_items:
         parts.append(
-            "Si el cliente confirma explícitamente que desea contratar o hacer pedido de alguno de los elementos de tu catálogo listado arriba, confírmale y escribe al final [PEDIDO: slug]."
+            "REGLAS CRÍTICAS PARA PEDIDOS:\n"
+            "- Si el cliente SOLAMENTE pregunta precios, características, soporte, dudas o saluda, responde amablemente y NO agregues ninguna etiqueta de pedido.\n"
+            "- ÚNICAMENTE si el cliente confirma de manera explícita y directa que desea contratar o hacer pedido (ej. 'quiero contratar', 'lo quiero comprar', 'levanta el pedido', 'deseo adquirirlo'), confírmale amablemente y agrega al final de tu mensaje: [PEDIDO: slug]."
         )
     return "\n".join(parts)
 
@@ -614,37 +697,52 @@ def call_ollama_chat(ollama_url: str, model: str, messages: list) -> dict:
         return parse_agent_reply(content)
 
 
+def _normalize_text_for_intent(text: str) -> str:
+    nfkd = unicodedata.normalize("NFKD", (text or "").lower())
+    return "".join(c for c in nfkd if not unicodedata.combining(c)).strip()
+
+
 def detect_explicit_order_intent(user_text: str, history: list, catalog_items: list) -> tuple:
-    if not catalog_items:
+    if not catalog_items or not user_text:
         return False, []
 
-    text_lower = user_text.lower()
+    text_clean = _normalize_text_for_intent(user_text)
     confirm_triggers = [
         "quiero contratar",
+        "deseo contratar",
+        "me interesa contratar",
         "quiero comprar",
+        "deseo comprar",
         "confirmo el pedido",
         "confirmar pedido",
+        "confirmo la orden",
+        "confirmar orden",
         "hazme el pedido",
         "levanta el pedido",
         "levantar pedido",
+        "generar orden",
+        "hacer el pedido",
+        "proceder con el pedido",
         "lo quiero contratar",
         "si lo quiero",
-        "sí lo quiero",
+        "lo contrato",
         "registra mi pedido",
         "registrar pedido",
         "quiero adquirir",
+        "deseo adquirir",
         "contratar ambos",
         "quiero el paquete",
+        "proceder a la compra",
     ]
-    is_confirming = any(t in text_lower for t in confirm_triggers)
+    is_confirming = any(t in text_clean for t in confirm_triggers)
     if not is_confirming:
         return False, []
 
-    combined_context = " ".join([m.get("content", "") for m in history[-4:]] + [user_text]).lower()
+    combined_context = _normalize_text_for_intent(" ".join([m.get("content", "") for m in history[-4:]] + [user_text]))
     matched = []
     for item in catalog_items:
-        slug = item["slug"].lower()
-        name_words = [w for w in item["name"].lower().split() if len(w) > 3]
+        slug = _normalize_text_for_intent(item.get("slug", ""))
+        name_words = [w for w in _normalize_text_for_intent(item.get("name", "")).split() if len(w) > 3]
         if slug in combined_context or any(w in combined_context for w in name_words):
             matched.append(item)
 
@@ -692,6 +790,7 @@ def _run_inference_with_fallback(
 
 def process_request(payload: dict) -> dict:
     started_at = time.perf_counter()
+    is_load_test = bool(payload.get("is_load_test") or payload.get("skip_order"))
     main_db_path = payload.get("db_path") or os.path.join(os.path.dirname(__file__), "..", "data", "servibot.db")
     instance_id = str(payload.get("instance_id") or "servibot-00").strip() or "servibot-00"
     bot_db_path = payload.get("bot_db_path") or os.path.join(os.path.dirname(main_db_path), "bots", f"{instance_id}.db")
@@ -787,7 +886,7 @@ def process_request(payload: dict) -> dict:
         aws_region = str(payload.get("aws_region") or provider_cfg.get("aws_region") or DEFAULT_AWS_REGION)
 
         conv_id = get_or_create_conversation(
-            bot_conn, channel, sender_id, sender_name, user_message, is_priority=is_whitelisted, hidden=False
+            bot_conn, channel, sender_id, sender_name, user_message, is_priority=is_whitelisted, hidden=is_load_test
         )
         history = fetch_conversation_history(bot_conn, conv_id, limit=6)
         append_message(
@@ -801,7 +900,7 @@ def process_request(payload: dict) -> dict:
                 "instance_id": resolved_instance_id,
                 "priority": is_whitelisted,
             },
-            hidden=False,
+            hidden=is_load_test,
         )
 
         system_prompt = build_system_prompt(
@@ -823,20 +922,33 @@ def process_request(payload: dict) -> dict:
         )
 
         reply_text = str(ai_result.get("reply") or "").strip()
-        should_order = bool(ai_result.get("should_create_order", False)) and bool(catalog_items)
+        llm_wants_order = bool(ai_result.get("should_create_order", False)) and bool(catalog_items)
         selected_slugs = ai_result.get("selected_slugs") or []
 
         slug_map = {item["slug"]: item for item in catalog_items}
         matched_items = [slug_map[s] for s in selected_slugs if s in slug_map]
 
-        if not should_order and catalog_items:
-            det_should, det_items = detect_explicit_order_intent(user_message, history, catalog_items)
+        # Doble Llave de Seguridad (R1.1):
+        # Para que se cree una orden, el usuario DEBE haber expresado confirmación o intención explícita de compra/contratación.
+        det_should, det_items = detect_explicit_order_intent(user_message, history, catalog_items) if catalog_items else (False, [])
+
+        should_order = False
+        if is_load_test:
+            should_order = False
+            matched_items = []
+        elif llm_wants_order:
+            # El LLM etiquetó pedido: solo se permite si el usuario realmente expresó intención explícita
             if det_should:
                 should_order = True
-                matched_items = det_items
-
-        if should_order and not matched_items and catalog_items:
-            _, det_items = detect_explicit_order_intent("quiero contratar " + user_message, history, catalog_items)
+                if not matched_items:
+                    matched_items = det_items if det_items else [catalog_items[0]]
+            else:
+                # Falso positivo del LLM (el usuario solo preguntó dudas, precios, soporte, etc.): VETO a la orden
+                should_order = False
+                matched_items = []
+        elif det_should:
+            # El usuario dijo explícitamente "quiero contratar / comprar", aunque el LLM olvidó poner la etiqueta
+            should_order = True
             matched_items = det_items if det_items else [catalog_items[0]]
 
         created_order = None
@@ -888,7 +1000,7 @@ def process_request(payload: dict) -> dict:
                 "priority": is_whitelisted,
                 "latency_ms": latency_ms,
             },
-            hidden=False,
+            hidden=is_load_test,
         )
 
         return {
@@ -924,6 +1036,7 @@ def process_request(payload: dict) -> dict:
 class _ConcurrentHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+    request_queue_size = 128  # R3.2: amplía el backlog de socket de 5 a 128 conexiones concurrentes
 
 
 class _WorkerHandler(BaseHTTPRequestHandler):

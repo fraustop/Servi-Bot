@@ -60,10 +60,25 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 // Cola con prioridad: números en Lista Blanca (prioridad 0) se atienden antes que los demás (prioridad 1)
-const AGENT_MAX_CONCURRENCY = Number(process.env.AGENT_MAX_CONCURRENCY || 6);
+// R3.2 / R3.4: Concurrencia elevada a 16 para atender ráfagas concurrentes en Bedrock sin encolamiento innecesario
+const AGENT_MAX_CONCURRENCY = Number(process.env.AGENT_MAX_CONCURRENCY || 16);
 let activeAgentTasks = 0;
 const priorityAgentQueue = [];
 const normalAgentQueue = [];
+
+// Rate limiting ligero en memoria para el endpoint público /api/chat (R2.3)
+const chatIpRateLimits = new Map();
+function checkChatRateLimit(ip, limit = 60, windowMs = 60000) {
+  const now = Date.now();
+  let record = chatIpRateLimits.get(ip);
+  if (!record || now - record.resetTime > windowMs) {
+    record = { count: 1, resetTime: now };
+    chatIpRateLimits.set(ip, record);
+    return true;
+  }
+  record.count += 1;
+  return record.count <= limit;
+}
 
 function pumpAgentQueue() {
   while (activeAgentTasks < AGENT_MAX_CONCURRENCY) {
@@ -127,7 +142,8 @@ async function runPythonSalesAgent({
   sender_id = 'anon',
   sender_name = '',
   message = '',
-  instance_id = 'servibot-00'
+  instance_id = 'servibot-00',
+  is_load_test = false
 }) {
   const canonicalInstance = normalizeInstanceIdKey(instance_id) || 'servibot-00';
   const botDbPath = getBotDbPath(canonicalInstance);
@@ -152,7 +168,8 @@ async function runPythonSalesAgent({
     ollama_model: botCfg.ollama_model || 'llama3.2:3b',
     ai_provider: botCfg.ai_provider || process.env.AI_PROVIDER || 'bedrock',
     bedrock_model: botCfg.bedrock_model || process.env.BEDROCK_MODEL_ID || 'us.amazon.nova-micro-v1:0',
-    aws_region: botCfg.aws_region || process.env.AWS_REGION || 'us-east-2'
+    aws_region: botCfg.aws_region || process.env.AWS_REGION || 'us-east-2',
+    is_load_test: Boolean(is_load_test)
   };
 
   const executeWorkerCall = async () => {
@@ -224,13 +241,34 @@ async function runPythonSalesAgent({
     });
   };
 
+  const tEnqueue = Date.now();
+  let tStart = 0;
+  let tEnd = 0;
+
+  const timedWorkerCall = async () => {
+    tStart = Date.now();
+    try {
+      return await executeWorkerCall();
+    } finally {
+      tEnd = Date.now();
+    }
+  };
+
   // Lista Negra / Omisión responden sin esperar en la cola; Lista Blanca entra con prioridad
   const result =
     ruleCheck.isBlacklisted || ruleCheck.isOmitted
-      ? await executeWorkerCall()
-      : await enqueueAgentTask(ruleCheck.isWhitelisted, executeWorkerCall);
+      ? await timedWorkerCall()
+      : await enqueueAgentTask(ruleCheck.isWhitelisted, timedWorkerCall);
 
-  if (result && result.order_created && result.order && result.order.order_code) {
+  if (tStart > 0 && tEnd > 0 && result && typeof result === 'object') {
+    result.timing = {
+      queue_ms: Math.max(0, tStart - tEnqueue),
+      worker_ms: Math.max(0, tEnd - tStart),
+      total_ms: Math.max(0, tEnd - tEnqueue)
+    };
+  }
+
+  if (!is_load_test && result && result.order_created && result.order && result.order.order_code) {
     try {
       db.prepare(
         `
@@ -2045,6 +2083,7 @@ async function main() {
       const businessName = String(body.business_name || '').trim();
       const clientName = String(body.client_name || '').trim();
       const clientContact = String(body.client_contact || '').trim();
+      const adminEmail = String(body.admin_email || '').trim().toLowerCase();
       const displayName =
         String(body.display_name || '').trim() || (businessName ? `Asistente ${businessName}` : 'ServiBot');
       const tone = String(body.tone || '').trim() || 'Profesional, cálido y orientado a resultados';
@@ -2118,6 +2157,7 @@ async function main() {
           business_name = ?,
           client_name = ?,
           client_contact = ?,
+          admin_email = CASE WHEN ? != '' THEN ? ELSE admin_email END,
           tone = ?,
           ai_soul = ?,
           system_prompt = ?,
@@ -2132,6 +2172,8 @@ async function main() {
         businessName,
         clientName,
         clientContact,
+        adminEmail,
+        adminEmail,
         tone,
         aiSoul,
         systemPrompt,
@@ -2573,16 +2615,43 @@ async function main() {
 
   // --- AGENTE DE VENTAS IA AISLADO POR INSTANCIA ---
   app.post('/api/chat', async (req, res) => {
+    const isLoadTest = Boolean(
+      req.headers['x-load-test'] ||
+      req.body?.is_load_test ||
+      req.body?.skip_order
+    );
+
+    // R2.3: Rate limit por IP para prevenir abuso/DoS (omite si es prueba autorizada con header)
+    const clientIp = String(req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+    if (!isLoadTest && !checkChatRateLimit(clientIp)) {
+      return res.status(429).json({
+        ok: false,
+        error: 'Has enviado demasiados mensajes en poco tiempo. Por favor espera un momento e inténtalo de nuevo.'
+      });
+    }
+
     const {
-      channel = 'web',
-      sender_id = 'web-visitor',
       sender_name = 'Visitante Web',
       message = '',
       instance_id = 'servibot-00'
     } = req.body || {};
 
-    if (!message || !String(message).trim()) {
+    const trimmedMessage = String(message || '').trim();
+    if (!trimmedMessage) {
       return res.status(400).json({ ok: false, error: 'El mensaje no puede estar vacío.' });
+    }
+    if (trimmedMessage.length > 2000) {
+      return res.status(400).json({ ok: false, error: 'El mensaje excede el límite permitido (2000 caracteres).' });
+    }
+
+    // R2.1: Forzar estrictamente canal 'web' (evita suplantación de WhatsApp u otros canales)
+    const channel = 'web';
+
+    // R2.2: Aislar estrictamente sender_id en prefijo web- (evita colisión o suplantación de teléfonos de WhatsApp)
+    let cleanSenderId = String(req.body?.sender_id || '').trim();
+    if (!cleanSenderId || !cleanSenderId.startsWith('web-')) {
+      const sanitized = cleanSenderId.replace(/[^a-zA-Z0-9_\-]/g, '').slice(0, 32);
+      cleanSenderId = sanitized ? `web-${sanitized}` : `web-${crypto.randomBytes(4).toString('hex')}`;
     }
 
     const canonicalInstance = normalizeInstanceIdKey(instance_id) || 'servibot-00';
@@ -2609,11 +2678,19 @@ async function main() {
 
     const result = await runPythonSalesAgent({
       channel,
-      sender_id,
-      sender_name,
-      message: String(message).trim(),
-      instance_id: canonicalInstance
+      sender_id: cleanSenderId,
+      sender_name: String(sender_name || 'Visitante Web').slice(0, 60),
+      message: trimmedMessage,
+      instance_id: canonicalInstance,
+      is_load_test: isLoadTest
     });
+
+    if (result?.timing) {
+      res.setHeader(
+        'Server-Timing',
+        `queue;dur=${result.timing.queue_ms || 0}, worker;dur=${result.timing.worker_ms || 0}, total;dur=${result.timing.total_ms || 0}`
+      );
+    }
 
     res.json(result);
   });
@@ -2735,6 +2812,233 @@ async function main() {
   app.post('/api/channels/email/poll', requireFirebaseAuth, async (req, res) => {
     await pollImapOnce(runPythonSalesAgent);
     res.json({ ok: true, status: getEmailWorkerStatus() });
+  });
+
+  // --- CANAL TELEGRAM (CHARLAS) ---
+  app.post('/api/channels/telegram/webhook', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const msg = body.message || body;
+      const senderId = String(msg.from?.id || body.sender_id || 'tg_user_01');
+      const senderName = String(msg.from?.username || msg.from?.first_name || body.sender_name || 'Usuario Telegram');
+      const text = String(msg.text || body.text || body.message || '').trim();
+      const chatId = msg.chat?.id || body.chat_id;
+      const targetId = normalizeInstanceIdKey(req.query?.instance_id || body.instance_id) || 'servibot-00';
+
+      if (!text) {
+        return res.json({ ok: true, ignored: true });
+      }
+
+      const agentResult = await runPythonSalesAgent({
+        channel: 'telegram',
+        sender_id: senderId,
+        sender_name: senderName,
+        message: text,
+        instance_id: targetId
+      });
+
+      const cfg = getSetting('telegram_config', {});
+      let sentReal = false;
+      if (cfg.enabled && cfg.bot_token && chatId && agentResult?.reply) {
+        try {
+          await fetch(`https://api.telegram.org/bot${encodeURIComponent(cfg.bot_token)}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text: agentResult.reply }),
+            signal: AbortSignal.timeout(6000)
+          });
+          sentReal = true;
+        } catch (e) {
+          console.error('[TELEGRAM] Error al enviar mensaje real:', e.message);
+        }
+      }
+
+      res.json({ ok: true, channel: 'telegram', sentReal, reply: agentResult?.reply, servibot: agentResult });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  app.post('/api/channels/telegram/simulate', requireFirebaseAuth, requireActiveClientSubscription, async (req, res) => {
+    try {
+      const targetId = getTargetAdminInstanceId(req);
+      const { user, text } = req.body || {};
+      const cleanUser = String(user || 'Usuario Telegram').trim();
+      const cleanText = String(text || 'Hola, deseo informes de sus servicios.').trim();
+
+      const agentResult = await runPythonSalesAgent({
+        channel: 'telegram',
+        sender_id: cleanUser.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 32) || 'tg_user',
+        sender_name: cleanUser,
+        message: cleanText,
+        instance_id: targetId
+      });
+
+      res.json({ ok: true, channel: 'telegram', reply: agentResult?.reply, servibot: agentResult });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // --- CANAL INSTAGRAM (COMENTARIOS EN PUBLICACIONES / REELS) ---
+  app.get('/api/channels/instagram/webhook', (req, res) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+    const cfg = getSetting('instagram_config', {});
+    const expectedToken = cfg.verify_token || 'servibot_meta_token';
+    if (mode === 'subscribe' && token === expectedToken) {
+      return res.status(200).send(challenge);
+    }
+    res.status(403).send('Forbidden');
+  });
+
+  app.post('/api/channels/instagram/webhook', async (req, res) => {
+    try {
+      const body = req.body || {};
+      let text = '';
+      let senderId = '';
+      let senderName = '';
+      let postId = '';
+
+      if (body.entry && Array.isArray(body.entry)) {
+        const change = body.entry[0]?.changes?.[0]?.value || {};
+        text = change.text || '';
+        senderId = change.from?.id || 'ig_user_01';
+        senderName = change.from?.username || 'usuario_instagram';
+        postId = change.media?.id || 'post_100';
+      } else {
+        text = body.comment || body.text || '';
+        senderId = body.user_id || body.sender_id || 'ig_user_01';
+        senderName = body.username || body.sender_name || 'usuario_instagram';
+        postId = body.post_id || 'post_100';
+      }
+
+      if (!text.trim()) {
+        return res.json({ ok: true, ignored: true });
+      }
+
+      const targetId = normalizeInstanceIdKey(req.query?.instance_id || body.instance_id) || 'servibot-00';
+      const cleanUser = String(senderName).replace(/^@/, '');
+      const agentResult = await runPythonSalesAgent({
+        channel: 'instagram',
+        sender_id: String(senderId || cleanUser),
+        sender_name: `@${cleanUser}`,
+        message: `[COMENTARIO EN POST/REEL ${postId}]: ${text.trim()}`,
+        instance_id: targetId
+      });
+
+      res.json({ ok: true, channel: 'instagram', reply: agentResult?.reply, servibot: agentResult });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  app.post('/api/channels/instagram/simulate', requireFirebaseAuth, requireActiveClientSubscription, async (req, res) => {
+    try {
+      const targetId = getTargetAdminInstanceId(req);
+      const { user, post_id, comment } = req.body || {};
+      const cleanUser = String(user || 'cliente_creativo').replace(/^@/, '').trim();
+      const cleanPost = String(post_id || 'reel_lanzamiento_01').trim();
+      const cleanComment = String(comment || '¿Qué precio tiene este paquete? ¿Tienen promociones hoy?').trim();
+
+      const agentResult = await runPythonSalesAgent({
+        channel: 'instagram',
+        sender_id: cleanUser.toLowerCase().replace(/[^a-z0-9_]/g, '') || 'ig_prospect',
+        sender_name: `@${cleanUser}`,
+        message: `[COMENTARIO EN POST/REEL ${cleanPost}]: ${cleanComment}`,
+        instance_id: targetId
+      });
+
+      res.json({ ok: true, channel: 'instagram', reply: agentResult?.reply, servibot: agentResult });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // --- CANAL TIKTOK (COMENTARIOS EN VIDEOS) ---
+  app.post('/api/channels/tiktok/webhook', async (req, res) => {
+    try {
+      const body = req.body || {};
+      let text = '';
+      let senderId = '';
+      let senderName = '';
+      let videoId = '';
+
+      if (body.event === 'comment.created' && body.data) {
+        text = body.data.text || '';
+        senderId = body.data.user_id || 'tt_user_01';
+        senderName = body.data.user_name || 'usuario_tiktok';
+        videoId = body.data.video_id || 'video_tiktok_1';
+      } else {
+        text = body.comment || body.text || '';
+        senderId = body.user_id || body.sender_id || 'tt_user_01';
+        senderName = body.username || body.sender_name || 'usuario_tiktok';
+        videoId = body.video_id || 'video_tiktok_1';
+      }
+
+      if (!text.trim()) {
+        return res.json({ ok: true, ignored: true });
+      }
+
+      const targetId = normalizeInstanceIdKey(req.query?.instance_id || body.instance_id) || 'servibot-00';
+      const cleanUser = String(senderName).replace(/^@/, '');
+      const agentResult = await runPythonSalesAgent({
+        channel: 'tiktok',
+        sender_id: String(senderId || cleanUser),
+        sender_name: `@${cleanUser}`,
+        message: `[COMENTARIO EN VIDEO TIKTOK ${videoId}]: ${text.trim()}`,
+        instance_id: targetId
+      });
+
+      res.json({ ok: true, channel: 'tiktok', reply: agentResult?.reply, servibot: agentResult });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  app.post('/api/channels/tiktok/simulate', requireFirebaseAuth, requireActiveClientSubscription, async (req, res) => {
+    try {
+      const targetId = getTargetAdminInstanceId(req);
+      const { user, video_id, comment } = req.body || {};
+      const cleanUser = String(user || 'usuario_trend').replace(/^@/, '').trim();
+      const cleanVideo = String(video_id || 'video_viral_404').trim();
+      const cleanComment = String(comment || '¡Está increíble! ¿Cómo los contacto para contratarlo?').trim();
+
+      const agentResult = await runPythonSalesAgent({
+        channel: 'tiktok',
+        sender_id: cleanUser.toLowerCase().replace(/[^a-z0-9_]/g, '') || 'tt_prospect',
+        sender_name: `@${cleanUser}`,
+        message: `[COMENTARIO EN VIDEO TIKTOK ${cleanVideo}]: ${cleanComment}`,
+        instance_id: targetId
+      });
+
+      res.json({ ok: true, channel: 'tiktok', reply: agentResult?.reply, servibot: agentResult });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // --- CANAL MICROSOFT TEAMS (SIMULACIÓN RÁPIDA) ---
+  app.post('/api/channels/teams/simulate', requireFirebaseAuth, requireActiveClientSubscription, async (req, res) => {
+    try {
+      const targetId = getTargetAdminInstanceId(req);
+      const { user, text } = req.body || {};
+      const cleanUser = String(user || 'Usuario Teams').trim();
+      const cleanText = String(text || 'Hola equipo, solicito cotización para nuestra empresa.').trim();
+
+      const agentResult = await runPythonSalesAgent({
+        channel: 'teams',
+        sender_id: cleanUser.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 32) || 'teams_user',
+        sender_name: cleanUser,
+        message: cleanText,
+        instance_id: targetId
+      });
+
+      res.json({ ok: true, channel: 'teams', reply: agentResult?.reply, servibot: agentResult });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
   });
 
   // --- CANAL UNIFICADO MICROSOFT 365: OUTLOOK + TEAMS (OAUTH 2.0 EN 1 PASO) ---
@@ -3194,6 +3498,9 @@ async function main() {
       bot_config: getSetting('bot_config', {}),
       email_config: isSuper ? getSetting('email_config', {}) : {},
       teams_config: isSuper ? getSetting('teams_config', {}) : {},
+      telegram_config: isSuper ? getSetting('telegram_config', {}) : {},
+      instagram_config: isSuper ? getSetting('instagram_config', {}) : {},
+      tiktok_config: isSuper ? getSetting('tiktok_config', {}) : {},
       tunnel_config: isSuper ? getSetting('tunnel_config', {}) : {},
       mercadopago_config: isSuper
         ? {
@@ -3209,9 +3516,18 @@ async function main() {
     });
   });
 
-  app.put('/api/settings/:key', requireFirebaseAuth, async (req, res) => {
+  const handleUpdateSetting = async (req, res) => {
     const key = req.params.key;
-    const allowed = ['bot_config', 'email_config', 'teams_config', 'tunnel_config', 'mercadopago_config'];
+    const allowed = [
+      'bot_config',
+      'email_config',
+      'teams_config',
+      'telegram_config',
+      'instagram_config',
+      'tiktok_config',
+      'tunnel_config',
+      'mercadopago_config'
+    ];
     if (!allowed.includes(key)) {
       return res.status(400).json({ ok: false, error: 'Clave de configuración no permitida.' });
     }
@@ -3237,7 +3553,10 @@ async function main() {
       value: key === 'mercadopago_config' ? { ...merged, access_token: merged.access_token ? '***' : '' } : merged,
       tunnel: getTunnelStatus()
     });
-  });
+  };
+
+  app.put('/api/settings/:key', requireFirebaseAuth, handleUpdateSetting);
+  app.post('/api/settings/:key', requireFirebaseAuth, handleUpdateSetting);
 
   // --- PERFIL ACTUAL DEL ADMIN LOGUEADO (ADMIN 0 vs ADMIN ESTÁNDAR 1..50) ---
   app.get('/api/admin/me', requireFirebaseAuth, (req, res) => {

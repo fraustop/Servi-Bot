@@ -61,6 +61,12 @@
             </button>
           </li>
           <li class="admin-nav-item hidden">
+            <button type="button" class="nav-btn admin-tab-nav" data-tab="tab-bot-soul">
+              <span class="nav-icon" aria-hidden="true">🧠</span>
+              <span>Alma del Bot</span>
+            </button>
+          </li>
+          <li class="admin-nav-item hidden">
             <button type="button" class="nav-btn admin-tab-nav" data-tab="tab-orders">
               <span class="nav-icon" aria-hidden="true">🛒</span>
               <span>Pedidos</span>
@@ -375,47 +381,204 @@
               </div>
 
               <section class="configurator-form-card wizard-shell" id="servibot-wizard-card" aria-labelledby="configurator-heading">
-                <nav class="wizard-nav" aria-label="Pasos para crear tu ServiBot">
-                  <div class="wizard-progress-header">
-                    <span class="wizard-step-counter" id="wizard-step-counter">Paso 1 de 3 · Tu Negocio</span>
-                    <progress class="wizard-progress-bar" id="wizard-progress-bar" max="3" value="1">Paso 1 de 3</progress>
+                <!-- ==================== FILTRO PREVIO OBLIGATORIO (FIREBASE AUTH + CONTACTO) ==================== -->
+                <div class="prospect-gate-shell" id="prospect-gate-shell">
+                  <!-- SUB-PASO A: AUTENTICACIÓN FIREBASE AUTH (GOOGLE O CORREO) -->
+                  <div class="prospect-gate-card" id="prospect-gate-auth">
+                    <div class="prospect-gate-head">
+                      <span class="badge-tag badge-tag-accent">Paso Previo Obligatorio · Identificación</span>
+                      <h3 class="prospect-gate-title">Identifícate para crear tu ServiBot</h3>
+                      <p class="prospect-gate-sub">
+                        Para personalizar tu primer bot autónomo y reservar tu instancia, inicia sesión o crea tu cuenta. Guardaremos tu configuración y podrás retomarla cuando lo desees.
+                      </p>
+                    </div>
+
+                    <!-- Botón de autenticación con Google -->
+                    <button type="button" class="btn-google-auth" id="btn-prospect-google">
+                      <svg class="google-logo-svg" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.87c2.27-2.09 3.67-5.17 3.67-9.15z"/>
+                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.87-3.05c-1.08.72-2.45 1.16-4.06 1.16-3.13 0-5.78-2.11-6.73-4.96H1.25v3.15C3.25 21.36 7.34 24 12 24z"/>
+                        <path fill="#FBBC05" d="M5.27 14.24A7.18 7.18 0 0 1 4.9 12c0-.78.14-1.54.37-2.24V6.61H1.25A11.96 11.96 0 0 0 0 12c0 1.92.45 3.74 1.25 5.39l4.02-3.15z"/>
+                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.25 2.64 1.25 6.61l4.02 3.15c.95-2.85 3.6-4.96 6.73-4.96z"/>
+                      </svg>
+                      <span>Continuar con Google</span>
+                    </button>
+
+                    <div class="auth-divider">
+                      <span>o con tu correo electrónico</span>
+                    </div>
+
+                    <!-- Selector segmentado: Registrarse / Iniciar sesión -->
+                    <div class="prospect-auth-mode-toggle" role="tablist" aria-label="Modo de autenticación">
+                      <button type="button" class="prospect-toggle-btn is-active" id="tab-btn-register" role="tab" aria-selected="true">
+                        Crear cuenta nueva
+                      </button>
+                      <button type="button" class="prospect-toggle-btn" id="tab-btn-login" role="tab" aria-selected="false">
+                        Ya tengo cuenta
+                      </button>
+                    </div>
+
+                    <form id="form-prospect-auth" novalidate>
+                      <div class="field" id="field-prospect-name">
+                        <label for="input-prospect-auth-name">Tu nombre completo</label>
+                        <input type="text" id="input-prospect-auth-name" placeholder="Ej.: Laura Gómez" autocomplete="name" />
+                      </div>
+                      <div class="field">
+                        <label for="input-prospect-email">Correo electrónico *</label>
+                        <input type="email" id="input-prospect-email" placeholder="nombre@tunegocio.com" autocomplete="email" required />
+                      </div>
+                      <div class="field">
+                        <label for="input-prospect-password">Contraseña (mínimo 6 caracteres) *</label>
+                        <input type="password" id="input-prospect-password" placeholder="••••••••" autocomplete="current-password" required />
+                      </div>
+                      <div id="prospect-auth-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
+                      <button type="submit" class="btn btn-primary" id="btn-prospect-submit-auth" style="width: 100%; margin-top: 0.5rem;">
+                        Crear Cuenta y Continuar →
+                      </button>
+                    </form>
                   </div>
-                  <ol class="wizard-steps-list" id="wizard-steps-list">
-                    <li class="wizard-step-item is-active" data-step="1">
-                      <button type="button" class="wizard-step-btn" data-step="1" aria-current="step">
-                        <span class="wizard-step-num" aria-hidden="true">1</span>
-                        <span class="wizard-step-text">Tu Negocio</span>
-                      </button>
-                    </li>
-                    <li class="wizard-step-item" data-step="2">
-                      <button type="button" class="wizard-step-btn" data-step="2">
-                        <span class="wizard-step-num" aria-hidden="true">2</span>
-                        <span class="wizard-step-text">Alma e IA</span>
-                      </button>
-                    </li>
-                    <li class="wizard-step-item" data-step="3">
-                      <button type="button" class="wizard-step-btn" data-step="3" disabled>
-                        <span class="wizard-step-num" aria-hidden="true">3</span>
-                        <span class="wizard-step-text">Simulador y Costo</span>
-                      </button>
-                    </li>
-                  </ol>
-                </nav>
 
-                <form id="servibot-wizard-form" action="/api/instances/provision" method="POST" novalidate>
-                  <input type="hidden" id="cfg-instance-id" name="instance_id" value="" />
+                  <!-- SUB-PASO B: CONFIRMACIÓN DE DATOS DE CONTACTO -->
+                  <div class="prospect-gate-card hidden" id="prospect-gate-contact" hidden>
+                    <div class="prospect-gate-head">
+                      <span class="badge-tag badge-tag-accent">Paso 2 Obligatorio · Datos de Contacto</span>
+                      <h3 class="prospect-gate-title" id="prospect-contact-heading">Confirma tus datos de contacto</h3>
+                      <p class="prospect-gate-sub" id="prospect-contact-sub">
+                        Verifica tus datos para asociar la instancia de tu ServiBot y permitir el seguimiento.
+                      </p>
+                    </div>
 
-                  <!-- PASO 1: IDENTIDAD DEL NEGOCIO Y CONTACTO -->
-                  <div class="wizard-pane" id="wizard-step-1" data-step="1">
-                    <header class="wizard-pane-head">
-                      <h3 id="wizard-step-1-title" tabindex="-1" class="wizard-pane-title">1. Cuéntanos sobre tu negocio</h3>
-                      <p class="wizard-pane-sub">Elige tu giro para sugerirte una configuración base o escribe tus datos directamente.</p>
-                    </header>
+                    <form id="form-prospect-contact" novalidate>
+                      <div class="cfg-two-col">
+                        <div class="field">
+                          <label for="prospect-input-name">Tu nombre completo *</label>
+                          <input type="text" id="prospect-input-name" placeholder="Ej. Roberto Díaz" required autocomplete="name" />
+                        </div>
+                        <div class="field">
+                          <label for="prospect-input-email">Correo de tu cuenta *</label>
+                          <input type="email" id="prospect-input-email" readonly style="opacity: 0.85; background: rgba(255,255,255,0.04);" />
+                        </div>
+                      </div>
 
-                    <div class="wizard-recover-box" id="wizard-recover-box">
-                      <div class="wizard-recover-info">
-                        <strong>🔄 ¿Ya habías configurado un bot aquí antes?</strong>
-                        <span>Ingresa tu teléfono WhatsApp, correo o folio (ej. <code>servibot-04</code>) para retomar tu instancia o recuperar tu borrador desde la base de prospectos.</span>
+                      <div class="field">
+                        <label for="prospect-input-business">Nombre de tu empresa o marca *</label>
+                        <input type="text" id="prospect-input-business" placeholder="Ej. Clínica Dental Sonrisa Norte" required />
+                      </div>
+
+                      <div class="field">
+                        <label for="prospect-input-phone">Número de celular o WhatsApp *</label>
+                        <input type="tel" id="prospect-input-phone" placeholder="Ej. 8112345678 o 5218112345678" required autocomplete="tel" />
+                        <span class="field-hint">Ingresa 10 dígitos (México) o con lada internacional.</span>
+                      </div>
+
+                      <!-- TARJETA DESTACADA: AVISO SOBRE EL NÚMERO DE CELULAR -->
+                      <div class="prospect-phone-notice">
+                        <div class="notice-icon" aria-hidden="true">📲</div>
+                        <div class="notice-text">
+                          <strong>Importante sobre tu número de celular:</strong>
+                          <p>
+                            El número de celular o WhatsApp proporcionado se utilizará exclusivamente para <strong>enviarte mensajes y notificaciones periódicas directamente sobre tu bot</strong> (confirmaciones de cotización, avisos de pedidos recibidos, estado de vinculación y actualizaciones del servicio).
+                          </p>
+                        </div>
+                      </div>
+
+                      <!-- CHECKBOX DE TÉRMINOS Y CONDICIONES -->
+                      <div class="prospect-terms-consent">
+                        <label class="consent-checkbox-label">
+                          <input type="checkbox" id="prospect-terms-checkbox" required />
+                          <span>
+                            He leído y acepto los <a href="/terminos.html" class="link-terms-modal" id="link-terms-open" target="_blank" rel="noopener">Términos y Condiciones del Servicio</a> y autorizo expresamente a Servi-Bot a contactarme vía WhatsApp/celular con información y notificaciones de mi bot.
+                          </span>
+                        </label>
+                      </div>
+
+                      <div id="prospect-contact-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
+
+                      <div class="prospect-contact-actions">
+                        <button type="submit" class="btn btn-primary" id="btn-confirm-prospect-contact">
+                          Confirmar y Configurar mi ServiBot →
+                        </button>
+                        <button type="button" class="btn btn-outline btn-sm" id="btn-prospect-switch-account">
+                          Cerrar sesión / Cambiar cuenta
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+
+                <!-- ==================== CONTENIDO DESBLOQUEADO DEL WIZARD ==================== -->
+                <div id="wizard-unlocked-content" class="hidden" hidden>
+                  <!-- Barra de prospecto identificado -->
+                  <div class="prospect-verified-bar" id="prospect-verified-bar">
+                    <div class="prospect-verified-info">
+                      <span class="prospect-avatar-icon" aria-hidden="true">👤</span>
+                      <div>
+                        <span class="badge-tag badge-tag-accent">Cliente Identificado</span>
+                        <div class="prospect-verified-text">
+                          Configurando bot para <strong id="bar-prospect-name">Cliente</strong> (<span id="bar-prospect-business">Empresa</span>) · Celular: <code id="bar-prospect-phone"></code>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="prospect-verified-actions">
+                      <button type="button" class="btn btn-outline btn-sm" id="btn-edit-prospect-data">Editar mis datos</button>
+                      <button type="button" class="btn btn-outline btn-sm" id="btn-prospect-signout">Cerrar sesión</button>
+                    </div>
+                  </div>
+
+                  <nav class="wizard-nav" aria-label="Pasos para crear tu ServiBot">
+                    <div class="wizard-progress-header">
+                      <span class="wizard-step-counter" id="wizard-step-counter">Paso 1 de 3 · Tu Negocio</span>
+                      <progress class="wizard-progress-bar" id="wizard-progress-bar" max="3" value="1">Paso 1 de 3</progress>
+                    </div>
+                    <ol class="wizard-steps-list" id="wizard-steps-list">
+                      <li class="wizard-step-item is-active" data-step="1">
+                        <button type="button" class="wizard-step-btn" data-step="1" aria-current="step">
+                          <span class="wizard-step-num" aria-hidden="true">1</span>
+                          <span class="wizard-step-text">Tu Negocio</span>
+                        </button>
+                      </li>
+                      <li class="wizard-step-item" data-step="2">
+                        <button type="button" class="wizard-step-btn" data-step="2">
+                          <span class="wizard-step-num" aria-hidden="true">2</span>
+                          <span class="wizard-step-text">Alma e IA</span>
+                        </button>
+                      </li>
+                      <li class="wizard-step-item" data-step="3">
+                        <button type="button" class="wizard-step-btn" data-step="3" disabled>
+                          <span class="wizard-step-num" aria-hidden="true">3</span>
+                          <span class="wizard-step-text">Simulador y Costo</span>
+                        </button>
+                      </li>
+                    </ol>
+                  </nav>
+
+                  <form id="servibot-wizard-form" action="/api/instances/provision" method="POST" novalidate>
+                    <input type="hidden" id="cfg-instance-id" name="instance_id" value="" />
+
+                    <!-- PASO 1: IDENTIDAD DEL NEGOCIO Y CONTACTO -->
+                    <div class="wizard-pane" id="wizard-step-1" data-step="1">
+                      <header class="wizard-pane-head">
+                        <h3 id="wizard-step-1-title" tabindex="-1" class="wizard-pane-title">1. Cuéntanos sobre tu negocio</h3>
+                        <p class="wizard-pane-sub">Elige tu giro para sugerirte una configuración base o escribe tus datos directamente.</p>
+                      </header>
+
+                      <div class="wizard-recover-box" id="wizard-recover-box">
+                        <div class="wizard-recover-info">
+                          <strong>🔄 ¿Ya habías configurado un bot aquí antes?</strong>
+                          <span>Ingresa tu teléfono WhatsApp, correo o folio (ej. <code>servibot-04</code>) para retomar tu instancia o recuperar tu borrador desde la base de prospectos.</span>
+                        </div>
+                        <div class="wizard-recover-controls">
+                          <input
+                            type="text"
+                            id="wizard-recover-input"
+                            placeholder="Ej. +5215512345678, correo o servibot-04"
+                            autocomplete="off"
+                          />
+                          <button type="button" class="btn btn-outline btn-sm" id="btn-wizard-recover">
+                            Retomar mi Bot
+                          </button>
+                        </div>
+                        <div id="wizard-recover-status" class="auth-feedback" role="status" aria-live="polite"></div>
                       </div>
                       <div class="wizard-recover-controls">
                         <input
@@ -835,7 +998,8 @@
                     </div>
                   </div>
                 </form>
-              </section>
+              </div>
+            </section>
             </div>
           </article>
         </div>
@@ -875,6 +1039,9 @@
             </div>
           </div>
           <div class="sim-header-actions">
+            <button type="button" class="btn btn-outline btn-sm" id="btn-sim-edit-soul" title="Ver y modificar el alma e instrucciones de tu bot">
+              <span aria-hidden="true">🧠</span> Alma
+            </button>
             <button type="button" class="btn btn-outline btn-sm" id="btn-reset-chat">Reiniciar</button>
             <button
               type="button"
@@ -971,6 +1138,20 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
           <span class="sim-fab-emoji hidden" id="sim-fab-emoji" aria-hidden="true">🤖</span>
           <span class="sim-fab-text" id="sim-fab-text">Asesor Servi-Bot</span>
         </button>
+        <!-- Footer público con enlace a Términos y Condiciones -->
+        <footer class="public-site-footer">
+          <div class="footer-inner">
+            <div class="footer-brand">
+              <img src="/assets/servibot-logo.png" alt="Servi-Bot" width="24" height="24" />
+              <span>Servi-Bot © 2026 · Asistentes Inteligentes y Automatización Comercial</span>
+            </div>
+            <div class="footer-links">
+              <a href="/terminos.html" class="link-terms-modal" id="footer-terms-link" target="_blank" rel="noopener">Términos y Condiciones del Servicio</a>
+              <span>·</span>
+              <a href="#servibot-wizard-card" class="btn-go-offer">Configurar mi ServiBot</a>
+            </div>
+          </div>
+        </footer>
       </div>
     </section>
 
@@ -1212,6 +1393,16 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
             <span class="pill"><span class="dot" id="dot-tunnel"></span> Túnel: <span id="label-tunnel">Verificando...</span></span>
           </div>
 
+          <!-- SECCIÓN 1: CHARLAS Y MENSAJERÍA DIRECTA -->
+          <div style="margin: 1.25rem 0 0.5rem;">
+            <h3 style="margin:0 0 0.25rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem;">
+              <span>💬</span> <span>Atención de Charlas (WhatsApp, Telegram y Teams)</span>
+            </h3>
+            <p style="margin:0; font-size:0.83rem; color:var(--text-muted);">
+              Atención directa en tiempo real para prospectos y clientes mediante agentes conversacionales autónomos.
+            </p>
+          </div>
+
           <div class="form-grid channels-unified-grid">
             <!-- WHATSAPP EVOLUTION -->
             <div class="panel-card">
@@ -1245,68 +1436,269 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
               <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-wa">Disparar Webhook WhatsApp</button>
             </div>
 
-            <!-- MICROSOFT 365 UNIFICADO: OUTLOOK + TEAMS (1 PASO CON INICIO DE SESIÓN EXTERNO) -->
-            <div class="panel-card" id="ms-unified-card">
+            <!-- TELEGRAM BOT -->
+            <div class="panel-card">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-                <h3 style="margin:0;">🟦 Microsoft 365: Outlook + Teams (1 Paso)</h3>
-                <span class="badge-tag" id="ms-state-badge">SIN VINCULAR</span>
+                <h3 style="margin:0;">✈️ Telegram (Charlas en Bot)</h3>
+                <span class="badge-tag" id="tg-state-badge">CONFIGURACIÓN</span>
               </div>
-              <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0.5rem;">
-                Vincula tu correo <strong>Outlook</strong> y tu canal de <strong>Microsoft Teams</strong> en un solo paso solicitando el inicio de sesión directamente a Microsoft en aplicación externa, sin capturar contraseñas.
+              <p style="font-size:0.85rem; color:var(--text-muted);">
+                Atiende conversaciones en Telegram vinculando tu bot creado en <strong>@BotFather</strong>.
               </p>
-
-              <div id="ms-connection-status" class="ms-connection-status">
-                <div class="ms-channel-pills">
-                  <span class="badge-tag">📧 Outlook Mail: Pendiente</span>
-                  <span class="badge-tag">👥 Microsoft Teams: Pendiente</span>
+              <form id="telegram-config-form">
+                <div class="field">
+                  <label for="cfg-telegram-name">Nombre del Bot</label>
+                  <input type="text" id="cfg-telegram-name" placeholder="Servi-Bot Telegram" />
                 </div>
-                <p style="margin:0.45rem 0 0; font-size:0.82rem; color:var(--text-muted);">
-                  Autoriza tu cuenta de Microsoft (@outlook.com, @hotmail.com o Microsoft 365) para activar ambos canales automáticamente.
-                </p>
-              </div>
-
-              <div class="ms-oauth-actions">
-                <button type="button" class="btn-microsoft-oauth" id="btn-ms-oauth-login">
-                  <svg class="ms-logo-svg" width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
-                    <rect x="1" y="1" width="9" height="9" fill="#f25022" />
-                    <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
-                    <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
-                    <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
-                  </svg>
-                  <span id="btn-ms-oauth-label">Iniciar sesión con Microsoft · Conectar Outlook y Teams</span>
-                </button>
-                <button type="button" class="btn btn-danger btn-sm hidden" id="btn-ms-oauth-logout" hidden>Desvincular cuenta Microsoft</button>
-              </div>
+                <div class="field">
+                  <label for="cfg-telegram-username">Usuario del Bot (@username)</label>
+                  <input type="text" id="cfg-telegram-username" placeholder="@TuEmpresa_bot" />
+                </div>
+                <div class="field">
+                  <label for="cfg-telegram-token">Bot Token de Telegram (@BotFather)</label>
+                  <input type="password" id="cfg-telegram-token" placeholder="123456789:AAFg..." autocomplete="off" />
+                </div>
+                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; font-size:0.86rem;">
+                  <input type="checkbox" id="cfg-telegram-enabled" />
+                  <span>Activar atención automática en Telegram</span>
+                </label>
+                <button type="submit" class="btn btn-primary btn-sm">Guardar Configuración Telegram</button>
+              </form>
 
               <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
-              <div class="ms-simulators-grid">
-                <div>
-                  <h4 style="margin:0 0 0.5rem;">🧪 Simular Correo (Outlook)</h4>
-                  <div class="field">
-                    <label for="sim-email-from">Correo del Cliente</label>
-                    <input type="email" id="sim-email-from" value="director@pyme-industrial.mx" />
-                  </div>
-                  <div class="field">
-                    <label for="sim-email-body">Cuerpo del Correo</label>
-                    <input type="text" id="sim-email-body" value="Buen día, deseo contratar la Interfaz de Catálogo Dinámico y el Bot Autónomo. Soy el Ing. Roberto Díaz, por favor levanten mi pedido." />
-                  </div>
-                  <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-email">Procesar Correo Outlook</button>
-                </div>
+              <h4 style="margin:0 0 0.5rem;">🧪 Simular Mensaje Entrante en Telegram</h4>
+              <div class="field">
+                <label for="sim-telegram-user">Usuario de Telegram (@usuario o Nombre)</label>
+                <input type="text" id="sim-telegram-user" value="carlos_director" />
+              </div>
+              <div class="field">
+                <label for="sim-telegram-text">Mensaje del Prospecto</label>
+                <input type="text" id="sim-telegram-text" value="Hola, ¿tienen disponibilidad para implementar un catálogo web y bots para mi empresa?" />
+              </div>
+              <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-telegram">Enviar Mensaje de Telegram</button>
+            </div>
 
-                <div>
-                  <h4 style="margin:0 0 0.5rem;">🧪 Simular Mención en Teams</h4>
-                  <div class="field">
-                    <label for="sim-teams-user">Usuario de Teams</label>
-                    <input type="text" id="sim-teams-user" value="Sofía Méndez (Gerente TI)" />
-                  </div>
-                  <div class="field">
-                    <label for="sim-teams-text">Mensaje en Canal de Teams</label>
-                    <input type="text" id="sim-teams-text" value="@Servi-Bot queremos contratar el paquete de Bots Autónomos e Interfaz de Catálogo Dinámico para nuestra empresa, confirma el pedido." />
-                  </div>
-                  <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-teams">Enviar Webhook de Teams</button>
+            <!-- MICROSOFT TEAMS -->
+            <div class="panel-card">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                <h3 style="margin:0;">👥 Microsoft Teams (Charlas y Webhook)</h3>
+                <span class="badge-tag" id="teams-state-badge">ACTIVO</span>
+              </div>
+              <p style="font-size:0.85rem; color:var(--text-muted);">
+                Atiende menciones y chats en canales de Microsoft Teams mediante Webhook directo.
+              </p>
+              <form id="teams-config-form">
+                <div class="field">
+                  <label for="cfg-teams-name">Nombre del Bot en Teams</label>
+                  <input type="text" id="cfg-teams-name" value="Servi-Bot Teams" />
+                </div>
+                <div class="field">
+                  <label for="cfg-teams-webhook">Incoming Webhook URL de Teams (Para alertas)</label>
+                  <input type="url" id="cfg-teams-webhook" placeholder="https://outlook.office.com/webhook/..." />
+                </div>
+                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; font-size:0.86rem;">
+                  <input type="checkbox" id="cfg-teams-enabled" checked />
+                  <span>Activar atención en Microsoft Teams</span>
+                </label>
+                <button type="submit" class="btn btn-primary btn-sm">Guardar Configuración Teams</button>
+              </form>
+
+              <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
+              <h4 style="margin:0 0 0.5rem;">🧪 Simular Mención en Microsoft Teams</h4>
+              <div class="field">
+                <label for="sim-teams-user">Usuario de Teams</label>
+                <input type="text" id="sim-teams-user" value="Sofía Méndez (Gerente TI)" />
+              </div>
+              <div class="field">
+                <label for="sim-teams-text">Mensaje en Canal de Teams</label>
+                <input type="text" id="sim-teams-text" value="@Servi-Bot queremos contratar el paquete de Bots Autónomos e Interfaz de Catálogo Dinámico para nuestra empresa, confirma el pedido." />
+              </div>
+              <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-teams">Enviar Webhook de Teams</button>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 2: REDES SOCIALES (COMENTARIOS EN INSTAGRAM Y TIKTOK) -->
+          <div style="margin: 1.5rem 0 0.5rem;">
+            <h3 style="margin:0 0 0.25rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem;">
+              <span>📸</span> <span>Respuesta a Comentarios en Redes Sociales (Instagram y TikTok)</span>
+            </h3>
+            <p style="margin:0; font-size:0.83rem; color:var(--text-muted);">
+              Convierte comentarios públicos en reels, posts y videos en ventas directas respondiendo al instante con IA y guiándolos a WhatsApp o DM.
+            </p>
+          </div>
+
+          <div class="form-grid channels-unified-grid">
+            <!-- INSTAGRAM COMENTARIOS -->
+            <div class="panel-card">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                <h3 style="margin:0;">📸 Instagram (Comentarios en Posts / Reels)</h3>
+                <span class="badge-tag" id="ig-state-badge">COMENTARIOS</span>
+              </div>
+              <p style="font-size:0.85rem; color:var(--text-muted);">
+                Responde comentarios en tus fotos y reels con respuestas ágiles y claras, resolviendo dudas de catálogo o precios.
+              </p>
+              <form id="instagram-config-form">
+                <div class="field">
+                  <label for="cfg-instagram-user">Cuenta de Instagram (@usuario)</label>
+                  <input type="text" id="cfg-instagram-user" placeholder="@tu_marca" />
+                </div>
+                <div class="field">
+                  <label for="cfg-instagram-token">Token de Acceso / Graph API</label>
+                  <input type="password" id="cfg-instagram-token" placeholder="EAAX..." autocomplete="off" />
+                </div>
+                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; font-size:0.86rem;">
+                  <input type="checkbox" id="cfg-instagram-enabled" />
+                  <span>Activar respuesta automática a comentarios de Instagram</span>
+                </label>
+                <button type="submit" class="btn btn-primary btn-sm">Guardar Configuración Instagram</button>
+              </form>
+
+              <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
+              <h4 style="margin:0 0 0.5rem;">🧪 Simular Comentario en Publicación de Instagram</h4>
+              <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap:0.5rem;">
+                <div class="field">
+                  <label for="sim-instagram-user">Usuario de Instagram</label>
+                  <input type="text" id="sim-instagram-user" value="mariana_fitness" />
+                </div>
+                <div class="field">
+                  <label for="sim-instagram-post">ID de Post / Reel</label>
+                  <input type="text" id="sim-instagram-post" value="reel_promo_febrero" />
                 </div>
               </div>
+              <div class="field">
+                <label for="sim-instagram-comment">Comentario en la Publicación</label>
+                <input type="text" id="sim-instagram-comment" value="¿Qué precio tiene el paquete de Bots Autónomos? ¿Hacen factura?" />
+              </div>
+              <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-instagram">Simular Comentario Instagram</button>
             </div>
+
+            <!-- TIKTOK COMENTARIOS -->
+            <div class="panel-card">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                <h3 style="margin:0;">🎵 TikTok (Comentarios en Videos)</h3>
+                <span class="badge-tag" id="tt-state-badge">VIDEOS</span>
+              </div>
+              <p style="font-size:0.85rem; color:var(--text-muted);">
+                Monitorea y responde comentarios en videos de TikTok con tono fresco y dinámico, invitando al link en bio o WhatsApp.
+              </p>
+              <form id="tiktok-config-form">
+                <div class="field">
+                  <label for="cfg-tiktok-user">Cuenta de TikTok (@usuario)</label>
+                  <input type="text" id="cfg-tiktok-user" placeholder="@tu_empresa_tiktok" />
+                </div>
+                <div class="field">
+                  <label for="cfg-tiktok-key">Client Key / App Token</label>
+                  <input type="password" id="cfg-tiktok-key" placeholder="aw..." autocomplete="off" />
+                </div>
+                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; font-size:0.86rem;">
+                  <input type="checkbox" id="cfg-tiktok-enabled" />
+                  <span>Activar respuesta automática a comentarios de TikTok</span>
+                </label>
+                <button type="submit" class="btn btn-primary btn-sm">Guardar Configuración TikTok</button>
+              </form>
+
+              <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
+              <h4 style="margin:0 0 0.5rem;">🧪 Simular Comentario en Video de TikTok</h4>
+              <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap:0.5rem;">
+                <div class="field">
+                  <label for="sim-tiktok-user">Usuario de TikTok</label>
+                  <input type="text" id="sim-tiktok-user" value="jorge_tech" />
+                </div>
+                <div class="field">
+                  <label for="sim-tiktok-video">ID de Video</label>
+                  <input type="text" id="sim-tiktok-video" value="video_73849102" />
+                </div>
+              </div>
+              <div class="field">
+                <label for="sim-tiktok-comment">Comentario en el Video</label>
+                <input type="text" id="sim-tiktok-comment" value="¡Está brutal! ¿Cómo puedo contratar este bot para mi clínica?" />
+              </div>
+              <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-tiktok">Simular Comentario TikTok</button>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 3: CORREO ELECTRÓNICO (IMAP / SMTP CON USUARIO Y CONTRASEÑA) -->
+          <div style="margin: 1.5rem 0 0.5rem;">
+            <h3 style="margin:0 0 0.25rem; font-size:1.15rem; display:flex; align-items:center; gap:0.5rem;">
+              <span>📧</span> <span>Correo Electrónico (IMAP / SMTP con Usuario y Contraseña)</span>
+            </h3>
+            <p style="margin:0; font-size:0.83rem; color:var(--text-muted);">
+              Configuración directa con credenciales de aplicación (Gmail, Outlook, Yahoo o servidor corporativo propio).
+            </p>
+          </div>
+
+          <div class="panel-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+              <h3 style="margin:0;">📧 Correo Electrónico (IMAP / SMTP)</h3>
+              <span class="badge-tag" id="email-state-badge">CREDENCIALES</span>
+            </div>
+
+            <!-- Plantillas rápidas para rellenar servidores -->
+            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem; padding:0.6rem 0.8rem; background:rgba(15,23,42,0.6); border-radius:8px; border:1px solid var(--border-color);">
+              <span style="font-size:0.82rem; color:var(--text-muted); font-weight:600;">Completar servidores rápido:</span>
+              <button type="button" class="btn btn-outline btn-xs" id="btn-email-preset-gmail">🔴 Gmail</button>
+              <button type="button" class="btn btn-outline btn-xs" id="btn-email-preset-outlook">🟦 Outlook / Hotmail</button>
+              <button type="button" class="btn btn-outline btn-xs" id="btn-email-preset-yahoo">🟣 Yahoo</button>
+              <button type="button" class="btn btn-outline btn-xs" id="btn-email-preset-custom">⚙️ Servidor Propio / cPanel</button>
+            </div>
+
+            <form id="email-config-form">
+              <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                <div class="field">
+                  <label for="cfg-imap-host">Servidor IMAP (Entrada)</label>
+                  <input type="text" id="cfg-imap-host" placeholder="imap.gmail.com" />
+                </div>
+                <div class="field">
+                  <label for="cfg-imap-port">Puerto IMAP</label>
+                  <input type="number" id="cfg-imap-port" value="993" />
+                </div>
+                <div class="field">
+                  <label for="cfg-smtp-host">Servidor SMTP (Salida)</label>
+                  <input type="text" id="cfg-smtp-host" placeholder="smtp.gmail.com" />
+                </div>
+                <div class="field">
+                  <label for="cfg-smtp-port">Puerto SMTP</label>
+                  <input type="number" id="cfg-smtp-port" value="465" />
+                </div>
+              </div>
+
+              <div class="form-grid" style="grid-template-columns: 1fr 1fr; margin-top:0.5rem;">
+                <div class="field">
+                  <label for="cfg-email-user">Correo de Atención (Usuario)</label>
+                  <input type="email" id="cfg-email-user" placeholder="ventas@tunegocio.com" />
+                </div>
+                <div class="field">
+                  <label for="cfg-email-pass">Contraseña de Aplicación (Contraseña)</label>
+                  <input type="password" id="cfg-email-pass" placeholder="xxxx xxxx xxxx xxxx" autocomplete="off" />
+                  <span class="field-hint">Usa contraseña de aplicación generada en tu cuenta de correo.</span>
+                </div>
+              </div>
+
+              <label style="display:flex; align-items:center; gap:0.5rem; margin:0.85rem 0; font-size:0.86rem;">
+                <input type="checkbox" id="cfg-email-enabled" />
+                <span>Activar lectura periódica IMAP y respuesta automática SMTP</span>
+              </label>
+
+              <button type="submit" class="btn btn-primary btn-sm">💾 Guardar Configuración de Correo</button>
+            </form>
+
+            <hr style="border:none; border-top:1px solid var(--border-color); margin:1.25rem 0 1rem;" />
+            <h4 style="margin:0 0 0.5rem;">🧪 Simular Correo Entrante de Cliente</h4>
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap:0.5rem;">
+              <div class="field">
+                <label for="sim-email-from">Correo del Cliente</label>
+                <input type="email" id="sim-email-from" value="director@pyme-industrial.mx" />
+              </div>
+              <div class="field">
+                <label for="sim-email-subject">Asunto del Correo</label>
+                <input type="text" id="sim-email-subject" value="Solicitud de contratación de Bots Autónomos y Catálogo" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="sim-email-body">Cuerpo del Correo</label>
+              <input type="text" id="sim-email-body" value="Buen día, deseo contratar la Interfaz de Catálogo Dinámico y el Bot Autónomo. Soy el Ing. Roberto Díaz, por favor confirmen el pedido y formas de pago." />
+            </div>
+            <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-email">Procesar Correo con IA Python</button>
           </div>
 
           <div class="panel-card">
@@ -1571,6 +1963,164 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
             </div>
           </div>
         </div>
+
+        <!-- TAB 7: ALMA, PERSONALIDAD E INSTRUCCIONES DEL BOT -->
+        <div id="tab-bot-soul" class="admin-tab-pane hidden">
+          <div class="bot-soul-container">
+            <header class="bot-soul-header">
+              <div class="bot-soul-title-row">
+                <div>
+                  <h3 class="bot-soul-title">🧠 Alma, Personalidad e Instrucciones de tu Bot</h3>
+                  <p class="bot-soul-subtitle">
+                    Configura con precisión el comportamiento de tu bot, el tono de sus respuestas, su propósito central y cómo debe responder a preguntas frecuentes o situaciones clave de tus clientes.
+                  </p>
+                </div>
+                <div class="bot-soul-instance-pill">
+                  <span class="badge-tag badge-tag-custom" id="soul-instance-pill">servibot-00</span>
+                </div>
+              </div>
+            </header>
+
+            <form id="bot-soul-form" class="bot-soul-form" novalidate>
+              <div class="bot-soul-grid">
+                <!-- Columna Izquierda: Identidad y Tono -->
+                <div class="bot-soul-col">
+                  <div class="panel-card bot-soul-card">
+                    <h4 class="soul-card-title">🎭 Identidad y Presencia</h4>
+                    <p class="soul-card-desc">Cómo se presenta el bot y qué nombre utiliza ante los clientes.</p>
+
+                    <div class="field">
+                      <label for="soul-display-name">Nombre del Asistente Bot <span aria-hidden="true">*</span></label>
+                      <input
+                        type="text"
+                        id="soul-display-name"
+                        name="display_name"
+                        placeholder="Ej.: Sofía, Asistente de Sonrisa Norte"
+                        required
+                      />
+                      <span class="field-hint">Nombre propio con el que saluda y se identifica en WhatsApp, Teams y Web.</span>
+                    </div>
+
+                    <div class="field">
+                      <label for="soul-business-name">Nombre de la Empresa o Marca <span aria-hidden="true">*</span></label>
+                      <input
+                        type="text"
+                        id="soul-business-name"
+                        name="business_name"
+                        placeholder="Ej.: Clínica Dental Sonrisa Norte"
+                        required
+                      />
+                      <span class="field-hint">La entidad o negocio al que representa de manera exclusiva.</span>
+                    </div>
+
+                    <div class="field">
+                      <label for="soul-welcome-message">Mensaje de Saludo o Bienvenida</label>
+                      <textarea
+                        id="soul-welcome-message"
+                        name="welcome_message"
+                        rows="3"
+                        placeholder="Ej.: ¡Hola! Te doy la bienvenida a Sonrisa Norte. Soy Sofía, ¿en qué servicio o duda te puedo asesorar hoy?"
+                      ></textarea>
+                      <span class="field-hint">Primer mensaje que envía al iniciar una conversación nueva o saludar.</span>
+                    </div>
+                  </div>
+
+                  <div class="panel-card bot-soul-card">
+                    <h4 class="soul-card-title">🗣️ Tono y Estilo de Comunicación</h4>
+                    <p class="soul-card-desc">El carácter y emoción de cada respuesta generada por la IA.</p>
+
+                    <div class="field">
+                      <label for="soul-tone">Tono de conversación</label>
+                      <input
+                        type="text"
+                        id="soul-tone"
+                        name="tone"
+                        placeholder="Ej.: Cálido, empático, profesional y resolutivo"
+                      />
+                      <span class="field-hint">Personaliza el carácter (ej.: formal, amigable, alegre, sobrio, etc.).</span>
+                    </div>
+
+                    <div class="preset-group">
+                      <span class="preset-label">Seleccionar tono predefinido:</span>
+                      <div class="preset-chips-row" id="soul-tone-presets">
+                        <button type="button" class="preset-chip" data-tone="Cálido, cercano y empático">🌟 Cálido y Empático</button>
+                        <button type="button" class="preset-chip" data-tone="Ejecutivo, directo y orientado a resultados">💼 Ejecutivo y Directo</button>
+                        <button type="button" class="preset-chip" data-tone="Elegante, consultivo y de alto nivel">👑 Premium / Consultivo</button>
+                        <button type="button" class="preset-chip" data-tone="Dinámico, amigable y entusiasta">⚡ Dinámico y Entusiasta</button>
+                        <button type="button" class="preset-chip" data-tone="Médico, riguroso, paciente y tranquilizador">🩺 Profesional Clínico</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Columna Derecha: Alma, FAQ y Reglas de Comportamiento -->
+                <div class="bot-soul-col">
+                  <div class="panel-card bot-soul-card">
+                    <div class="soul-card-header-row">
+                      <div>
+                        <h4 class="soul-card-title">💫 Propósito y Alma de la IA (AI Soul)</h4>
+                        <p class="soul-card-desc">El espíritu, los valores y la misión de tu bot al interactuar.</p>
+                      </div>
+                    </div>
+
+                    <div class="field">
+                      <label for="soul-ai-soul">Alma del Bot <span aria-hidden="true">*</span></label>
+                      <textarea
+                        id="soul-ai-soul"
+                        name="ai_soul"
+                        rows="4"
+                        placeholder="Ej.: Tu misión es escuchar con atención cada necesidad del cliente, transmitirle confianza absoluta y guiarlo paso a paso. Hazlo sentir valorado, jamás uses tecnicismos complicados y enfócate en solucionar su duda de forma ágil y transparente."
+                        required
+                      ></textarea>
+                      <span class="field-hint">Define su personalidad interna: cómo hace sentir al cliente y qué postura asume.</span>
+                    </div>
+                  </div>
+
+                  <div class="panel-card bot-soul-card">
+                    <div class="soul-card-header-row">
+                      <div>
+                        <h4 class="soul-card-title">📋 Reglas de Comportamiento y Respuestas Específicas</h4>
+                        <p class="soul-card-desc">Directrices exactas sobre cómo responder a preguntas determinadas, horarios, políticas y límites.</p>
+                      </div>
+                    </div>
+
+                    <!-- Botones de inserción rápida de plantillas -->
+                    <div class="soul-template-actions">
+                      <span class="preset-label">Plantillas rápidas:</span>
+                      <button type="button" class="btn btn-outline btn-xs soul-template-btn" id="btn-tmpl-faq">➕ Preguntas Frecuentes (FAQ)</button>
+                      <button type="button" class="btn btn-outline btn-xs soul-template-btn" id="btn-tmpl-hours">➕ Horarios y Ubicación</button>
+                      <button type="button" class="btn btn-outline btn-xs soul-template-btn" id="btn-tmpl-limits">➕ Reglas Estrictas / Prohibiciones</button>
+                    </div>
+
+                    <div class="field" style="margin-top:0.75rem;">
+                      <label for="soul-system-prompt">Instrucciones y respuestas a preguntas específicas</label>
+                      <textarea
+                        id="soul-system-prompt"
+                        name="system_prompt"
+                        rows="8"
+                        placeholder="Escribe directrices concretas como:&#10;- Si preguntan por horarios: responder que abrimos de Lunes a Sábado de 9:00 a 19:00 hrs.&#10;- Si preguntan por ubicación: estamos en Av. Principal #123, Col. Centro.&#10;- Si preguntan por formas de pago: aceptamos tarjeta de débito/crédito, transferencia y efectivo.&#10;- Si preguntan por garantías: todos nuestros servicios cuentan con 30 días de garantía.&#10;- Jamás inventar precios ni servicios que no estén registrados en el catálogo."
+                      ></textarea>
+                      <span class="field-hint">Estas instrucciones tienen máxima prioridad al responder cualquier mensaje.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Barra Inferior de Guardado y Feedback -->
+              <div class="bot-soul-footer">
+                <div id="bot-soul-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
+                <div class="bot-soul-footer-actions">
+                  <button type="button" class="btn btn-outline" id="btn-soul-test-simulator">
+                    🧪 Probar en Simulador
+                  </button>
+                  <button type="submit" class="btn btn-primary" id="btn-save-bot-soul">
+                    💾 Guardar Alma y Reglas del Bot
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -1713,6 +2263,61 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
           </div>
         </div>
       </form>
+    </div>
+  </dialog>
+
+  <!-- Native <dialog> Modal para Términos y Condiciones per modern-web-guidance `dialog` -->
+  <dialog id="terms-modal" class="product-form-modal terms-modal" closedby="any" aria-labelledby="terms-modal-title">
+    <div class="dialog-inner">
+      <div class="dialog-header">
+        <h2 id="terms-modal-title">📜 Términos y Condiciones del Servicio</h2>
+        <form method="dialog">
+          <button type="submit" class="btn btn-outline btn-sm" aria-label="Cerrar ventana">✕</button>
+        </form>
+      </div>
+      <div class="terms-modal-body">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+          Última actualización: Noviembre 2026 · Válido para México e internacional.
+        </p>
+
+        <h4>1. Identificación y Aceptación</h4>
+        <p>
+          Al crear una cuenta mediante Firebase Authentication (Google Sign-In o correo electrónico) y registrar sus datos de contacto, usted manifiesta su conformidad expresa con estos Términos y Condiciones de <strong>Servi-Bot</strong>.
+        </p>
+
+        <h4>2. Descripción del Servicio</h4>
+        <p>
+          Servi-Bot provee una plataforma integral de automatización comercial basada en IA: asistentes inteligentes (ServiBot), catálogo interactivo, páginas web y canales multicanal (WhatsApp vía Baileys sin costo por token, Outlook/Teams). Cada bot cuenta con su base de datos aislada en SQLite, garantizando total privacidad de sus datos comerciales.
+        </p>
+
+        <div class="prospect-phone-notice" style="margin: 1rem 0;">
+          <div class="notice-icon" aria-hidden="true">📲</div>
+          <div class="notice-text">
+            <strong>3. Consentimiento Expreso de Mensajería y WhatsApp:</strong>
+            <p>
+              Al proporcionar su número de teléfono celular, usted autoriza expresamente a Servi-Bot a utilizarlo para el envío de notificaciones del sistema, avisos de pedidos, confirmaciones de cotizaciones y actualizaciones de su bot.
+            </p>
+          </div>
+        </div>
+
+        <h4>4. Esquema de Costos y Facturación</h4>
+        <p>
+          Servicio de Bot Configurado: <strong>$1,500 MXN mensuales</strong> más 16% IVA ($240 MXN) = <strong>$1,740 MXN</strong>. Servicios opcionales: Catálogo Virtual ($500 MXN + IVA), Página Web ($300 MXN + IVA), Soporte 24/7 ($200 MXN + IVA). Paquete completo: <strong>$2,900 MXN IVA incl.</strong> al mes. Cada pago activa 30 días naturales de suscripción.
+        </p>
+
+        <h4>5. Protección de Datos Personales (LFPDPPP)</h4>
+        <p>
+          Sus datos de contacto serán tratados exclusivamente para la prestación, personalización y facturación del servicio, con estricto apego a la ley mexicana.
+        </p>
+        <p style="margin-top: 1.25rem;">
+          <a href="/terminos.html" target="_blank" rel="noopener" class="btn-link">Ver documento legal completo en página independiente ↗</a>
+        </p>
+      </div>
+      <div style="display: flex; justify-content: flex-end; margin-top: 1.25rem; padding-top: 0.75rem; border-top: 1px solid var(--metal-border);">
+        <form method="dialog">
+          <button type="submit" class="btn btn-primary btn-sm">Entendido y Cerrar</button>
+        </form>
+      </div>
     </div>
   </dialog>
 
