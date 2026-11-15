@@ -167,6 +167,18 @@
             <nav class="carousel-markers" id="carousel-markers" aria-label="Seleccionar sección"></nav>
             <button
               type="button"
+              class="btn-topbar-user hidden"
+              id="btn-topbar-user"
+              aria-haspopup="dialog"
+              aria-controls="user-profile-dialog"
+              title="Ver mi perfil y sesión"
+              hidden
+            >
+              <span class="topbar-user-icon" aria-hidden="true">👤</span>
+              <span class="topbar-user-name" id="topbar-user-name">Usuario</span>
+            </button>
+            <button
+              type="button"
               class="btn-topbar-sim"
               id="btn-topbar-sim"
               aria-controls="simulator-panel"
@@ -396,41 +408,38 @@
             data-marker-name="02 · Configura tu ServiBot"
           >
             <div class="slide-inner slide-inner-configurator">
-              <div class="configurator-sticky-header">
-                <div class="section-head configurator-head-clean">
-                  <h2 id="configurator-heading">Crea tu Primer ServiBot</h2>
-                  <button type="button" class="btn btn-outline btn-sm" id="btn-go-description">
-                    ← Ver Descripción
-                  </button>
-                </div>
+              <header class="configurator-sticky-header">
+                <div class="configurator-header-row">
+                  <h2 id="configurator-heading" class="configurator-heading-left">Crea tu Primer ServiBot</h2>
 
-                <nav class="wizard-nav wizard-nav-sticky" aria-label="Pasos para crear tu ServiBot">
-                  <div class="wizard-progress-header visually-hidden">
-                    <span class="wizard-step-counter" id="wizard-step-counter">Paso 1 de 3 · Tu Negocio</span>
-                    <progress class="wizard-progress-bar" id="wizard-progress-bar" max="3" value="1">Paso 1 de 3</progress>
-                  </div>
-                  <ol class="wizard-steps-list wizard-tabs-square" id="wizard-steps-list">
-                    <li class="wizard-step-item is-active" data-step="1">
-                      <button type="button" class="wizard-step-btn wizard-tab-square" data-step="1" aria-current="step">
-                        <span class="wizard-step-num" aria-hidden="true">1</span>
-                        <span class="wizard-step-text">Tu Negocio</span>
-                      </button>
-                    </li>
-                    <li class="wizard-step-item" data-step="2">
-                      <button type="button" class="wizard-step-btn wizard-tab-square" data-step="2">
-                        <span class="wizard-step-num" aria-hidden="true">2</span>
-                        <span class="wizard-step-text">Alma e IA</span>
-                      </button>
-                    </li>
-                    <li class="wizard-step-item" data-step="3">
-                      <button type="button" class="wizard-step-btn wizard-tab-square" data-step="3" disabled>
-                        <span class="wizard-step-num" aria-hidden="true">3</span>
-                        <span class="wizard-step-text">Simulador y Costo</span>
-                      </button>
-                    </li>
-                  </ol>
-                </nav>
-              </div>
+                  <nav class="wizard-nav wizard-nav-sticky" aria-label="Pasos para crear tu ServiBot">
+                    <div class="wizard-progress-header visually-hidden">
+                      <span class="wizard-step-counter" id="wizard-step-counter">Paso 1 de 3 · Tu Negocio</span>
+                      <progress class="wizard-progress-bar" id="wizard-progress-bar" max="3" value="1">Paso 1 de 3</progress>
+                    </div>
+                    <ol class="wizard-steps-list wizard-tabs-square" id="wizard-steps-list">
+                      <li class="wizard-step-item is-active" data-step="1">
+                        <button type="button" class="wizard-step-btn wizard-tab-square" data-step="1" aria-current="step">
+                          <span class="wizard-step-num" aria-hidden="true">1</span>
+                          <span class="wizard-step-text">Tu Negocio</span>
+                        </button>
+                      </li>
+                      <li class="wizard-step-item" data-step="2">
+                        <button type="button" class="wizard-step-btn wizard-tab-square" data-step="2">
+                          <span class="wizard-step-num" aria-hidden="true">2</span>
+                          <span class="wizard-step-text">Alma e IA</span>
+                        </button>
+                      </li>
+                      <li class="wizard-step-item" data-step="3">
+                        <button type="button" class="wizard-step-btn wizard-tab-square" data-step="3" disabled>
+                          <span class="wizard-step-num" aria-hidden="true">3</span>
+                          <span class="wizard-step-text">Simulador y Costo</span>
+                        </button>
+                      </li>
+                    </ol>
+                  </nav>
+                </div>
+              </header>
 
               <section class="configurator-form-card wizard-shell" id="servibot-wizard-card" aria-labelledby="configurator-heading">
                 <!-- ==================== FILTRO PREVIO OBLIGATORIO (FIREBASE AUTH + CONTACTO) ==================== -->
@@ -569,23 +578,6 @@
 
                 <!-- ==================== CONTENIDO DESBLOQUEADO DEL WIZARD ==================== -->
                 <div id="wizard-unlocked-content" class="hidden" hidden>
-                  <!-- Barra de prospecto identificado -->
-                  <div class="prospect-verified-bar" id="prospect-verified-bar">
-                    <div class="prospect-verified-info">
-                      <span class="prospect-avatar-icon" aria-hidden="true">👤</span>
-                      <div>
-                        <span class="badge-tag badge-tag-accent">Cliente Identificado</span>
-                        <div class="prospect-verified-text">
-                          Configurando bot para <strong id="bar-prospect-name">Cliente</strong> (<span id="bar-prospect-business">Empresa</span>) · Celular: <code id="bar-prospect-phone"></code>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="prospect-verified-actions">
-                      <button type="button" class="btn btn-outline btn-sm" id="btn-edit-prospect-data">Editar mis datos</button>
-                      <button type="button" class="btn btn-outline btn-sm" id="btn-prospect-signout">Cerrar sesión</button>
-                    </div>
-                  </div>
-
                   <form id="servibot-wizard-form" action="/api/instances/provision" method="POST" novalidate>
                     <input type="hidden" id="cfg-instance-id" name="instance_id" value="" />
 
@@ -2372,6 +2364,38 @@ Pregúntame cómo funciona la plataforma, los canales de WhatsApp / Outlook / Te
         <form method="dialog">
           <button type="submit" class="btn btn-primary btn-sm">Entendido y Cerrar</button>
         </form>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Native <dialog> Modal para Sesión y Perfil del Cliente per modern-web-guidance `dialog` -->
+  <dialog id="user-profile-dialog" class="product-form-modal user-profile-modal" closedby="any" aria-labelledby="user-profile-dialog-title">
+    <div class="dialog-inner" style="max-width: 440px;">
+      <div class="dialog-header">
+        <h2 id="user-profile-dialog-title">👤 Perfil y Sesión del Cliente</h2>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-close-profile-modal" aria-label="Cerrar modal">✕</button>
+      </div>
+      <div class="user-profile-body" style="display: flex; flex-direction: column; gap: 0.85rem; padding: 0.85rem 0;">
+        <div class="user-profile-row">
+          <span style="font-size: 0.76rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Cliente</span>
+          <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-main);" id="bar-prospect-name">Cliente</div>
+        </div>
+        <div class="user-profile-row">
+          <span style="font-size: 0.76rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Empresa o Marca</span>
+          <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-secondary);" id="bar-prospect-business">Empresa</div>
+        </div>
+        <div class="user-profile-row">
+          <span style="font-size: 0.76rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">WhatsApp / Celular</span>
+          <div><code id="bar-prospect-phone" style="font-size: 0.92rem; color: var(--wa-green-bright); background: rgba(37, 211, 102, 0.12); padding: 0.2rem 0.5rem; border-radius: 4px;"></code></div>
+        </div>
+        <div class="user-profile-row" id="user-profile-email-row">
+          <span style="font-size: 0.76rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Correo Registrado</span>
+          <div style="font-size: 0.88rem; color: var(--text-muted);" id="bar-prospect-email">-</div>
+        </div>
+      </div>
+      <div class="dialog-actions" style="display: flex; justify-content: space-between; gap: 0.75rem; margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid var(--metal-border);">
+        <button type="button" class="btn btn-outline btn-sm" id="btn-edit-prospect-data">Editar mis datos</button>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-prospect-signout" style="border-color: rgba(239, 68, 68, 0.5); color: #fca5a5;">Cerrar sesión</button>
       </div>
     </div>
   </dialog>

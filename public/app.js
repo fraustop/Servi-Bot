@@ -171,9 +171,21 @@ function unlockWizardWithProspect(profile) {
   const barName = document.getElementById('bar-prospect-name');
   const barBiz = document.getElementById('bar-prospect-business');
   const barPhone = document.getElementById('bar-prospect-phone');
+  const barEmail = document.getElementById('bar-prospect-email');
   if (barName) barName.textContent = profile.name || 'Cliente';
   if (barBiz) barBiz.textContent = profile.business || 'Empresa';
   if (barPhone) barPhone.textContent = profile.phone || '';
+  if (barEmail) barEmail.textContent = currentUser?.email || '-';
+
+  const topbarUserBtn = document.getElementById('btn-topbar-user');
+  const topbarUserName = document.getElementById('topbar-user-name');
+  if (topbarUserBtn) {
+    topbarUserBtn.classList.remove('hidden');
+    topbarUserBtn.removeAttribute('hidden');
+  }
+  if (topbarUserName) {
+    topbarUserName.textContent = profile.name || currentUser?.displayName || 'Mi Cuenta';
+  }
 
   // Pre-llenar paso 1 del wizard si está vacío o difiere
   const cfgName = document.getElementById('cfg-client-name');
@@ -198,6 +210,11 @@ function syncProspectGateUI() {
   if (!gateShell) return;
 
   if (!currentUser) {
+    const topbarUserBtn = document.getElementById('btn-topbar-user');
+    if (topbarUserBtn) {
+      topbarUserBtn.classList.add('hidden');
+      topbarUserBtn.setAttribute('hidden', '');
+    }
     gateShell.classList.remove('hidden');
     gateShell.removeAttribute('hidden');
     gateAuth?.classList.remove('hidden');
@@ -208,6 +225,20 @@ function syncProspectGateUI() {
     unlocked?.setAttribute('hidden', '');
     setProspectAuthMode(prospectAuthMode);
     return;
+  }
+
+  const topbarUserBtn = document.getElementById('btn-topbar-user');
+  const topbarUserName = document.getElementById('topbar-user-name');
+  if (topbarUserBtn) {
+    topbarUserBtn.classList.remove('hidden');
+    topbarUserBtn.removeAttribute('hidden');
+  }
+  if (topbarUserName) {
+    topbarUserName.textContent =
+      prospectProfile?.name ||
+      currentUser.displayName ||
+      currentUser.email?.split('@')[0] ||
+      'Mi Cuenta';
   }
 
   // Hay usuario autenticado con Firebase Auth
@@ -3402,12 +3433,27 @@ function setupEventListeners() {
 
   document.getElementById('btn-prospect-switch-account')?.addEventListener('click', handleProspectSignOut);
   document.getElementById('btn-prospect-logout')?.addEventListener('click', handleProspectSignOut);
-  document.getElementById('btn-prospect-signout')?.addEventListener('click', handleProspectSignOut);
+  document.getElementById('btn-prospect-signout')?.addEventListener('click', () => {
+    document.getElementById('user-profile-dialog')?.close();
+    handleProspectSignOut();
+  });
 
   document.getElementById('btn-edit-prospect-data')?.addEventListener('click', () => {
+    document.getElementById('user-profile-dialog')?.close();
     if (currentUser) {
       showProspectContactStep(currentUser, true);
     }
+  });
+
+  document.getElementById('btn-topbar-user')?.addEventListener('click', () => {
+    const dialog = document.getElementById('user-profile-dialog');
+    if (dialog && typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    }
+  });
+
+  document.getElementById('btn-close-profile-modal')?.addEventListener('click', () => {
+    document.getElementById('user-profile-dialog')?.close();
   });
 
   const openTermsModal = (e) => {
