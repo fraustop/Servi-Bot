@@ -1950,6 +1950,11 @@ async function main() {
       hasSavedSession: Boolean(live.hasSavedSession),
       lastError: live.lastError || null
     };
+    try {
+      merged.quick_options = JSON.parse(row.quick_options_json || '[]');
+    } catch {
+      merged.quick_options = [];
+    }
     if (includeCatalog && row.instance_id) {
       try {
         const botDb = getBotDb(row.instance_id);
@@ -2149,6 +2154,8 @@ async function main() {
         syncWizardCatalogToBotDb(instanceId, rawCatalog, Boolean(body.replace_catalog));
       }
 
+      const quickOptionsJson = Array.isArray(body.quick_options) ? JSON.stringify(body.quick_options) : null;
+
       db.prepare(
         `
         UPDATE bot_instances SET
@@ -2162,6 +2169,7 @@ async function main() {
           ai_soul = ?,
           system_prompt = ?,
           welcome_message = ?,
+          quick_options_json = CASE WHEN ? IS NOT NULL THEN ? ELSE quick_options_json END,
           db_file = ?,
           active = 1,
           updated_at = datetime('now', 'localtime')
@@ -2178,6 +2186,8 @@ async function main() {
         aiSoul,
         systemPrompt,
         welcomeMessage,
+        quickOptionsJson,
+        quickOptionsJson,
         getBotDbPath(instanceId),
         instanceId
       );

@@ -240,6 +240,9 @@ ensureColumn(db, 'bot_instances', 'paid_status', "TEXT NOT NULL DEFAULT 'unpaid'
 ensureColumn(db, 'bot_instances', 'paid_at', 'TEXT DEFAULT NULL');
 ensureColumn(db, 'bot_instances', 'subscription_expires_at', 'TEXT DEFAULT NULL');
 ensureColumn(db, 'bot_instances', 'locked_for_public', 'INTEGER NOT NULL DEFAULT 0');
+ensureColumn(db, 'bot_instances', 'quick_options_json', "TEXT NOT NULL DEFAULT '[]'");
+
+ensureColumn(prospectsDb, 'prospects', 'quick_options_json', "TEXT NOT NULL DEFAULT '[]'");
 
 ensureColumn(db, 'admin_accounts', 'assigned_instance_id', "TEXT NOT NULL DEFAULT 'servibot-01'");
 ensureColumn(db, 'admin_accounts', 'subscription_expires_at', 'TEXT DEFAULT NULL');

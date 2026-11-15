@@ -48,6 +48,709 @@ if (!('closedBy' in HTMLDialogElement.prototype)) {
   }
 }
 
+// --- TEMA CLARO Y MASTER-DETAIL PASO 2 ---
+let wizardCatalogItems = [
+  {
+    name: 'Consulta de Valoración',
+    type: 'service',
+    price: 400,
+    billing_cycle: 'por sesión',
+    tagline: 'Diagnóstico integral',
+    description: 'Revisión clínica completa y plan de tratamiento personalizado.'
+  },
+  {
+    name: 'Limpieza Dental Ultrasónica',
+    type: 'service',
+    price: 650,
+    billing_cycle: 'por sesión',
+    tagline: 'Profilaxis preventiva',
+    description: 'Eliminación de sarro con ultrasonido, pulido y flúor protector.'
+  }
+];
+
+let wizardFaqItems = [
+  {
+    question: '¿Aceptan tarjetas de crédito y emiten factura fiscal?',
+    answer: 'Sí, aceptamos tarjetas Visa, Mastercard y emitimos factura electrónica fiscal (CFDI).'
+  },
+  {
+    question: '¿Dónde están ubicados y cómo llego?',
+    answer: 'Nuestra ubicación principal cuenta con estacionamiento privado sin costo para pacientes.'
+  }
+];
+
+let wizardQuickOptions = [
+  { label: '¿Qué servicios tienen?', prompt: 'Hola, ¿qué servicios o productos ofrecen y cuáles son sus costos?' },
+  { label: 'Horarios y Ubicación', prompt: '¿Cuáles son sus horarios de atención y su ubicación?' },
+  { label: 'Agendar Cita / Pedido', prompt: 'Hola, me gustaría agendar una cita o hacer un pedido en ${bizName}.' }
+];
+
+const DAYS_OF_WEEK = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+let wizardSchedule = DAYS_OF_WEEK.map((day, idx) => ({
+  day,
+  open: idx < 6, // Lunes a Sábado abierto, Domingo cerrado
+  open_time: '09:00',
+  close_time: '19:00',
+  has_lunch: true,
+  lunch_start: '14:00',
+  lunch_end: '15:00',
+  accepts_appt: idx < 6,
+  appt_start: '09:30',
+  appt_end: '18:30'
+}));
+
+let autoSaveTimer = null;
+let isAutoSaving = false;
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('servibot_theme') || 'dark';
+  applyTheme(savedTheme);
+
+  document.getElementById('btn-topbar-theme')?.addEventListener('click', () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
+    applyTheme(nextTheme);
+  });
+}
+
+function applyTheme(theme) {
+  const isLight = theme === 'light';
+  document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
+  localStorage.setItem('servibot_theme', isLight ? 'light' : 'dark');
+
+  const sunIcon = document.getElementById('theme-icon-sun');
+  const moonIcon = document.getElementById('theme-icon-moon');
+  const btn = document.getElementById('btn-topbar-theme');
+
+  if (sunIcon && moonIcon) {
+    if (isLight) {
+      sunIcon.classList.add('hidden');
+      sunIcon.hidden = true;
+      moonIcon.classList.remove('hidden');
+      moonIcon.hidden = false;
+    } else {
+      sunIcon.classList.remove('hidden');
+      sunIcon.hidden = false;
+      moonIcon.classList.add('hidden');
+      moonIcon.hidden = true;
+    }
+  }
+
+  if (btn) {
+    btn.title = isLight ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro';
+    btn.setAttribute('aria-label', isLight ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro');
+  }
+}
+
+// Aplicar tema inmediatamente al cargar el módulo
+try {
+  const earlyTheme = localStorage.getItem('servibot_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', earlyTheme);
+} catch {}
+
+function initSoulTabs() {
+  document.querySelectorAll('.soul-tab-btn').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const paneId = tab.dataset.pane;
+      switchSoulPane(paneId);
+    });
+  });
+}
+
+function switchSoulPane(targetPaneId) {
+  document.querySelectorAll('.soul-tab-btn').forEach((tab) => {
+    const isTarget = tab.dataset.pane === targetPaneId;
+    tab.classList.toggle('is-active', isTarget);
+    tab.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+  });
+
+  document.querySelectorAll('.soul-pane').forEach((pane) => {
+    const isTarget = pane.id === targetPaneId;
+    pane.classList.toggle('hidden', !isTarget);
+    if (isTarget) {
+      pane.removeAttribute('hidden');
+    } else {
+      pane.setAttribute('hidden', '');
+    }
+  });
+}
+
+function renderQuickOptionsList() {
+  const container = document.getElementById('quick-options-list');
+  if (!container) return;
+
+  if (!wizardQuickOptions.length) {
+    container.innerHTML = '<div style="font-size: 0.82rem; color: var(--text-muted); font-style: italic; padding: 0.5rem 0;">No hay opciones rápidas configuradas. Agrega una abajo o restablece los valores por defecto.</div>';
+    return;
+  }
+
+  container.innerHTML = wizardQuickOptions.map((opt, idx) => `
+    <div class="quick-opt-row">
+      <div class="quick-opt-info">
+        <span class="quick-opt-badge">${escapeHtml(opt.label)}</span>
+        <span class="quick-opt-prompt-preview" title="${escapeHtml(opt.prompt)}">${escapeHtml(opt.prompt)}</span>
+      </div>
+      <button type="button" class="btn btn-outline btn-xs btn-del-quick-opt" data-index="${idx}" title="Eliminar opción">
+        ✕
+      </button>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.btn-del-quick-opt').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.index);
+      wizardQuickOptions.splice(idx, 1);
+      renderQuickOptionsList();
+      updateQuickPrompts(true);
+      scheduleAutoSaveInstance();
+    });
+  });
+}
+
+function initQuickOptionsManager() {
+  renderQuickOptionsList();
+
+  document.getElementById('btn-add-quick-opt')?.addEventListener('click', () => {
+    const labelInput = document.getElementById('new-quick-opt-label');
+    const promptInput = document.getElementById('new-quick-opt-prompt');
+    const label = labelInput?.value.trim();
+    const prompt = promptInput?.value.trim();
+
+    if (!label) {
+      labelInput?.focus();
+      return;
+    }
+    const finalPrompt = prompt || label;
+    wizardQuickOptions.push({ label, prompt: finalPrompt });
+    if (labelInput) labelInput.value = '';
+    if (promptInput) promptInput.value = '';
+
+    renderQuickOptionsList();
+    updateQuickPrompts(true);
+    scheduleAutoSaveInstance();
+  });
+
+  document.getElementById('btn-reset-quick-opts')?.addEventListener('click', () => {
+    wizardQuickOptions = [
+      { label: '¿Qué servicios tienen?', prompt: 'Hola, ¿qué servicios o productos ofrecen y cuáles son sus costos?' },
+      { label: 'Horarios y Ubicación', prompt: '¿Cuáles son sus horarios de atención y su ubicación?' },
+      { label: 'Agendar Cita / Pedido', prompt: 'Hola, me gustaría agendar una cita o hacer un pedido en ${bizName}.' }
+    ];
+    renderQuickOptionsList();
+    updateQuickPrompts(true);
+    scheduleAutoSaveInstance();
+  });
+}
+
+function renderScheduleUI() {
+  const container = document.getElementById('schedule-days-container');
+  if (!container) return;
+
+  container.innerHTML = wizardSchedule.map((d, idx) => `
+    <div class="schedule-day-row ${d.open ? '' : 'is-closed'}" data-index="${idx}">
+      <label class="schedule-day-label">
+        <input type="checkbox" class="sched-open-chk" data-index="${idx}" ${d.open ? 'checked' : ''} />
+        <span>${d.day}</span>
+      </label>
+
+      <div class="schedule-time-group" ${d.open ? '' : 'style="opacity: 0.35; pointer-events: none;"'}>
+        <span>Horario:</span>
+        <input type="time" class="sched-open-time" data-index="${idx}" value="${d.open_time}" />
+        <span>a</span>
+        <input type="time" class="sched-close-time" data-index="${idx}" value="${d.close_time}" />
+      </div>
+
+      <div class="schedule-time-group" ${d.open ? '' : 'style="opacity: 0.35; pointer-events: none;"'}>
+        <label>
+          <input type="checkbox" class="sched-lunch-chk" data-index="${idx}" ${d.has_lunch ? 'checked' : ''} />
+          <span>Comida:</span>
+        </label>
+        <input type="time" class="sched-lunch-start" data-index="${idx}" value="${d.lunch_start}" ${d.has_lunch ? '' : 'disabled'} />
+        <span>-</span>
+        <input type="time" class="sched-lunch-end" data-index="${idx}" value="${d.lunch_end}" ${d.has_lunch ? '' : 'disabled'} />
+      </div>
+
+      <div class="schedule-time-group" ${d.open ? '' : 'style="opacity: 0.35; pointer-events: none;"'}>
+        <label>
+          <input type="checkbox" class="sched-appt-chk" data-index="${idx}" ${d.accepts_appt ? 'checked' : ''} />
+          <span>Citas:</span>
+        </label>
+        <input type="time" class="sched-appt-start" data-index="${idx}" value="${d.appt_start}" ${d.accepts_appt ? '' : 'disabled'} />
+        <span>-</span>
+        <input type="time" class="sched-appt-end" data-index="${idx}" value="${d.appt_end}" ${d.accepts_appt ? '' : 'disabled'} />
+      </div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.sched-open-chk').forEach((chk) => {
+    chk.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      wizardSchedule[idx].open = e.target.checked;
+      renderScheduleUI();
+      scheduleAutoSaveInstance();
+    });
+  });
+
+  container.querySelectorAll('.sched-open-time').forEach((inp) => {
+    inp.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      wizardSchedule[idx].open_time = e.target.value;
+      updateScheduleSummary();
+      scheduleAutoSaveInstance();
+    });
+  });
+
+  container.querySelectorAll('.sched-close-time').forEach((inp) => {
+    inp.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      wizardSchedule[idx].close_time = e.target.value;
+      updateScheduleSummary();
+      scheduleAutoSaveInstance();
+    });
+  });
+
+  container.querySelectorAll('.sched-lunch-chk').forEach((chk) => {
+    chk.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      wizardSchedule[idx].has_lunch = e.target.checked;
+      renderScheduleUI();
+      scheduleAutoSaveInstance();
+    });
+  });
+
+  container.querySelectorAll('.sched-lunch-start').forEach((inp) => {
+    inp.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      wizardSchedule[idx].lunch_start = e.target.value;
+      updateScheduleSummary();
+      scheduleAutoSaveInstance();
+    });
+  });
+
+  container.querySelectorAll('.sched-lunch-end').forEach((inp) => {
+    inp.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      wizardSchedule[idx].lunch_end = e.target.value;
+      updateScheduleSummary();
+      scheduleAutoSaveInstance();
+    });
+  });
+
+  container.querySelectorAll('.sched-appt-chk').forEach((chk) => {
+    chk.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      wizardSchedule[idx].accepts_appt = e.target.checked;
+      renderScheduleUI();
+      scheduleAutoSaveInstance();
+    });
+  });
+
+  container.querySelectorAll('.sched-appt-start').forEach((inp) => {
+    inp.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      wizardSchedule[idx].appt_start = e.target.value;
+      updateScheduleSummary();
+      scheduleAutoSaveInstance();
+    });
+  });
+
+  container.querySelectorAll('.sched-appt-end').forEach((inp) => {
+    inp.addEventListener('change', (e) => {
+      const idx = Number(e.target.dataset.index);
+      wizardSchedule[idx].appt_end = e.target.value;
+      updateScheduleSummary();
+      scheduleAutoSaveInstance();
+    });
+  });
+
+  updateScheduleSummary();
+}
+
+function updateScheduleSummary() {
+  const summaryEl = document.getElementById('schedule-summary-preview');
+  if (!summaryEl) return;
+
+  const openDays = wizardSchedule.filter((d) => d.open);
+  const closedDays = wizardSchedule.filter((d) => !d.open);
+
+  if (!openDays.length) {
+    summaryEl.textContent = 'Negocio actualmente sin horarios de apertura definidos.';
+    return;
+  }
+
+  const parts = [];
+  const openDaysNames = openDays.map((d) => d.day);
+  const first = openDays[0];
+  const allSame = openDays.every(
+    (d) =>
+      d.open_time === first.open_time &&
+      d.close_time === first.close_time &&
+      d.has_lunch === first.has_lunch &&
+      d.lunch_start === first.lunch_start &&
+      d.lunch_end === first.lunch_end
+  );
+
+  if (allSame) {
+    const range = openDaysNames.length > 2 ? `${openDaysNames[0]} a ${openDaysNames[openDaysNames.length - 1]}` : openDaysNames.join(' y ');
+    let text = `Horario de atención: ${range} de ${first.open_time} a ${first.close_time} hrs`;
+    if (first.has_lunch) {
+      text += ` (Comida/Receso: ${first.lunch_start} a ${first.lunch_end} hrs)`;
+    }
+    parts.push(text);
+  } else {
+    parts.push('Horarios de atención: ' + openDays.map((d) => `${d.day} (${d.open_time} a ${d.close_time}${d.has_lunch ? `, comida ${d.lunch_start}-${d.lunch_end}` : ''})`).join(', '));
+  }
+
+  const apptDays = wizardSchedule.filter((d) => d.open && d.accepts_appt);
+  if (apptDays.length) {
+    const firstAppt = apptDays[0];
+    const allSameAppt = apptDays.every((d) => d.appt_start === firstAppt.appt_start && d.appt_end === firstAppt.appt_end);
+    if (allSameAppt) {
+      const apptRange = apptDays.length > 2 ? `${apptDays[0].day} a ${apptDays[apptDays.length - 1].day}` : apptDays.map((d) => d.day).join(' y ');
+      parts.push(`Citas y reservaciones disponibles: ${apptRange} de ${firstAppt.appt_start} a ${firstAppt.appt_end} hrs`);
+    } else {
+      parts.push('Citas disponibles: ' + apptDays.map((d) => `${d.day} de ${d.appt_start} a ${d.appt_end}`).join(', '));
+    }
+  } else {
+    parts.push('No se agendan citas previas (atención conforme van llegando).');
+  }
+
+  if (closedDays.length) {
+    parts.push(`Días no laborables: ${closedDays.map((d) => d.day).join(', ')} cerrado.`);
+  }
+
+  summaryEl.textContent = parts.join('. ') + '.';
+}
+
+function initScheduleManager() {
+  renderScheduleUI();
+
+  document.getElementById('btn-copy-monday-schedule')?.addEventListener('click', () => {
+    const monday = wizardSchedule[0];
+    for (let i = 1; i < 6; i++) {
+      wizardSchedule[i].open = monday.open;
+      wizardSchedule[i].open_time = monday.open_time;
+      wizardSchedule[i].close_time = monday.close_time;
+      wizardSchedule[i].has_lunch = monday.has_lunch;
+      wizardSchedule[i].lunch_start = monday.lunch_start;
+      wizardSchedule[i].lunch_end = monday.lunch_end;
+      wizardSchedule[i].accepts_appt = monday.accepts_appt;
+      wizardSchedule[i].appt_start = monday.appt_start;
+      wizardSchedule[i].appt_end = monday.appt_end;
+    }
+    renderScheduleUI();
+    scheduleAutoSaveInstance();
+  });
+}
+
+function renderCatalogUI() {
+  const grid = document.getElementById('catalog-items-grid');
+  const countEl = document.getElementById('catalog-items-count');
+  const hiddenText = document.getElementById('cfg-initial-products');
+  if (!grid) return;
+
+  if (countEl) {
+    const s = wizardCatalogItems.length === 1 ? '' : 's';
+    countEl.textContent = `${wizardCatalogItems.length} producto${s}/servicio${s} registrado${s}`;
+  }
+
+  if (hiddenText) {
+    hiddenText.value = wizardCatalogItems
+      .map((it) => `${it.name} | ${it.price} | ${it.description || it.name}`)
+      .join('\n');
+  }
+
+  if (!wizardCatalogItems.length) {
+    grid.innerHTML = '<div style="grid-column: 1 / -1; padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.88rem; border: 1px dashed var(--metal-border); border-radius: 10px;">Tu catálogo está vacío. Utiliza el formulario arriba para agregar tu primer producto o servicio.</div>';
+    return;
+  }
+
+  grid.innerHTML = wizardCatalogItems.map((item, idx) => `
+    <article class="catalog-item-card">
+      <div>
+        <div class="catalog-item-top">
+          <h5 class="catalog-item-title">${escapeHtml(item.name)}</h5>
+          <span class="catalog-item-price">${Number(item.price || 0).toLocaleString('es-MX')} MXN</span>
+        </div>
+        ${item.tagline ? `<div class="catalog-item-tagline">${escapeHtml(item.tagline)}</div>` : ''}
+        <p class="catalog-item-desc">${escapeHtml(item.description || '')}</p>
+      </div>
+      <div class="catalog-item-bottom">
+        <span class="catalog-item-badge">${item.type === 'service' ? '🛠️ Servicio' : '📦 Producto'} · ${escapeHtml(item.billing_cycle || 'estándar')}</span>
+        <button type="button" class="btn btn-outline btn-xs btn-del-catalog-item" data-index="${idx}" title="Eliminar del catálogo">
+          🗑️ Eliminar
+        </button>
+      </div>
+    </article>
+  `).join('');
+
+  grid.querySelectorAll('.btn-del-catalog-item').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.index);
+      wizardCatalogItems.splice(idx, 1);
+      renderCatalogUI();
+      scheduleAutoSaveInstance();
+    });
+  });
+}
+
+function initCatalogManager() {
+  renderCatalogUI();
+
+  document.getElementById('btn-add-catalog-item')?.addEventListener('click', () => {
+    const nameInput = document.getElementById('cat-item-name');
+    const typeSelect = document.getElementById('cat-item-type');
+    const priceInput = document.getElementById('cat-item-price');
+    const cycleInput = document.getElementById('cat-item-cycle');
+    const descInput = document.getElementById('cat-item-desc');
+
+    const name = nameInput?.value.trim();
+    const price = Number(priceInput?.value || 0);
+    const type = typeSelect?.value === 'product' ? 'product' : 'service';
+    const billing_cycle = cycleInput?.value.trim() || 'estándar';
+    const description = descInput?.value.trim() || name;
+
+    if (!name) {
+      nameInput?.focus();
+      return;
+    }
+
+    wizardCatalogItems.push({
+      name,
+      type,
+      price,
+      billing_cycle,
+      tagline: '',
+      description
+    });
+
+    if (nameInput) nameInput.value = '';
+    if (priceInput) priceInput.value = '';
+    if (cycleInput) cycleInput.value = '';
+    if (descInput) descInput.value = '';
+
+    renderCatalogUI();
+    scheduleAutoSaveInstance();
+  });
+}
+
+function renderFaqUI() {
+  const list = document.getElementById('faq-items-list');
+  const countEl = document.getElementById('faq-items-count');
+  if (!list) return;
+
+  if (countEl) {
+    const s = wizardFaqItems.length === 1 ? '' : 's';
+    countEl.textContent = `${wizardFaqItems.length} pregunta${s} frecuente${s} registrada${s}`;
+  }
+
+  if (!wizardFaqItems.length) {
+    list.innerHTML = '<div style="padding: 1.2rem; text-align: center; color: var(--text-muted); font-size: 0.86rem; border: 1px dashed var(--metal-border); border-radius: 9px;">Aún no hay preguntas frecuentes registradas. Agrega una con el formulario arriba.</div>';
+    return;
+  }
+
+  list.innerHTML = wizardFaqItems.map((faq, idx) => `
+    <div class="faq-item-card">
+      <div class="faq-item-content">
+        <div class="faq-item-q">
+          <span class="faq-item-q-icon" aria-hidden="true">💡</span>
+          <span>${escapeHtml(faq.question)}</span>
+        </div>
+        <p class="faq-item-a">${escapeHtml(faq.answer)}</p>
+      </div>
+      <button type="button" class="btn btn-outline btn-xs btn-del-faq" data-index="${idx}" title="Eliminar pregunta">
+        🗑️
+      </button>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.btn-del-faq').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.index);
+      wizardFaqItems.splice(idx, 1);
+      renderFaqUI();
+      scheduleAutoSaveInstance();
+    });
+  });
+}
+
+function initFaqManager() {
+  renderFaqUI();
+
+  document.getElementById('btn-add-faq-item')?.addEventListener('click', () => {
+    const qInput = document.getElementById('faq-item-question');
+    const aInput = document.getElementById('faq-item-answer');
+    const question = qInput?.value.trim();
+    const answer = aInput?.value.trim();
+
+    if (!question) {
+      qInput?.focus();
+      return;
+    }
+    if (!answer) {
+      aInput?.focus();
+      return;
+    }
+
+    wizardFaqItems.push({ question, answer });
+    if (qInput) qInput.value = '';
+    if (aInput) aInput.value = '';
+
+    renderFaqUI();
+    scheduleAutoSaveInstance();
+  });
+}
+
+function buildFullSystemPrompt() {
+  const baseRules = document.getElementById('cfg-system-prompt')?.value.trim() || '';
+  const scheduleSummary = document.getElementById('schedule-summary-preview')?.textContent.trim() || '';
+  const parts = [];
+
+  if (baseRules) {
+    parts.push(`REGLAS CLAVE DEL NEGOCIO:\n${baseRules}`);
+  }
+  if (scheduleSummary && !scheduleSummary.includes('sin horarios')) {
+    parts.push(`HORARIOS Y DISPONIBILIDAD DE CITAS:\n${scheduleSummary}`);
+  }
+  if (wizardFaqItems.length) {
+    const faqsFormatted = wizardFaqItems.map((f, i) => `${i + 1}. P: ${f.question}\n   R: ${f.answer}`).join('\n');
+    parts.push(`PREGUNTAS FRECUENTES OBLIGATORIAS (FAQ):\n${faqsFormatted}`);
+  }
+
+  return parts.join('\n\n');
+}
+
+function setSyncIndicator(state) {
+  const dot = document.getElementById('soul-sync-dot');
+  const label = document.getElementById('soul-sync-status');
+  if (!dot || !label) return;
+
+  if (state === 'saving') {
+    dot.className = 'soul-sync-dot is-saving';
+    label.textContent = 'Guardando cambios en vivo...';
+  } else if (state === 'synced') {
+    dot.className = 'soul-sync-dot is-synced';
+    label.textContent = '⚡ Sincronizado en tiempo real';
+  } else if (state === 'draft') {
+    dot.className = 'soul-sync-dot is-synced';
+    label.textContent = '⚡ Borrador guardado localmente';
+  } else if (state === 'error') {
+    dot.className = 'soul-sync-dot';
+    label.textContent = 'Pendiente de sincronizar';
+  }
+}
+
+function scheduleAutoSaveInstance() {
+  setSyncIndicator('saving');
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    autoSaveInstanceNow();
+  }, 500);
+}
+
+async function autoSaveInstanceNow() {
+  if (isAutoSaving) return;
+
+  const displayInput = document.getElementById('cfg-display-name');
+  const soulInput = document.getElementById('cfg-ai-soul');
+  const displayName = displayInput?.value.trim() || '';
+  const aiSoul = soulInput?.value.trim() || '';
+  const businessName = document.getElementById('cfg-business-name')?.value.trim() || '';
+
+  updateWizardLivePreview();
+
+  if (!displayName || !aiSoul) {
+    setSyncIndicator('draft');
+    return;
+  }
+
+  const compiledSystemPrompt = buildFullSystemPrompt();
+
+  const payload = {
+    instance_id: clientInstanceId || document.getElementById('cfg-instance-id')?.value || '',
+    client_name: document.getElementById('cfg-client-name')?.value.trim() || prospectProfile?.name || '',
+    client_contact: document.getElementById('cfg-client-contact')?.value.trim() || prospectProfile?.phone || '',
+    business_name: businessName || prospectProfile?.business || '',
+    admin_email: prospectProfile?.email || currentUser?.email || '',
+    firebase_uid: currentUser?.uid || prospectProfile?.uid || '',
+    display_name: displayName,
+    tone: document.getElementById('cfg-tone')?.value.trim() || '',
+    ai_soul: aiSoul,
+    system_prompt: compiledSystemPrompt,
+    welcome_message: document.getElementById('cfg-welcome-message')?.value.trim() || '',
+    initial_products: document.getElementById('cfg-initial-products')?.value.trim() || '',
+    catalog_items: wizardCatalogItems,
+    replace_catalog: true,
+    quick_options: wizardQuickOptions
+  };
+
+  try {
+    localStorage.setItem('servibot_draft_config', JSON.stringify(payload));
+  } catch {}
+
+  if (!currentUser && !prospectProfile && !payload.client_contact) {
+    setSyncIndicator('draft');
+    return;
+  }
+
+  isAutoSaving = true;
+  try {
+    const res = await apiFetch('/api/instances/provision', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    if (res?.locked || res?.statusCode === 423) {
+      renderLockedWizardState(res);
+      setSyncIndicator('error');
+      return;
+    }
+
+    if (!res || !res.ok || !res.instance) {
+      setSyncIndicator('error');
+      return;
+    }
+
+    const inst = { ...res.instance, catalog: Array.isArray(res.catalog) ? res.catalog : wizardCatalogItems };
+    clientInstanceId = inst.instance_id;
+    activeBotMode = 'custom';
+    activeChatInstanceId = inst.instance_id;
+    provisionedInstance = inst;
+    localStorage.setItem('servibot_client_instance_id', clientInstanceId);
+
+    const idHidden = document.getElementById('cfg-instance-id');
+    if (idHidden) idHidden.value = inst.instance_id;
+
+    document.querySelectorAll('#wizard-steps-list .wizard-step-item').forEach((li) => {
+      if (Number(li.dataset.step) === 3) {
+        const btn = li.querySelector('.wizard-step-btn');
+        if (btn) btn.disabled = false;
+      }
+    });
+
+    syncSimulatorHeaderLabel(inst);
+    renderWizardSummary(inst);
+    updateCheckoutPricing();
+    updateQuickPrompts(true, inst);
+
+    const box = document.getElementById('chat-messages');
+    if (box && (box.children.length <= 1 || box.querySelector('.chat-bubble.assistant:only-child'))) {
+      const greeting =
+        inst.welcome_message ||
+        `¡Hola! Soy ${inst.display_name} de ${inst.business_name}. ¿En qué te ayudo hoy?`;
+      box.innerHTML = `<div class="chat-bubble assistant is-custom-bot">${buildAssistantIdentityHeader('custom', inst)}${escapeHtml(greeting)}</div>`;
+    }
+
+    setSyncIndicator('synced');
+  } catch (err) {
+    console.warn('[AutoSave] Guardado en borrador:', err.message);
+    setSyncIndicator('draft');
+  } finally {
+    isAutoSaving = false;
+  }
+}
+
 let API_BASE = '';
 let currentUser = null;
 let currentAdminMeta = null;
@@ -997,37 +1700,79 @@ const GIRO_PRESETS = {
     label: 'Clínica / Consultorio',
     tone: 'Cálido, empático y profesional',
     ai_soul: 'Atender a pacientes con calma y claridad, resolver dudas sobre servicios o estudios y agendar citas solicitando nombre, horario preferido y motivo.',
-    system_prompt: 'Reglas: pedir nombre completo y horario deseado para citas; no emitir diagnósticos médicos; confirmar teléfono de contacto.'
+    system_prompt: 'Reglas: pedir nombre completo y horario deseado para citas; no emitir diagnósticos médicos; confirmar teléfono de contacto.',
+    catalog: [
+      { name: 'Consulta de Valoración', type: 'service', price: 400, billing_cycle: 'por sesión', tagline: 'Diagnóstico integral', description: 'Revisión clínica completa y plan de tratamiento personalizado.' },
+      { name: 'Limpieza Dental Ultrasónica', type: 'service', price: 650, billing_cycle: 'por sesión', tagline: 'Profilaxis preventiva', description: 'Eliminación de sarro con ultrasonido, pulido y flúor protector.' }
+    ],
+    faqs: [
+      { question: '¿Aceptan seguros de gastos médicos?', answer: 'Emitimos factura fiscal (CFDI) y llenamos formatos de reembolso para las principales aseguradoras.' },
+      { question: '¿Dónde se ubica la clínica y tienen estacionamiento?', answer: 'Estamos en la sucursal principal con estacionamiento privado disponible sin costo para pacientes.' }
+    ]
   },
   restaurante: {
     label: 'Restaurante / Café',
     tone: 'Dinámico, amigable y entusiasta',
     ai_soul: 'Dar la bienvenida con calidez, recomendar platillos o bebidas destacadas, tomar reservaciones y confirmar pedidos para recoger o a domicilio.',
-    system_prompt: 'Reglas: preguntar número de personas, fecha y hora para reservaciones; confirmar dirección exacta para entregas.'
+    system_prompt: 'Reglas: preguntar número de personas, fecha y hora para reservaciones; confirmar dirección exacta para entregas.',
+    catalog: [
+      { name: 'Menú Ejecutivo del Día', type: 'product', price: 180, billing_cycle: 'pago único', tagline: 'Comida completa', description: 'Incluye entrada, plato fuerte, bebida natural y postre de la casa.' },
+      { name: 'Especialidad del Chef', type: 'product', price: 290, billing_cycle: 'pago único', tagline: 'Platillo estelar', description: 'Corte seleccionado preparado al momento con guarnición premium.' }
+    ],
+    faqs: [
+      { question: '¿Tienen servicio a domicilio?', answer: 'Sí, contamos con servicio de entrega a domicilio y pedidos para recoger llamando o por WhatsApp.' },
+      { question: '¿Se requiere reservación previa?', answer: 'Aceptamos comensales con y sin reservación, aunque recomendamos reservar para grupos mayores a 4 personas.' }
+    ]
   },
   salon: {
     label: 'Salón / Spa / Barbería',
     tone: 'Cercano, amable y orientado al cuidado personal',
     ai_soul: 'Asesorar sobre servicios de belleza, tratamientos o cortes, recomendar disponibilidad y cerrar citas rápidas sin hacer esperar al cliente.',
-    system_prompt: 'Reglas: consultar servicio deseado y preferencia de día/hora; recordar políticas de puntualidad con amabilidad.'
+    system_prompt: 'Reglas: consultar servicio deseado y preferencia de día/hora; recordar políticas de puntualidad con amabilidad.',
+    catalog: [
+      { name: 'Corte y Peinado Estilo', type: 'service', price: 350, billing_cycle: 'por sesión', tagline: 'Cuidado capilar', description: 'Asesoría de imagen, lavado, corte y peinado con acabado profesional.' },
+      { name: 'Tratamiento Spa Hidratante', type: 'service', price: 750, billing_cycle: 'por sesión', tagline: 'Nutrición profunda', description: 'Mascarilla intensiva con masaje capilar y sellado térmico.' }
+    ],
+    faqs: [
+      { question: '¿Se puede agendar cita el mismo día?', answer: 'Sí, si contamos con espacios disponibles en agenda con gusto te asignamos turno el mismo día.' }
+    ]
   },
   tienda: {
     label: 'Tienda / E-commerce',
     tone: 'Ágil, resolutivo y enfocado en cierre de venta',
     ai_soul: 'Guiar al comprador para elegir el producto ideal, resolver dudas de envíos, precios y existencias, y cerrar pedidos completos.',
-    system_prompt: 'Reglas: confirmar modelo/talla o cantidad, solicitar nombre y datos de entrega para cotizar envío y cerrar compra.'
+    system_prompt: 'Reglas: confirmar modelo/talla o cantidad, solicitar nombre y datos de entrega para cotizar envío y cerrar compra.',
+    catalog: [
+      { name: 'Producto Destacado', type: 'product', price: 499, billing_cycle: 'pago único', tagline: 'Más vendido', description: 'Artículo original de alta calidad con garantía de satisfacción.' },
+      { name: 'Kit Premium Completo', type: 'product', price: 899, billing_cycle: 'pago único', tagline: 'Paquete de ahorro', description: 'Incluye accesorios indispensables y envío preferencial.' }
+    ],
+    faqs: [
+      { question: '¿Cuánto tardan los envíos?', answer: 'Enviamos por paquetería express con entrega habitual de 2 a 4 días hábiles.' }
+    ]
   },
   inmobiliaria: {
     label: 'Inmobiliaria / Autos',
     tone: 'Ejecutivo, directo y consultivo',
     ai_soul: 'Calificar presupuesto y necesidades del prospecto, presentar ventajas clave de la propiedad o vehículo y agendar visita o prueba.',
-    system_prompt: 'Reglas: preguntar zona de interés, rango de inversión o modelo buscado y confirmar número telefónico para seguimiento.'
+    system_prompt: 'Reglas: preguntar zona de interés, rango de inversión o modelo buscado y confirmar número telefónico para seguimiento.',
+    catalog: [
+      { name: 'Visita Guiada a Propiedad', type: 'service', price: 0, billing_cycle: 'gratuito', tagline: 'Recorrido presencial', description: 'Cita con asesor certificado para conocer la propiedad y resolver dudas financieras.' }
+    ],
+    faqs: [
+      { question: '¿Aceptan créditos bancarios o Infonavit?', answer: 'Sí, trabajamos con todos los bancos, Infonavit y Fovissste con asesoría hipotecaria sin costo.' }
+    ]
   },
   servicios: {
     label: 'Servicios Profesionales',
     tone: 'Confiable, claro y estructurado',
     ai_soul: 'Escuchar el requerimiento del cliente, explicar alcances de manera sencilla y agendar una llamada o diagnóstico formal.',
-    system_prompt: 'Reglas: solicitar giro o necesidad principal, ciudad/empresa y mejor horario para llamada de diagnóstico.'
+    system_prompt: 'Reglas: solicitar giro o necesidad principal, ciudad/empresa y mejor horario para llamada de diagnóstico.',
+    catalog: [
+      { name: 'Sesión de Asesoría Inicial', type: 'service', price: 500, billing_cycle: 'por sesión', tagline: 'Diagnóstico estratégico', description: 'Revisión puntual de tu caso con plan de recomendaciones concretas.' }
+    ],
+    faqs: [
+      { question: '¿Emiten contratos y facturas fiscales?', answer: 'Sí, todas nuestras operaciones se formalizan con contrato de prestación de servicios y CFDI fiscal.' }
+    ]
   }
 };
 
@@ -1245,11 +1990,18 @@ function updateQuickPrompts(isCustom, inst = provisionedInstance) {
 
   if (isCustom) {
     const bizName = inst?.business_name || document.getElementById('cfg-business-name')?.value.trim() || 'tu negocio';
-    container.innerHTML = `
-      <button type="button" class="quick-chip" data-prompt="Hola, ¿qué servicios o productos ofrecen y cuáles son sus costos?">¿Qué servicios tienen?</button>
-      <button type="button" class="quick-chip" data-prompt="¿Cuáles son sus horarios de atención y su ubicación?">Horarios y Ubicación</button>
-      <button type="button" class="quick-chip" data-prompt="Hola, me gustaría agendar una cita o hacer un pedido en ${bizName}.">Agendar Cita / Pedido</button>
-    `;
+    if (Array.isArray(wizardQuickOptions) && wizardQuickOptions.length > 0) {
+      container.innerHTML = wizardQuickOptions.map((opt) => {
+        const promptWithBiz = opt.prompt.replace(/\${bizName}/g, bizName);
+        return `<button type="button" class="quick-chip" data-prompt="${escapeHtml(promptWithBiz)}">${escapeHtml(opt.label)}</button>`;
+      }).join('');
+    } else {
+      container.innerHTML = `
+        <button type="button" class="quick-chip" data-prompt="Hola, ¿qué servicios o productos ofrecen y cuáles son sus costos?">¿Qué servicios tienen?</button>
+        <button type="button" class="quick-chip" data-prompt="¿Cuáles son sus horarios de atención y su ubicación?">Horarios y Ubicación</button>
+        <button type="button" class="quick-chip" data-prompt="Hola, me gustaría agendar una cita o hacer un pedido en ${escapeHtml(bizName)}.">Agendar Cita / Pedido</button>
+      `;
+    }
   } else {
     container.innerHTML = `
       <button type="button" class="quick-chip" data-prompt="Hola, ¿qué servicios ofrecen y cuáles son sus precios?">¿Qué planes tienen?</button>
@@ -1258,7 +2010,7 @@ function updateQuickPrompts(isCustom, inst = provisionedInstance) {
     `;
   }
 
-  container.querySelectorAll('.quick-chip').forEach((chip) => {
+    container.querySelectorAll('.quick-chip').forEach((chip) => {
     chip.addEventListener('click', () => {
       const promptText = chip.dataset.prompt;
       if (promptText) sendChatMessage(promptText);
@@ -1382,17 +2134,43 @@ function populateWizardForm(inst) {
   setVal('cfg-system-prompt', inst.system_prompt || '');
   setVal('cfg-welcome-message', inst.welcome_message || '');
 
-  const productsText = Array.isArray(inst.catalog)
-    ? inst.catalog
-        .map((item) => {
-          const parts = [String(item.title || '').trim(), item.price != null ? String(item.price) : '0'];
-          if (item.description) parts.push(String(item.description).trim());
-          return parts.join(' | ');
-        })
-        .filter(Boolean)
-        .join('\n')
-    : (inst.initial_products || '');
-  setVal('cfg-initial-products', productsText);
+  if (Array.isArray(inst.catalog) && inst.catalog.length > 0) {
+    wizardCatalogItems = inst.catalog.map((item) => ({
+      name: String(item.name || item.title || '').trim(),
+      type: item.type === 'service' ? 'service' : 'product',
+      price: Math.max(0, Number(item.price || 0)),
+      billing_cycle: String(item.billing_cycle || 'estándar').trim(),
+      tagline: String(item.tagline || '').trim(),
+      description: String(item.description || item.name || '').trim()
+    }));
+  } else if (inst.initial_products) {
+    const parsed = String(inst.initial_products)
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const parts = line.split('|').map((p) => p.trim());
+        return {
+          name: parts[0] || '',
+          price: Number(parts[1]) || 0,
+          description: parts[2] || parts[0] || '',
+          type: 'service',
+          billing_cycle: 'estándar',
+          tagline: ''
+        };
+      })
+      .filter((it) => it.name);
+    if (parsed.length) wizardCatalogItems = parsed;
+  }
+  renderCatalogUI();
+
+  if (Array.isArray(inst.quick_options) && inst.quick_options.length > 0) {
+    wizardQuickOptions = inst.quick_options;
+  }
+  renderQuickOptionsList();
+
+  updateScheduleSummary();
+  renderFaqUI();
   updateWizardLivePreview();
 }
 
@@ -1624,6 +2402,18 @@ function resetWizardForNewBot() {
   document.querySelectorAll('.checkout-addon-check').forEach((chk) => {
     chk.checked = true;
   });
+
+  wizardCatalogItems = [];
+  renderCatalogUI();
+  wizardFaqItems = [];
+  renderFaqUI();
+  wizardQuickOptions = [
+    { label: '¿Qué servicios tienen?', prompt: 'Hola, ¿qué servicios o productos ofrecen y cuáles son sus costos?' },
+    { label: 'Horarios y Ubicación', prompt: '¿Cuáles son sus horarios de atención y su ubicación?' },
+    { label: 'Agendar Cita / Pedido', prompt: 'Hola, me gustaría agendar una cita o hacer un pedido en ${bizName}.' }
+  ];
+  renderQuickOptionsList();
+  renderScheduleUI();
 
   setFeedback('wizard-step-1-error', '');
   setFeedback('instance-save-status', '');
@@ -3005,6 +3795,12 @@ function escapeHtml(str) {
 
 // ==================== EVENT LISTENERS ====================
 function setupEventListeners() {
+  initTheme();
+  initSoulTabs();
+  initQuickOptionsManager();
+  initScheduleManager();
+  initCatalogManager();
+  initFaqManager();
   initNavbarMeasurement();
   carouselController = initPublicCarousel();
 
@@ -3222,7 +4018,20 @@ function setupEventListeners() {
       applyPresetField('cfg-tone', preset.tone);
       applyPresetField('cfg-ai-soul', preset.ai_soul);
       applyPresetField('cfg-system-prompt', preset.system_prompt);
+
+      if (preset.catalog && (!wizardCatalogItems.length || wizardCatalogItems._fromPreset)) {
+        wizardCatalogItems = JSON.parse(JSON.stringify(preset.catalog));
+        wizardCatalogItems._fromPreset = true;
+        renderCatalogUI();
+      }
+      if (preset.faqs && (!wizardFaqItems.length || wizardFaqItems._fromPreset)) {
+        wizardFaqItems = JSON.parse(JSON.stringify(preset.faqs));
+        wizardFaqItems._fromPreset = true;
+        renderFaqUI();
+      }
+
       updateWizardLivePreview();
+      scheduleAutoSaveInstance();
     });
   });
 
@@ -3245,6 +4054,7 @@ function setupEventListeners() {
   ['cfg-tone', 'cfg-ai-soul', 'cfg-system-prompt'].forEach((id) => {
     document.getElementById(id)?.addEventListener('input', (e) => {
       delete e.target.dataset.fromPreset;
+      scheduleAutoSaveInstance();
     });
   });
 
@@ -3255,6 +4065,7 @@ function setupEventListeners() {
         delete e.target.dataset.autoFilled;
       }
       updateWizardLivePreview();
+      scheduleAutoSaveInstance();
     });
   });
 
@@ -3569,9 +4380,9 @@ function setupEventListeners() {
       return;
     }
 
-    if (!currentUser || !prospectProfile) {
-      setFeedback('instance-save-status', 'Por favor inicia sesión y confirma tus datos de contacto antes de crear tu ServiBot.', false);
-      syncProspectGateUI();
+    if (wizardCurrentStep === 2) {
+      await autoSaveInstanceNow();
+      goToWizardStep(3, { focusHeading: true });
       return;
     }
 
