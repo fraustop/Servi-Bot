@@ -3962,22 +3962,24 @@ async function loadAdminSettings() {
     const igActiveContainer = document.getElementById('ig-active-container');
     const igConnectBox = document.getElementById('ig-connect-box');
     const igActiveUser = document.getElementById('ig-active-user');
+    const igActiveTitle = document.getElementById('ig-active-title');
     const igForm = document.getElementById('instagram-config-form');
     const igProfileLink = document.getElementById('btn-ig-open-profile');
 
     if (igUserEl) igUserEl.value = ig.account_username || '';
     if (igTokenEl) igTokenEl.value = ig.access_token || '';
-    if (igEnabledEl) igEnabledEl.checked = ig.enabled !== false;
+    if (igEnabledEl) igEnabledEl.checked = Boolean(ig.enabled);
 
-    const hasAccount = Boolean(ig.account_username);
-    const isIgActive = hasAccount && ig.enabled !== false;
+    const hasAccount = Boolean(ig.account_username && ig.account_username.trim());
+    const isIgActive = hasAccount && Boolean(ig.enabled);
 
     if (igActiveContainer && igConnectBox) {
-      if (hasAccount) {
+      if (isIgActive) {
         igActiveContainer.style.display = 'block';
         igConnectBox.style.display = 'none';
         if (igForm) igForm.style.display = 'none';
         if (igActiveUser) igActiveUser.textContent = ig.account_username.startsWith('@') ? ig.account_username : `@${ig.account_username}`;
+        if (igActiveTitle) igActiveTitle.textContent = 'Cuenta de Instagram Conectada y Activa';
         if (igProfileLink) {
           const cleanUser = ig.account_username.replace(/^@/, '');
           igProfileLink.href = `https://instagram.com/${cleanUser}`;
@@ -3993,9 +3995,6 @@ async function loadAdminSettings() {
       if (isIgActive) {
         igBadge.textContent = 'ACTIVO';
         igBadge.className = 'badge-tag badge-status-dot-active';
-      } else if (hasAccount) {
-        igBadge.textContent = 'PAUSADO';
-        igBadge.className = 'badge-tag';
       } else {
         igBadge.textContent = 'SIN VINCULAR';
         igBadge.className = 'badge-tag';
@@ -6723,6 +6722,20 @@ function setupEventListeners() {
     const form = document.getElementById('instagram-config-form');
     if (activeBox) activeBox.style.display = 'none';
     if (form) form.style.display = 'block';
+  });
+
+  document.getElementById('btn-ig-unlink')?.addEventListener('click', async () => {
+    if (!confirm('¿Deseas desvincular tu cuenta de Instagram?')) return;
+    const payload = {
+      account_username: '',
+      access_token: '',
+      enabled: false
+    };
+    await apiFetch('/api/settings/instagram_config', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    await loadAdminSettings();
   });
 
   // Guardar configuración de TikTok
