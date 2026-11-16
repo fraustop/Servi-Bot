@@ -1808,8 +1808,12 @@
                   <input type="text" id="cfg-telegram-username" placeholder="@TuEmpresa_bot" value="" />
                 </div>
                 <div class="field">
-                  <label for="cfg-telegram-token">Bot Token de Telegram (@BotFather)</label>
+                  <label for="cfg-telegram-token" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.25rem;">
+                    <span>Bot Token de Telegram</span>
+                    <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" style="font-size:0.78rem; color:#0088cc; font-weight:600; text-decoration:none;">🤖 Abrir @BotFather en Telegram ↗</a>
+                  </label>
                   <input type="password" id="cfg-telegram-token" placeholder="123456789:AAFg..." autocomplete="off" />
+                  <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-top:0.25rem;">Escribe <code>/newbot</code> a @BotFather en Telegram para crearlo gratis y obtener este código.</span>
                 </div>
                 <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; font-size:0.86rem;">
                   <input type="checkbox" id="cfg-telegram-enabled" />
