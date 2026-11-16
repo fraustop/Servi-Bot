@@ -1805,7 +1805,7 @@
                 </div>
                 <div class="field">
                   <label for="cfg-telegram-username">Usuario del Bot (@username)</label>
-                  <input type="text" id="cfg-telegram-username" placeholder="@TuEmpresa_bot" value="ServiBot_bot" />
+                  <input type="text" id="cfg-telegram-username" placeholder="@TuEmpresa_bot" value="" />
                 </div>
                 <div class="field">
                   <label for="cfg-telegram-token">Bot Token de Telegram (@BotFather)</label>
@@ -1829,23 +1829,26 @@
                   <strong style="font-size:0.9rem; display:flex; align-items:center; gap:0.35rem;">
                     <span>📱</span> Código QR de Acceso a Telegram
                   </strong>
-                  <span id="tg-qr-badge" style="font-size:0.75rem; padding:0.15rem 0.55rem; border-radius:999px; background:rgba(0,136,204,0.15); color:#0088cc; font-weight:600;">ENLACE DIRECTO</span>
+                  <span id="tg-qr-badge" style="font-size:0.75rem; padding:0.15rem 0.55rem; border-radius:999px; background:rgba(100,116,139,0.15); color:var(--text-muted); font-weight:600;">SIN USUARIO</span>
                 </div>
                 <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 0.85rem; text-align:left;">
                   Escanea el código QR con la cámara de tu teléfono móvil o haz clic en el enlace para iniciar el chat en Telegram de inmediato.
                 </p>
 
                 <div id="tg-qr-container" style="text-align:center; margin:0.5rem 0;">
-                  <div class="qr-box">
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=https://t.me/ServiBot_bot" alt="Código QR de Telegram para @ServiBot_bot" />
-                  </div>
-                  <div style="font-size:0.83rem; color:var(--text-muted); margin-top:0.35rem;">
-                    Usuario: <strong>@ServiBot_bot</strong> <span style="color:#f59e0b; font-size:0.75rem; font-weight:600;">(Vista Previa)</span> · Enlace: <a href="https://t.me/ServiBot_bot" target="_blank" rel="noopener noreferrer" style="color:#0088cc; font-weight:600; text-decoration:underline;">t.me/ServiBot_bot</a>
+                  <div style="padding:1.5rem 1rem; color:var(--text-muted); text-align:center;">
+                    <div style="font-size:2rem; margin-bottom:0.4rem;">📱</div>
+                    <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary, #0f172a); margin-bottom:0.25rem;">
+                      Ingresa el usuario de tu Bot de Telegram
+                    </div>
+                    <p style="font-size:0.82rem; margin:0 auto; max-width:320px; line-height:1.45;">
+                      Escribe el <strong>@username</strong> de tu bot en el campo superior o guarda tu <strong>Bot Token</strong> para generar tu código QR real y evitar enlaces a usuarios inexistentes.
+                    </p>
                   </div>
                 </div>
 
                 <div style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
-                  <a id="btn-tg-open-chat" href="https://t.me/ServiBot_bot" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" style="display:inline-flex;">✈️ Abrir en Telegram</a>
+                  <a id="btn-tg-open-chat" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" style="display:none;">✈️ Abrir en Telegram</a>
                   <button type="button" class="btn btn-outline btn-sm" id="btn-tg-refresh-qr">🔄 Regenerar Código QR</button>
                 </div>
               </div>

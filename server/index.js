@@ -3343,8 +3343,13 @@ async function main() {
     try {
       const cfg = getSetting('telegram_config', {});
       const rawUser = String(req.query.username || cfg.bot_username || '').trim();
-      const cleanUser = rawUser.replace(/^@+/, '') || 'ServiBot_bot';
-      const isDefault = cleanUser === 'ServiBot_bot' && !rawUser;
+      const cleanUser = rawUser.replace(/^@+/, '');
+      if (!cleanUser) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Por favor ingresa o configura el usuario de tu bot (@username) para generar el código QR.'
+        });
+      }
 
       const deepLink = `https://t.me/${cleanUser}`;
       const qrBase64 = await QRCode.toDataURL(deepLink, {
@@ -3357,8 +3362,7 @@ async function main() {
         ok: true,
         username: cleanUser,
         deep_link: deepLink,
-        qr_base64: qrBase64,
-        is_default: isDefault
+        qr_base64: qrBase64
       });
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });
