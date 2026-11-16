@@ -51,6 +51,7 @@ const {
 } = require('./channels/teams_handler');
 const { startCloudflareTunnel, getTunnelStatus } = require('./tunnel_manager');
 const { allTimeRouter } = require('./alltime_api');
+const QRCode = require('qrcode');
 
 const PORT = Number(process.env.PORT || 10000);
 const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyCZm5qX98Y8ww4ksJWX-xQs6deaSQojhHk';
@@ -3167,11 +3168,29 @@ async function main() {
         }
       } catch (_) {}
 
+      // 5. Generar deep link y código QR para Telegram (t.me/botusername)
+      const rawUser = String(botInfo?.username || cfg.bot_username || '').trim();
+      const cleanUser = rawUser.replace(/^@+/, '');
+      let deepLink = cleanUser ? `https://t.me/${cleanUser}` : null;
+      let qrBase64 = null;
+      if (deepLink) {
+        try {
+          qrBase64 = await QRCode.toDataURL(deepLink, {
+            margin: 2,
+            width: 280,
+            color: { dark: '#0f172a', light: '#ffffff' }
+          });
+        } catch (_) {}
+      }
+
       return {
         ok: true,
         webhook_url: webhookUrl,
         bot_info: botInfo,
         webhook_info: webhookInfo,
+        username: cleanUser,
+        deep_link: deepLink,
+        qr_base64: qrBase64,
         description: setData.description || 'Webhook sincronizado exitosamente con Telegram.'
       };
     } catch (err) {
@@ -3286,6 +3305,20 @@ async function main() {
         liveError = err.message;
       }
 
+      const rawUser = String(botInfo?.username || cfg.bot_username || '').trim();
+      const cleanUser = rawUser.replace(/^@+/, '');
+      const deepLink = cleanUser ? `https://t.me/${cleanUser}` : null;
+      let qrBase64 = cfg.qr_base64 || null;
+      if (deepLink && !qrBase64) {
+        try {
+          qrBase64 = await QRCode.toDataURL(deepLink, {
+            margin: 2,
+            width: 280,
+            color: { dark: '#0f172a', light: '#ffffff' }
+          });
+        } catch (_) {}
+      }
+
       res.json({
         ok: true,
         configured: true,
@@ -3294,8 +3327,42 @@ async function main() {
         webhook_synced: Boolean(cfg.webhook_synced && webhookInfo?.url === webhookUrl),
         bot_info: botInfo,
         webhook_info: webhookInfo,
+        username: cleanUser,
+        deep_link: deepLink,
+        qr_base64: qrBase64,
         last_sync_at: cfg.last_sync_at || null,
         live_error: liveError || cfg.sync_error || null
+      });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // Generar código QR para Telegram (deep link t.me/botusername)
+  app.get('/api/channels/telegram/qr', async (req, res) => {
+    try {
+      const cfg = getSetting('telegram_config', {});
+      const rawUser = String(req.query.username || cfg.bot_username || '').trim();
+      const cleanUser = rawUser.replace(/^@+/, '');
+      if (!cleanUser) {
+        return res.status(400).json({
+          ok: false,
+          error: 'No hay un usuario de bot (@username) configurado para generar el código QR.'
+        });
+      }
+
+      const deepLink = `https://t.me/${cleanUser}`;
+      const qrBase64 = await QRCode.toDataURL(deepLink, {
+        margin: 2,
+        width: 280,
+        color: { dark: '#0f172a', light: '#ffffff' }
+      });
+
+      res.json({
+        ok: true,
+        username: cleanUser,
+        deep_link: deepLink,
+        qr_base64: qrBase64
       });
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });
@@ -3327,6 +3394,8 @@ async function main() {
         }
         targetCfg.webhook_url = syncResult.webhook_url || '';
         targetCfg.webhook_synced = !syncResult.disabled;
+        targetCfg.deep_link = syncResult.deep_link || (targetCfg.bot_username ? `https://t.me/${targetCfg.bot_username.replace(/^@+/, '')}` : null);
+        targetCfg.qr_base64 = syncResult.qr_base64 || null;
         targetCfg.sync_error = null;
         targetCfg.last_sync_at = new Date().toISOString();
       } else {
@@ -4054,8 +4123,36 @@ async function main() {
         merged.last_sync_at = new Date().toISOString();
         telegramSyncResult = { ok: false, error: err.message };
       }
+
+      if (merged.bot_username) {
+        const cleanUser = String(merged.bot_username).replace(/^@+/, '');
+        if (cleanUser) {
+          merged.deep_link = `https://t.me/${cleanUser}`;
+          try {
+            merged.qr_base64 = await QRCode.toDataURL(merged.deep_link, {
+              margin: 2,
+              width: 280,
+              color: { dark: '#0f172a', light: '#ffffff' }
+            });
+          } catch (_) {}
+        }
+      }
+
       setSetting(key, merged);
     } else {
+      if (key === 'telegram_config' && merged.bot_username) {
+        const cleanUser = String(merged.bot_username).replace(/^@+/, '');
+        if (cleanUser) {
+          merged.deep_link = `https://t.me/${cleanUser}`;
+          try {
+            merged.qr_base64 = await QRCode.toDataURL(merged.deep_link, {
+              margin: 2,
+              width: 280,
+              color: { dark: '#0f172a', light: '#ffffff' }
+            });
+          } catch (_) {}
+        }
+      }
       setSetting(key, merged);
     }
 

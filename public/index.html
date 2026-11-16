@@ -1823,6 +1823,28 @@
 
               <div id="tg-sync-feedback" style="display:none; margin-top:0.75rem; padding:0.6rem 0.85rem; border-radius:6px; font-size:0.83rem;"></div>
 
+              <!-- CÓDIGO QR PARA TELEGRAM (ACCESO DIRECTO t.me) -->
+              <div id="tg-qr-section" style="margin: 1.25rem 0 0.75rem; padding: 1rem; background: var(--bg-secondary, #f8fafc); border: 1px solid var(--border-color); border-radius: 12px; text-align: center;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; flex-wrap:wrap; gap:0.5rem;">
+                  <strong style="font-size:0.9rem; display:flex; align-items:center; gap:0.35rem;">
+                    <span>📱</span> Código QR de Acceso a Telegram
+                  </strong>
+                  <span id="tg-qr-badge" style="font-size:0.75rem; padding:0.15rem 0.55rem; border-radius:999px; background:rgba(0,136,204,0.15); color:#0088cc; font-weight:600;">ENLACE DIRECTO</span>
+                </div>
+                <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 0.85rem; text-align:left;">
+                  Escanea el código QR con la cámara de tu teléfono móvil o haz clic en el enlace para iniciar el chat en Telegram de inmediato.
+                </p>
+
+                <div id="tg-qr-container" style="text-align:center; margin:0.5rem 0;">
+                  <p style="color:var(--text-muted); font-size:0.84rem;">Configura y guarda el usuario de tu bot (<code>@TuEmpresa_bot</code>) para generar su código QR automático.</p>
+                </div>
+
+                <div style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
+                  <a id="btn-tg-open-chat" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" style="display:none;">✈️ Abrir en Telegram</a>
+                  <button type="button" class="btn btn-outline btn-sm" id="btn-tg-refresh-qr">🔄 Regenerar Código QR</button>
+                </div>
+              </div>
+
               <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
               <h4 style="margin:0 0 0.5rem;">🧪 Simular Mensaje Entrante en Telegram</h4>
               <div class="field">

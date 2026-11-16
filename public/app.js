@@ -3799,6 +3799,87 @@ async function loadWhatsAppStatus() {
   }
 }
 
+function renderTelegramQr(username, qrBase64, deepLink) {
+  const container = document.getElementById('tg-qr-container');
+  const openBtn = document.getElementById('btn-tg-open-chat');
+  const badge = document.getElementById('tg-qr-badge');
+  if (!container) return;
+
+  const cleanUser = String(username || '').replace(/^@+/, '').trim();
+  const link = deepLink || (cleanUser ? `https://t.me/${cleanUser}` : '');
+
+  if (cleanUser && qrBase64) {
+    container.innerHTML = `
+      <div class="qr-box">
+        <img src="${qrBase64}" alt="Código QR de Telegram para @${escapeHtml(cleanUser)}" />
+      </div>
+      <div style="font-size:0.83rem; color:var(--text-muted); margin-top:0.35rem;">
+        Usuario: <strong>@${escapeHtml(cleanUser)}</strong> · Enlace directo: <a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" style="color:#0088cc; font-weight:600; text-decoration:underline;">t.me/${escapeHtml(cleanUser)}</a>
+      </div>
+    `;
+    if (openBtn) {
+      openBtn.href = link;
+      openBtn.style.display = 'inline-flex';
+    }
+    if (badge) {
+      badge.textContent = `@${cleanUser}`;
+      badge.style.background = 'rgba(0,136,204,0.15)';
+      badge.style.color = '#0088cc';
+    }
+  } else if (cleanUser) {
+    container.innerHTML = `
+      <div style="padding:1.5rem; color:var(--text-muted); font-size:0.84rem;">
+        ⏳ Generando código QR para <strong>@${escapeHtml(cleanUser)}</strong>...
+      </div>
+    `;
+    loadTelegramQr(cleanUser);
+  } else {
+    container.innerHTML = `
+      <p style="color:var(--text-muted); font-size:0.84rem; margin:0.75rem 0;">
+        Configura y guarda el usuario de tu bot (<code>@TuEmpresa_bot</code>) arriba para generar su código QR automático.
+      </p>
+    `;
+    if (openBtn) openBtn.style.display = 'none';
+    if (badge) {
+      badge.textContent = 'SIN USUARIO';
+      badge.style.background = 'rgba(100,116,139,0.15)';
+      badge.style.color = 'var(--text-muted)';
+    }
+  }
+}
+
+async function loadTelegramQr(username) {
+  const container = document.getElementById('tg-qr-container');
+  const cleanUser = String(username || '').replace(/^@+/, '').trim();
+  if (!cleanUser) {
+    renderTelegramQr('', null, null);
+    return;
+  }
+
+  try {
+    const res = await apiFetch(`/api/channels/telegram/qr?username=${encodeURIComponent(cleanUser)}`);
+    if (res.ok && res.qr_base64) {
+      renderTelegramQr(res.username, res.qr_base64, res.deep_link);
+    } else {
+      if (container) {
+        container.innerHTML = `
+          <div style="padding:1rem; color:#fda4af; font-size:0.84rem;">
+            ⚠️ No se pudo generar el código QR: ${escapeHtml(res?.error || 'Error desconocido')}
+          </div>
+        `;
+      }
+    }
+  } catch (err) {
+    if (container) {
+      container.innerHTML = `
+        <div style="padding:1rem; color:#fda4af; font-size:0.84rem;">
+          ❌ Error al contactar servidor para QR: ${escapeHtml(err.message)}
+        </div>
+      `;
+    }
+  }
+}
+
 async function loadChannelsStatus() {
   await Promise.all([
     loadWhatsAppStatus(),
@@ -3937,6 +4018,11 @@ async function loadAdminSettings() {
         tgWebhookPill.style.color = 'var(--text-muted)';
       }
     }
+
+    // Renderizar código QR de Telegram (deep link t.me/botusername)
+    const rawTgUser = String(tg.bot_username || '').trim();
+    const cleanTgUser = rawTgUser.replace(/^@+/, '');
+    renderTelegramQr(cleanTgUser, tg.qr_base64, tg.deep_link);
 
     // 4. Instagram (Comentarios)
     const ig = data.instagram_config || {};
@@ -6547,6 +6633,13 @@ function setupEventListeners() {
         feedback.textContent = `❌ Error de conexión: ${err.message}`;
       }
     }
+  });
+
+  // Regenerar / Actualizar Código QR de Telegram
+  document.getElementById('btn-tg-refresh-qr')?.addEventListener('click', async () => {
+    const userInput = document.getElementById('cfg-telegram-username');
+    const username = userInput ? userInput.value.trim() : '';
+    await loadTelegramQr(username);
   });
 
   // Guardar configuración de Instagram
