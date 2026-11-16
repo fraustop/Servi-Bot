@@ -12,6 +12,22 @@
         "destination": "/terminos.html"
       },
       {
+        "source": "/privacy",
+        "destination": "/privacy.html"
+      },
+      {
+        "source": "/privacidad",
+        "destination": "/privacy.html"
+      },
+      {
+        "source": "/data-deletion",
+        "destination": "/privacy.html"
+      },
+      {
+        "source": "/eliminacion-datos",
+        "destination": "/privacy.html"
+      },
+      {
         "source": "/alltime",
         "destination": "/alltime.html"
       },
