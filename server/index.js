@@ -3551,6 +3551,7 @@ async function main() {
   app.post('/api/channels/instagram/webhook', async (req, res) => {
     try {
       const body = req.body || {};
+      console.log('[INSTAGRAM WEBHOOK INCOMING]', JSON.stringify(body));
       let text = '';
       let senderId = '';
       let senderName = '';
