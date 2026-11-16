@@ -871,10 +871,11 @@ function resolvePublicBackendBaseUrl(req) {
 
 function getMicrosoftOAuthAppConfig() {
   const saved = getSetting('microsoft_oauth_app', {});
+  const teamsSaved = getSetting('teams_config', {});
   return {
-    client_id: String(process.env.MS_CLIENT_ID || saved.client_id || '').trim(),
-    client_secret: String(process.env.MS_CLIENT_SECRET || saved.client_secret || '').trim(),
-    tenant_id: String(process.env.MS_TENANT_ID || saved.tenant_id || 'common').trim() || 'common'
+    client_id: String(process.env.MS_CLIENT_ID || saved.client_id || teamsSaved.azure_client_id || '').trim(),
+    client_secret: String(process.env.MS_CLIENT_SECRET || saved.client_secret || teamsSaved.azure_client_secret || '').trim(),
+    tenant_id: String(process.env.MS_TENANT_ID || saved.tenant_id || teamsSaved.tenant_id || 'common').trim() || 'common'
   };
 }
 
@@ -2978,6 +2979,52 @@ async function main() {
 
       if (!text.trim()) {
         return res.json({ ok: true, ignored: true });
+      }
+
+      // Detección e intercepción inteligente de Bot Token de Telegram enviado por WhatsApp
+      const tgTokenMatch = text.trim().match(/\b(\d{8,12}:[A-Za-z0-9_-]{35,})\b/);
+      if (tgTokenMatch) {
+        const detectedToken = tgTokenMatch[1];
+        console.log('[INTERCEPTOR] Bot Token de Telegram detectado en WhatsApp:', detectedToken.substring(0, 10) + '...');
+        try {
+          const syncRes = await syncTelegramWebhook({ bot_token: detectedToken, enabled: true }, req);
+          const currentTg = getSetting('telegram_config', {});
+          const cleanTgUser = syncRes.bot_info?.username ? String(syncRes.bot_info.username).replace(/^@+/, '') : '';
+          const updatedTg = {
+            ...currentTg,
+            bot_token: detectedToken,
+            enabled: true,
+            bot_username: cleanTgUser ? `@${cleanTgUser}` : currentTg.bot_username,
+            bot_name: syncRes.bot_info?.first_name || currentTg.bot_name,
+            webhook_url: syncRes.webhook_url || currentTg.webhook_url,
+            webhook_synced: syncRes.ok,
+            deep_link: cleanTgUser ? `https://t.me/${cleanTgUser}` : null,
+            qr_base64: syncRes.qr_base64 || null,
+            sync_error: syncRes.ok ? null : syncRes.error,
+            last_sync_at: new Date().toISOString()
+          };
+          setSetting('telegram_config', updatedTg);
+
+          const replyMsg = syncRes.ok
+            ? `🤖 ¡Token de Telegram recibido y configurado con éxito!\n\n` +
+              `• Bot: @${cleanTgUser || 'Vinculado'}\n` +
+              `• Estado: Webhook Oficial Activo ✅\n` +
+              `• Enlace directo: https://t.me/${cleanTgUser}\n\n` +
+              `Tu bot ya está listo para responder mensajes en tiempo real con IA en Telegram y su código QR está activo en tu panel.`
+            : `⚠️ Recibí el token de Telegram, pero la API reportó: ${syncRes.error}. Por favor verifica el token emitido por @BotFather.`;
+
+          try {
+            await fetch(`http://127.0.0.1:${EVOLUTION_PORT}/message/sendText/${encodeURIComponent(instanceId)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ number: remoteJid, text: replyMsg })
+            });
+          } catch (_) {}
+
+          return res.json({ ok: true, intercepted: true, telegram_sync: syncRes });
+        } catch (e) {
+          console.error('[INTERCEPTOR] Error al procesar token de Telegram:', e.message);
+        }
       }
 
       const agentResult = await runPythonSalesAgent({
