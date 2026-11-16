@@ -3804,7 +3804,7 @@ async function main() {
         const accountsResp = await fetch(accountsUrl);
         const accountsData = await accountsResp.json();
 
-        if (accountsData.data && Array.isArray(accountsData.data)) {
+        if (accountsData.data && Array.isArray(accountsData.data) && accountsData.data.length > 0) {
           for (const page of accountsData.data) {
             targetPageId = page.id || targetPageId;
             pageAccessToken = page.access_token || pageAccessToken;
@@ -3816,7 +3816,50 @@ async function main() {
           }
         }
 
-        // Suscribir la página al webhook de la aplicación para que Meta envíe los eventos
+        // Si /me/accounts devolvió vacío (común en Portafolios Comerciales / New Pages Experience),
+        // consultar debug_token para extraer los target_ids exactos autorizados por el usuario
+        if (!targetPageId && appCfg.app_id && appCfg.app_secret) {
+          try {
+            const appToken = `${appCfg.app_id}|${appCfg.app_secret}`;
+            const dbgResp = await fetch(`https://graph.facebook.com/debug_token?input_token=${encodeURIComponent(userAccessToken)}&access_token=${encodeURIComponent(appToken)}`);
+            const dbgData = await dbgResp.json();
+            const granular = dbgData.data?.granular_scopes || [];
+            const pageScope = granular.find((g) => g.scope === 'pages_show_list' || g.scope === 'pages_read_engagement');
+            const candidatePageId = pageScope?.target_ids?.[0];
+
+            if (candidatePageId) {
+              const pResp = await fetch(`https://graph.facebook.com/v18.0/${candidatePageId}?fields=name,access_token,instagram_business_account{id,username}&access_token=${encodeURIComponent(userAccessToken)}`);
+              const pData = await pResp.json();
+              if (pData.id) {
+                targetPageId = pData.id;
+                pageAccessToken = pData.access_token || userAccessToken;
+                if (pData.instagram_business_account?.username) {
+                  targetIgUsername = pData.instagram_business_account.username;
+                  targetIgBusinessId = pData.instagram_business_account.id || '';
+                }
+              }
+            }
+          } catch (dbgErr) {
+            console.warn('[INSTAGRAM GRANULAR DEBUG WARN]', dbgErr.message);
+          }
+        }
+
+        // Suscribir la cuenta de Instagram al webhook para recibir mensajes y comentarios
+        if (targetIgBusinessId && pageAccessToken) {
+          try {
+            const subIgUrl = `https://graph.facebook.com/v18.0/${targetIgBusinessId}/subscribed_apps`;
+            const subIgParams = new URLSearchParams({
+              subscribed_fields: 'messages,comments',
+              access_token: pageAccessToken
+            });
+            await fetch(subIgUrl, { method: 'POST', body: subIgParams });
+            console.log(`[INSTAGRAM OAUTH] Suscrito cuenta IG ${targetIgBusinessId} (${targetIgUsername}) a webhooks.`);
+          } catch (subIgErr) {
+            console.warn('[INSTAGRAM ACCOUNT SUBSCRIBED_APPS WARN]', subIgErr.message);
+          }
+        }
+
+        // Suscribir la página de Facebook al webhook si corresponde
         if (targetPageId && pageAccessToken) {
           try {
             const subUrl = `https://graph.facebook.com/v18.0/${targetPageId}/subscribed_apps`;
