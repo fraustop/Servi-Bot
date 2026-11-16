@@ -3858,33 +3858,15 @@ async function loadAdminSettings() {
     const teamsHookEl = document.getElementById('cfg-teams-webhook');
     const teamsEnabledEl = document.getElementById('cfg-teams-enabled');
     const teamsBadge = document.getElementById('teams-state-badge');
-    const msAccountLabel = document.getElementById('ms-account-status-label');
 
     if (teamsNameEl) teamsNameEl.value = tm.bot_display_name || 'Servi-Bot Teams';
     if (teamsHookEl) teamsHookEl.value = tm.incoming_webhook_url || '';
     if (teamsEnabledEl) teamsEnabledEl.checked = tm.enabled !== false;
 
-    if (msAccountLabel) {
-      const emailCfg = data.email_config || {};
-      const linkedEmail = tm.account_email || emailCfg.user || 'fraustop@outlook.com';
-      if (linkedEmail) {
-        msAccountLabel.textContent = `Conectada: ${linkedEmail}`;
-        msAccountLabel.style.color = '#10b981';
-      } else {
-        msAccountLabel.textContent = 'Sin cuenta vinculada';
-        msAccountLabel.style.color = 'var(--text-muted)';
-      }
-    }
-
     if (teamsBadge) {
       const isTeamsActive = tm.enabled !== false;
       teamsBadge.textContent = isTeamsActive ? 'ACTIVO' : 'PAUSADO';
       teamsBadge.className = isTeamsActive ? 'badge-tag badge-status-dot-active' : 'badge-tag';
-    }
-
-    const msClientIdEl = document.getElementById('cfg-ms-client-id');
-    if (msClientIdEl && !msClientIdEl.value) {
-      msClientIdEl.value = tm.azure_client_id || '';
     }
 
     // 3. Telegram (Charlas en Bot)
@@ -6428,53 +6410,6 @@ function setupEventListeners() {
     await loadAdminSettings();
   });
 
-  // Iniciar Sesión con Microsoft 365 (OAuth Oficial Directo)
-  document.getElementById('btn-ms-login')?.addEventListener('click', async () => {
-    const clientIdInput = document.getElementById('cfg-ms-client-id');
-    const clientId = clientIdInput ? clientIdInput.value.trim() : '';
-
-    if (!clientId) {
-      alert('⚠️ Para conectar con la API oficial de Microsoft (login.microsoftonline.com), por favor ingresa tu Application (Client) ID de Azure Entra ID. Puedes registrar tu app gratis en portal.azure.com.');
-      if (clientIdInput) clientIdInput.focus();
-      return;
-    }
-
-    try {
-      if (outBox) outBox.textContent = 'Iniciando autenticación en Microsoft Identity Platform...';
-      const payload = {
-        bot_display_name: document.getElementById('cfg-teams-name')?.value.trim() || 'Servi-Bot Teams',
-        incoming_webhook_url: document.getElementById('cfg-teams-webhook')?.value.trim() || '',
-        enabled: Boolean(document.getElementById('cfg-teams-enabled')?.checked),
-        azure_client_id: clientId
-      };
-      await apiFetch('/api/settings/teams_config', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-
-      const res = await apiFetch('/api/channels/microsoft/oauth/init', {
-        method: 'POST',
-        body: JSON.stringify({ origin: window.location.origin, client_id: clientId })
-      });
-
-      if (res.ok && res.authUrl) {
-        const popup = window.open(res.authUrl, 'ms_login_popup', 'width=620,height=720,scrollbars=yes');
-        if (popup) popup.focus();
-      } else {
-        alert(res.error || 'No se pudo generar el enlace de autenticación con Microsoft.');
-      }
-    } catch (err) {
-      alert('Error al conectar con Microsoft: ' + err.message);
-    }
-  });
-
-  window.addEventListener('message', async (ev) => {
-    if (ev.data && (ev.data.type === 'microsoft_oauth_connected' || ev.data.account_email)) {
-      if (outBox) outBox.textContent = '✅ Cuenta de Microsoft vinculada correctamente.';
-      await loadAdminSettings();
-    }
-  });
-
   // Guardar configuración de Microsoft Teams
   document.getElementById('teams-config-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -6482,8 +6417,7 @@ function setupEventListeners() {
     const payload = {
       bot_display_name: document.getElementById('cfg-teams-name')?.value.trim() || 'Servi-Bot Teams',
       incoming_webhook_url: document.getElementById('cfg-teams-webhook')?.value.trim() || '',
-      enabled: Boolean(document.getElementById('cfg-teams-enabled')?.checked),
-      azure_client_id: document.getElementById('cfg-ms-client-id')?.value.trim() || ''
+      enabled: Boolean(document.getElementById('cfg-teams-enabled')?.checked)
     };
     const res = await apiFetch('/api/settings/teams_config', {
       method: 'POST',

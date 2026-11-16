@@ -1874,40 +1874,6 @@
                 Atiende menciones y chats en canales de Microsoft Teams mediante Webhook directo.
               </p>
 
-              <!-- VINCULACIÓN CON CUENTA MICROSOFT 365 / TEAMS (OAUTH 2.0 DIRECTO) -->
-              <div id="ms-login-box" style="margin-bottom:1rem; padding:1rem; background:rgba(0,120,212,0.06); border:1px solid rgba(0,120,212,0.25); border-radius:12px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.6rem;">
-                  <div style="display:flex; align-items:center; gap:0.5rem;">
-                    <span style="font-size:1.3rem;">🪟</span>
-                    <strong style="font-size:0.88rem;">API Oficial de Microsoft (login.microsoftonline.com)</strong>
-                  </div>
-                  <span id="ms-account-status-label" style="font-size:0.78rem; color:#10b981; font-weight:600;">Cuenta: fraustop@outlook.com</span>
-                </div>
-                <p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 0.75rem; line-height:1.45;">
-                  Para iniciar sesión directo en los servidores de Microsoft mediante OAuth 2.0 oficial, ingresa tu <strong>Application (Client) ID</strong> registrado en Microsoft Entra ID (Azure Portal).
-                </p>
-
-                <div class="field" style="margin-bottom:0.75rem;">
-                  <label for="cfg-ms-client-id" style="font-size:0.78rem; display:flex; justify-content:space-between; align-items:center;">
-                    <span>Application (Client) ID de Azure *</span>
-                    <a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer" style="color:#0078d4; font-size:0.72rem; text-decoration:none;">Abrir Azure Portal ↗</a>
-                  </label>
-                  <input type="text" id="cfg-ms-client-id" placeholder="Ej. 00000000-0000-0000-0000-000000000000" style="font-family:monospace; font-size:0.82rem;" />
-                  <span style="font-size:0.72rem; color:var(--text-muted); display:block; margin-top:0.25rem;">
-                    Redirect URI en Azure: <code>https://dqo1j67xmphbf.cloudfront.net/api/channels/microsoft/oauth/callback</code>
-                  </span>
-                </div>
-
-                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                  <button type="button" class="btn btn-primary btn-sm" id="btn-ms-login" style="background:#0078d4; border-color:#0078d4;">
-                    <span>🪟</span> Iniciar Sesión en Microsoft OAuth
-                  </button>
-                  <a href="https://teams.microsoft.com" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" style="display:inline-flex; align-items:center; gap:0.35rem;">
-                    <span>👥</span> Abrir Microsoft Teams Web ↗
-                  </a>
-                </div>
-              </div>
-
               <form id="teams-config-form">
                 <div class="field">
                   <label for="cfg-teams-name">Nombre del Bot en Teams</label>
@@ -1921,7 +1887,12 @@
                   <input type="checkbox" id="cfg-teams-enabled" checked />
                   <span>Activar atención en Microsoft Teams</span>
                 </label>
-                <button type="submit" class="btn btn-primary btn-sm">Guardar Configuración Teams</button>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                  <button type="submit" class="btn btn-primary btn-sm">Guardar Configuración Teams</button>
+                  <a href="https://teams.microsoft.com" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" style="display:inline-flex; align-items:center; gap:0.35rem;">
+                    <span>👥</span> Abrir Teams Web ↗
+                  </a>
+                </div>
               </form>
 
               <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
