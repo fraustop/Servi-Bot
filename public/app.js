@@ -3973,11 +3973,13 @@ async function loadAdminSettings() {
     const hasAccount = Boolean(ig.account_username && ig.account_username.trim());
     const isIgActive = hasAccount && Boolean(ig.enabled);
 
+    const igStep2Box = document.getElementById('ig-step2-box');
+
     if (igActiveContainer && igConnectBox) {
       if (isIgActive) {
         igActiveContainer.style.display = 'block';
         igConnectBox.style.display = 'none';
-        if (igForm) igForm.style.display = 'none';
+        if (igStep2Box) igStep2Box.style.display = 'none';
         if (igActiveUser) igActiveUser.textContent = ig.account_username.startsWith('@') ? ig.account_username : `@${ig.account_username}`;
         if (igActiveTitle) igActiveTitle.textContent = 'Cuenta de Instagram Conectada y Activa';
         if (igProfileLink) {
@@ -3987,7 +3989,7 @@ async function loadAdminSettings() {
       } else {
         igActiveContainer.style.display = 'none';
         igConnectBox.style.display = 'block';
-        if (igForm) igForm.style.display = 'none';
+        if (igStep2Box) igStep2Box.style.display = 'none';
       }
     }
 
@@ -6693,35 +6695,33 @@ function setupEventListeners() {
     await loadAdminSettings();
   });
 
-  // Toggles de formulario e inicio de sesión en Instagram
-  document.getElementById('btn-ig-toggle-form')?.addEventListener('click', () => {
+  // Flujo guiado de inicio de sesión y vinculación de Instagram
+  document.getElementById('btn-ig-start-login')?.addEventListener('click', () => {
+    window.open('https://www.instagram.com/accounts/login/', '_blank');
     const box = document.getElementById('ig-connect-box');
-    const form = document.getElementById('instagram-config-form');
+    const step2 = document.getElementById('ig-step2-box');
     if (box) box.style.display = 'none';
-    if (form) form.style.display = 'block';
+    if (step2) step2.style.display = 'block';
+    setTimeout(() => {
+      document.getElementById('cfg-instagram-user')?.focus();
+    }, 250);
   });
 
-  const hideIgForm = () => {
+  document.getElementById('btn-ig-cancel-step2')?.addEventListener('click', () => {
     const box = document.getElementById('ig-connect-box');
-    const activeBox = document.getElementById('ig-active-container');
-    const form = document.getElementById('instagram-config-form');
-    const hasAccount = Boolean(document.getElementById('cfg-instagram-user')?.value.trim());
-    if (form) form.style.display = 'none';
-    if (hasAccount && activeBox) {
-      activeBox.style.display = 'block';
-    } else if (box) {
-      box.style.display = 'block';
-    }
-  };
-
-  document.getElementById('btn-ig-cancel-form')?.addEventListener('click', hideIgForm);
-  document.getElementById('btn-ig-cancel-form-2')?.addEventListener('click', hideIgForm);
+    const step2 = document.getElementById('ig-step2-box');
+    if (step2) step2.style.display = 'none';
+    if (box) box.style.display = 'block';
+  });
 
   document.getElementById('btn-ig-reconfig')?.addEventListener('click', () => {
     const activeBox = document.getElementById('ig-active-container');
-    const form = document.getElementById('instagram-config-form');
+    const step2 = document.getElementById('ig-step2-box');
     if (activeBox) activeBox.style.display = 'none';
-    if (form) form.style.display = 'block';
+    if (step2) step2.style.display = 'block';
+    setTimeout(() => {
+      document.getElementById('cfg-instagram-user')?.focus();
+    }, 250);
   });
 
   document.getElementById('btn-ig-unlink')?.addEventListener('click', async () => {

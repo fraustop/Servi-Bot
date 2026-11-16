@@ -3499,18 +3499,32 @@ async function main() {
       let senderId = '';
       let senderName = '';
       let postId = '';
+      let isDm = false;
 
       if (body.entry && Array.isArray(body.entry)) {
-        const change = body.entry[0]?.changes?.[0]?.value || {};
-        text = change.text || '';
-        senderId = change.from?.id || 'ig_user_01';
-        senderName = change.from?.username || 'usuario_instagram';
-        postId = change.media?.id || 'post_100';
+        const entry = body.entry[0] || {};
+        // 1. Mensajes Directos (DMs) de Instagram
+        if (entry.messaging && Array.isArray(entry.messaging) && entry.messaging.length > 0) {
+          const msg = entry.messaging[0];
+          text = msg.message?.text || '';
+          senderId = msg.sender?.id || 'ig_user_dm';
+          senderName = msg.sender?.username || senderId || 'usuario_instagram';
+          isDm = true;
+        } else {
+          // 2. Comentarios en Publicaciones o Reels
+          const change = entry.changes?.[0]?.value || {};
+          text = change.text || '';
+          senderId = change.from?.id || 'ig_user_01';
+          senderName = change.from?.username || 'usuario_instagram';
+          postId = change.media?.id || 'post_100';
+          isDm = false;
+        }
       } else {
-        text = body.comment || body.text || '';
+        text = body.message || body.comment || body.text || '';
         senderId = body.user_id || body.sender_id || 'ig_user_01';
         senderName = body.username || body.sender_name || 'usuario_instagram';
-        postId = body.post_id || 'post_100';
+        postId = body.post_id || '';
+        isDm = Boolean(body.is_dm || !body.post_id);
       }
 
       if (!text.trim()) {
@@ -3519,15 +3533,16 @@ async function main() {
 
       const targetId = normalizeInstanceIdKey(req.query?.instance_id || body.instance_id) || 'servibot-00';
       const cleanUser = String(senderName).replace(/^@/, '');
+      const prefix = isDm ? `[MENSAJE DIRECTO / DM]` : `[COMENTARIO EN POST/REEL ${postId}]`;
       const agentResult = await runPythonSalesAgent({
         channel: 'instagram',
         sender_id: String(senderId || cleanUser),
         sender_name: `@${cleanUser}`,
-        message: `[COMENTARIO EN POST/REEL ${postId}]: ${text.trim()}`,
+        message: `${prefix}: ${text.trim()}`,
         instance_id: targetId
       });
 
-      res.json({ ok: true, channel: 'instagram', reply: agentResult?.reply, servibot: agentResult });
+      res.json({ ok: true, channel: 'instagram', type: isDm ? 'direct_message' : 'comment', reply: agentResult?.reply, servibot: agentResult });
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });
     }
