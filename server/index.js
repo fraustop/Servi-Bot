@@ -3795,20 +3795,39 @@ async function main() {
 
       // 2. Obtener Páginas de Facebook vinculadas y sus cuentas de Instagram Business
       let targetIgUsername = '';
+      let targetIgBusinessId = '';
+      let targetPageId = '';
       let pageAccessToken = userAccessToken;
 
       try {
-        const accountsUrl = `https://graph.facebook.com/v18.0/me/accounts?fields=name,access_token,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(userAccessToken)}`;
+        const accountsUrl = `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(userAccessToken)}`;
         const accountsResp = await fetch(accountsUrl);
         const accountsData = await accountsResp.json();
 
         if (accountsData.data && Array.isArray(accountsData.data)) {
           for (const page of accountsData.data) {
+            targetPageId = page.id || targetPageId;
+            pageAccessToken = page.access_token || pageAccessToken;
             if (page.instagram_business_account && page.instagram_business_account.username) {
               targetIgUsername = page.instagram_business_account.username;
-              pageAccessToken = page.access_token || userAccessToken;
+              targetIgBusinessId = page.instagram_business_account.id || '';
               break;
             }
+          }
+        }
+
+        // Suscribir la página al webhook de la aplicación para que Meta envíe los eventos
+        if (targetPageId && pageAccessToken) {
+          try {
+            const subUrl = `https://graph.facebook.com/v18.0/${targetPageId}/subscribed_apps`;
+            const subParams = new URLSearchParams({
+              subscribed_fields: 'messages,feed,mention',
+              access_token: pageAccessToken
+            });
+            await fetch(subUrl, { method: 'POST', body: subParams });
+            console.log(`[INSTAGRAM OAUTH] Suscrito página ${targetPageId} a webhooks.`);
+          } catch (subErr) {
+            console.warn('[INSTAGRAM SUBSCRIBED_APPS WARN]', subErr.message);
           }
         }
       } catch (acctErr) {
@@ -3830,6 +3849,8 @@ async function main() {
       const savedConfig = {
         enabled: true,
         account_username: cleanUser,
+        instagram_business_id: targetIgBusinessId,
+        page_id: targetPageId,
         access_token: pageAccessToken,
         user_access_token: userAccessToken,
         auto_reply_comments: true,
