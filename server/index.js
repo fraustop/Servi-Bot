@@ -3074,19 +3074,131 @@ async function main() {
     res.json({ ok: true, status: getEmailWorkerStatus() });
   });
 
+  // --- HELPER: SINCRONIZACIÓN DE WEBHOOK EN TELEGRAM BOT API ---
+  async function syncTelegramWebhook(cfg = {}, req = null) {
+    const token = String(cfg.bot_token || '').trim();
+    const enabled = Boolean(cfg.enabled);
+    if (!token) {
+      return { ok: false, error: 'No se ha configurado un Bot Token de Telegram.' };
+    }
+
+    const publicBase =
+      process.env.PUBLIC_BACKEND_URL ||
+      getTunnelStatus()?.publicUrl ||
+      (req ? resolvePublicBackendBaseUrl(req) : 'https://dqo1j67xmphbf.cloudfront.net');
+    const cleanBase = String(publicBase || 'https://dqo1j67xmphbf.cloudfront.net').replace(/\/+$/, '');
+    const webhookUrl = `${cleanBase}/api/channels/telegram/webhook`;
+
+    // 1. Validar bot con getMe
+    let botInfo = null;
+    try {
+      const meRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/getMe`, {
+        signal: AbortSignal.timeout(8000)
+      });
+      const meData = await meRes.json();
+      if (!meData.ok) {
+        return {
+          ok: false,
+          error: `Telegram getMe rechazado: ${meData.description || 'Token inválido'}`
+        };
+      }
+      botInfo = meData.result;
+    } catch (err) {
+      return {
+        ok: false,
+        error: `Error al contactar con la API de Telegram (getMe): ${err.message}`
+      };
+    }
+
+    // 2. Si el canal está desactivado, eliminar webhook de Telegram
+    if (!enabled) {
+      try {
+        const delRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/deleteWebhook`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ drop_pending_updates: false }),
+          signal: AbortSignal.timeout(8000)
+        });
+        const delData = await delRes.json();
+        return {
+          ok: true,
+          disabled: true,
+          bot_info: botInfo,
+          webhook_deleted: Boolean(delData.ok),
+          description: 'Webhook desvinculado de Telegram (atención automática desactivada).'
+        };
+      } catch (err) {
+        return {
+          ok: false,
+          error: `Error al desregistrar webhook en Telegram: ${err.message}`
+        };
+      }
+    }
+
+    // 3. Registrar el webhook en Telegram
+    try {
+      const setRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/setWebhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: webhookUrl,
+          allowed_updates: ['message', 'edited_message', 'callback_query'],
+          drop_pending_updates: false
+        }),
+        signal: AbortSignal.timeout(8000)
+      });
+      const setData = await setRes.json();
+      if (!setData.ok) {
+        return {
+          ok: false,
+          error: `Telegram setWebhook error: ${setData.description || 'Fallo desconocido'}`
+        };
+      }
+
+      // 4. Consultar webhookInfo para confirmación final
+      let webhookInfo = null;
+      try {
+        const infoRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/getWebhookInfo`, {
+          signal: AbortSignal.timeout(8000)
+        });
+        const infoData = await infoRes.json();
+        if (infoData.ok) {
+          webhookInfo = infoData.result;
+        }
+      } catch (_) {}
+
+      return {
+        ok: true,
+        webhook_url: webhookUrl,
+        bot_info: botInfo,
+        webhook_info: webhookInfo,
+        description: setData.description || 'Webhook sincronizado exitosamente con Telegram.'
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        error: `Fallo al registrar webhook en Telegram: ${err.message}`
+      };
+    }
+  }
+
   // --- CANAL TELEGRAM (CHARLAS) ---
   app.post('/api/channels/telegram/webhook', async (req, res) => {
     try {
       const body = req.body || {};
-      const msg = body.message || body;
+      const msg = body.message || body.edited_message || body.channel_post || body;
       const senderId = String(msg.from?.id || body.sender_id || 'tg_user_01');
       const senderName = String(msg.from?.username || msg.from?.first_name || body.sender_name || 'Usuario Telegram');
-      const text = String(msg.text || body.text || body.message || '').trim();
+      let text = String(msg.text || body.text || body.message || '').trim();
       const chatId = msg.chat?.id || body.chat_id;
       const targetId = normalizeInstanceIdKey(req.query?.instance_id || body.instance_id) || 'servibot-00';
 
       if (!text) {
         return res.json({ ok: true, ignored: true });
+      }
+
+      if (text === '/start') {
+        text = 'Hola, acabo de iniciar la conversación en Telegram. ¿Qué servicios o productos ofrecen?';
       }
 
       const agentResult = await runPythonSalesAgent({
@@ -3101,19 +3213,130 @@ async function main() {
       let sentReal = false;
       if (cfg.enabled && cfg.bot_token && chatId && agentResult?.reply) {
         try {
-          await fetch(`https://api.telegram.org/bot${encodeURIComponent(cfg.bot_token)}/sendMessage`, {
+          const tgSendRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(cfg.bot_token)}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: chatId, text: agentResult.reply }),
-            signal: AbortSignal.timeout(6000)
+            signal: AbortSignal.timeout(8000)
           });
-          sentReal = true;
+          const tgSendData = await tgSendRes.json();
+          sentReal = Boolean(tgSendData.ok);
+          if (!tgSendData.ok) {
+            console.error('[TELEGRAM] Error devuelto por API de Telegram al enviar mensaje:', tgSendData.description);
+          }
         } catch (e) {
           console.error('[TELEGRAM] Error al enviar mensaje real:', e.message);
         }
       }
 
+      if (text && senderName) {
+        try {
+          await notifyTeamsIncomingWebhook(
+            `💬 **Nuevo Mensaje en Telegram (@${senderName})**:\n"${text}"\n\n🤖 *Respuesta ServiBot:*\n${agentResult?.reply || '(Procesado)'}`
+          );
+        } catch (_) {}
+      }
+
       res.json({ ok: true, channel: 'telegram', sentReal, reply: agentResult?.reply, servibot: agentResult });
+    } catch (err) {
+      console.error('[TELEGRAM Webhook] Error interno:', err.message);
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // Estado y diagnóstico en vivo de Telegram
+  app.get('/api/channels/telegram/status', requireFirebaseAuth, async (req, res) => {
+    try {
+      const cfg = getSetting('telegram_config', {});
+      const token = String(cfg.bot_token || '').trim();
+      const basePublicUrl =
+        process.env.PUBLIC_BACKEND_URL ||
+        getTunnelStatus()?.publicUrl ||
+        resolvePublicBackendBaseUrl(req);
+      const webhookUrl = `${String(basePublicUrl).replace(/\/+$/, '')}/api/channels/telegram/webhook`;
+
+      if (!token) {
+        return res.json({
+          ok: true,
+          configured: false,
+          enabled: Boolean(cfg.enabled),
+          webhook_url: webhookUrl,
+          message: 'Bot Token de Telegram no configurado.'
+        });
+      }
+
+      let botInfo = null;
+      let webhookInfo = null;
+      let liveError = null;
+
+      try {
+        const meRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/getMe`, {
+          signal: AbortSignal.timeout(6000)
+        });
+        const meData = await meRes.json();
+        if (meData.ok) botInfo = meData.result;
+        else liveError = meData.description;
+
+        const whRes = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/getWebhookInfo`, {
+          signal: AbortSignal.timeout(6000)
+        });
+        const whData = await whRes.json();
+        if (whData.ok) webhookInfo = whData.result;
+      } catch (err) {
+        liveError = err.message;
+      }
+
+      res.json({
+        ok: true,
+        configured: true,
+        enabled: Boolean(cfg.enabled),
+        webhook_url: webhookUrl,
+        webhook_synced: Boolean(cfg.webhook_synced && webhookInfo?.url === webhookUrl),
+        bot_info: botInfo,
+        webhook_info: webhookInfo,
+        last_sync_at: cfg.last_sync_at || null,
+        live_error: liveError || cfg.sync_error || null
+      });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // Sincronización explícita manual del webhook con Telegram
+  app.post('/api/channels/telegram/sync-webhook', requireFirebaseAuth, async (req, res) => {
+    try {
+      if (!req.adminAccount?.is_superadmin) {
+        return res.status(403).json({ ok: false, error: 'Solo el administrador principal puede sincronizar el webhook de Telegram.' });
+      }
+      const currentCfg = getSetting('telegram_config', {});
+      const overrideToken = req.body?.bot_token ? String(req.body.bot_token).trim() : null;
+      const overrideEnabled = req.body?.enabled !== undefined ? Boolean(req.body.enabled) : null;
+      const targetCfg = {
+        ...currentCfg,
+        ...(overrideToken !== null ? { bot_token: overrideToken } : {}),
+        ...(overrideEnabled !== null ? { enabled: overrideEnabled } : {})
+      };
+
+      const syncResult = await syncTelegramWebhook(targetCfg, req);
+      if (syncResult.ok) {
+        if (syncResult.bot_info?.username) {
+          targetCfg.bot_username = `@${syncResult.bot_info.username}`;
+        }
+        if (syncResult.bot_info?.first_name) {
+          targetCfg.bot_name = syncResult.bot_info.first_name;
+        }
+        targetCfg.webhook_url = syncResult.webhook_url || '';
+        targetCfg.webhook_synced = !syncResult.disabled;
+        targetCfg.sync_error = null;
+        targetCfg.last_sync_at = new Date().toISOString();
+      } else {
+        targetCfg.webhook_synced = false;
+        targetCfg.sync_error = syncResult.error || 'Error desconocido';
+        targetCfg.last_sync_at = new Date().toISOString();
+      }
+
+      setSetting('telegram_config', targetCfg);
+      res.json({ ok: syncResult.ok, sync: syncResult, config: targetCfg });
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });
     }
@@ -3799,19 +4022,49 @@ async function main() {
     }
     const current = getSetting(key, {});
     const merged = { ...current, ...(req.body || {}) };
-    setSetting(key, merged);
+    let telegramSyncResult = null;
 
     if (key === 'email_config') {
+      setSetting(key, merged);
       startEmailPolling(runPythonSalesAgent);
     } else if (key === 'tunnel_config' && req.body?.restartTunnel) {
+      setSetting(key, merged);
       await startCloudflareTunnel(PORT);
+    } else if (key === 'telegram_config' && merged.bot_token) {
+      try {
+        telegramSyncResult = await syncTelegramWebhook(merged, req);
+        if (telegramSyncResult.ok) {
+          if (telegramSyncResult.bot_info?.username) {
+            merged.bot_username = `@${telegramSyncResult.bot_info.username}`;
+          }
+          if (telegramSyncResult.bot_info?.first_name) {
+            merged.bot_name = telegramSyncResult.bot_info.first_name;
+          }
+          merged.webhook_url = telegramSyncResult.webhook_url || '';
+          merged.webhook_synced = !telegramSyncResult.disabled;
+          merged.sync_error = null;
+        } else {
+          merged.webhook_synced = false;
+          merged.sync_error = telegramSyncResult.error || 'Fallo al sincronizar con Telegram';
+        }
+        merged.last_sync_at = new Date().toISOString();
+      } catch (err) {
+        merged.webhook_synced = false;
+        merged.sync_error = err.message;
+        merged.last_sync_at = new Date().toISOString();
+        telegramSyncResult = { ok: false, error: err.message };
+      }
+      setSetting(key, merged);
+    } else {
+      setSetting(key, merged);
     }
 
     res.json({
       ok: true,
       key,
       value: key === 'mercadopago_config' ? { ...merged, access_token: merged.access_token ? '***' : '' } : merged,
-      tunnel: getTunnelStatus()
+      tunnel: getTunnelStatus(),
+      telegram_sync: telegramSyncResult
     });
   };
 

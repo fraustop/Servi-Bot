@@ -3868,15 +3868,46 @@ async function loadAdminSettings() {
     const tgTokenEl = document.getElementById('cfg-telegram-token');
     const tgEnabledEl = document.getElementById('cfg-telegram-enabled');
     const tgBadge = document.getElementById('tg-state-badge');
+    const tgWebhookUrlEl = document.getElementById('cfg-telegram-webhook-url');
+    const tgWebhookPill = document.getElementById('tg-webhook-status-pill');
+    const tgBotNameLabel = document.getElementById('tg-verified-bot-name');
+    const tgSyncTimeLabel = document.getElementById('tg-last-sync-time');
 
     if (tgNameEl) tgNameEl.value = tg.bot_name || 'Servi-Bot Telegram';
     if (tgUserEl) tgUserEl.value = tg.bot_username || '';
     if (tgTokenEl) tgTokenEl.value = tg.bot_token || '';
     if (tgEnabledEl) tgEnabledEl.checked = Boolean(tg.enabled);
 
+    const runtimeBackend = (typeof API_BASE === 'string' && API_BASE) ? API_BASE : 'https://dqo1j67xmphbf.cloudfront.net';
+    const computedWebhookUrl = `${runtimeBackend.replace(/\/+$/, '')}/api/channels/telegram/webhook`;
+    if (tgWebhookUrlEl) tgWebhookUrlEl.value = tg.webhook_url || computedWebhookUrl;
+
+    if (tgBotNameLabel) {
+      if (tg.bot_username || tg.bot_name) {
+        tgBotNameLabel.textContent = `🤖 Bot: ${tg.bot_name || 'Bot'} (${tg.bot_username || 'Sin @username'})`;
+      } else {
+        tgBotNameLabel.textContent = '🤖 Bot: No vinculado';
+      }
+    }
+
+    if (tgSyncTimeLabel) {
+      if (tg.last_sync_at) {
+        try {
+          tgSyncTimeLabel.textContent = `Última sinc: ${new Date(tg.last_sync_at).toLocaleString()}`;
+        } catch {
+          tgSyncTimeLabel.textContent = `Última sinc: ${tg.last_sync_at}`;
+        }
+      } else {
+        tgSyncTimeLabel.textContent = 'Última sinc: Pendiente';
+      }
+    }
+
     if (tgBadge) {
-      if (tg.enabled && tg.bot_token) {
+      if (tg.enabled && tg.bot_token && tg.webhook_synced) {
         tgBadge.textContent = 'BOT EN LÍNEA';
+        tgBadge.className = 'badge-tag badge-status-dot-active';
+      } else if (tg.enabled && tg.bot_token) {
+        tgBadge.textContent = 'ACTIVO';
         tgBadge.className = 'badge-tag badge-status-dot-active';
       } else if (tg.bot_token) {
         tgBadge.textContent = 'CONFIGURADO';
@@ -3884,6 +3915,26 @@ async function loadAdminSettings() {
       } else {
         tgBadge.textContent = 'SIN VINCULAR';
         tgBadge.className = 'badge-tag';
+      }
+    }
+
+    if (tgWebhookPill) {
+      if (tg.enabled && tg.bot_token && tg.webhook_synced) {
+        tgWebhookPill.textContent = '✅ Sincronizado en Telegram';
+        tgWebhookPill.style.background = 'rgba(16, 185, 129, 0.15)';
+        tgWebhookPill.style.color = '#10b981';
+      } else if (tg.sync_error) {
+        tgWebhookPill.textContent = '❌ Error Sincronización';
+        tgWebhookPill.style.background = 'rgba(239, 68, 68, 0.15)';
+        tgWebhookPill.style.color = '#ef4444';
+      } else if (tg.bot_token) {
+        tgWebhookPill.textContent = '⚠️ Pendiente Registro';
+        tgWebhookPill.style.background = 'rgba(245, 158, 11, 0.15)';
+        tgWebhookPill.style.color = '#f59e0b';
+      } else {
+        tgWebhookPill.textContent = 'SIN VINCULAR';
+        tgWebhookPill.style.background = 'rgba(100, 116, 139, 0.15)';
+        tgWebhookPill.style.color = 'var(--text-muted)';
       }
     }
 
@@ -6385,10 +6436,38 @@ function setupEventListeners() {
     await loadAdminSettings();
   });
 
-  // Guardar configuración de Telegram
+  // Copiar URL de Webhook de Telegram
+  document.getElementById('btn-copy-tg-webhook')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-copy-tg-webhook');
+    const input = document.getElementById('cfg-telegram-webhook-url');
+    if (!input || !input.value) return;
+    try {
+      await navigator.clipboard.writeText(input.value);
+    } catch {
+      input.select();
+      document.execCommand('copy');
+    }
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = '✅ ¡Copiado!';
+      setTimeout(() => {
+        btn.textContent = orig;
+      }, 2000);
+    }
+  });
+
+  // Guardar configuración de Telegram y sincronizar Webhook
   document.getElementById('telegram-config-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (outBox) outBox.textContent = 'Guardando configuración de Telegram Bot...';
+    const feedback = document.getElementById('tg-sync-feedback');
+    if (outBox) outBox.textContent = 'Guardando configuración y sincronizando Webhook en Telegram...';
+    if (feedback) {
+      feedback.style.display = 'block';
+      feedback.style.background = 'rgba(59, 130, 246, 0.1)';
+      feedback.style.color = '#2563eb';
+      feedback.textContent = '⏳ Guardando y contactando API de Telegram...';
+    }
+
     const payload = {
       bot_name: document.getElementById('cfg-telegram-name')?.value.trim() || 'Servi-Bot Telegram',
       bot_username: document.getElementById('cfg-telegram-username')?.value.trim() || '',
@@ -6399,8 +6478,75 @@ function setupEventListeners() {
       method: 'POST',
       body: JSON.stringify(payload)
     });
+
+    if (feedback) {
+      if (res.ok) {
+        const sync = res.telegram_sync;
+        if (sync && !sync.ok) {
+          feedback.style.background = 'rgba(245, 158, 11, 0.15)';
+          feedback.style.color = '#b45309';
+          feedback.textContent = `⚠️ Configuración guardada, pero Telegram reportó: ${sync.error}`;
+        } else if (sync && sync.ok) {
+          feedback.style.background = 'rgba(16, 185, 129, 0.12)';
+          feedback.style.color = '#059669';
+          const info = sync.bot_info;
+          const botStr = info ? ` (@${info.username || info.first_name})` : '';
+          feedback.textContent = `✅ Configuración y Webhook sincronizados con Telegram${botStr}.`;
+        } else {
+          feedback.style.background = 'rgba(16, 185, 129, 0.12)';
+          feedback.style.color = '#059669';
+          feedback.textContent = '✅ Configuración de Telegram guardada con éxito.';
+        }
+      } else {
+        feedback.style.background = 'rgba(239, 68, 68, 0.12)';
+        feedback.style.color = '#dc2626';
+        feedback.textContent = `❌ Error: ${res.error}`;
+      }
+    }
     if (outBox) outBox.textContent = res.ok ? '✅ Configuración de Telegram guardada con éxito.' : `❌ Error: ${res.error}`;
     await loadAdminSettings();
+  });
+
+  // Botón Sincronizar Webhook en Telegram manualmente
+  document.getElementById('btn-tg-sync-webhook')?.addEventListener('click', async () => {
+    const feedback = document.getElementById('tg-sync-feedback');
+    const token = document.getElementById('cfg-telegram-token')?.value.trim();
+    const enabled = Boolean(document.getElementById('cfg-telegram-enabled')?.checked);
+
+    if (feedback) {
+      feedback.style.display = 'block';
+      feedback.style.background = 'rgba(59, 130, 246, 0.1)';
+      feedback.style.color = '#2563eb';
+      feedback.textContent = '⏳ Conectando con los servidores de Telegram y registrando Webhook...';
+    }
+
+    try {
+      const res = await apiFetch('/api/channels/telegram/sync-webhook', {
+        method: 'POST',
+        body: JSON.stringify({ bot_token: token, enabled })
+      });
+
+      if (feedback) {
+        if (res.ok) {
+          feedback.style.background = 'rgba(16, 185, 129, 0.12)';
+          feedback.style.color = '#059669';
+          const info = res.sync?.bot_info;
+          const botStr = info ? ` (@${info.username || info.first_name})` : '';
+          feedback.textContent = `✅ ¡Webhook registrado con éxito en Telegram${botStr}! El bot ya puede recibir mensajes.`;
+        } else {
+          feedback.style.background = 'rgba(239, 68, 68, 0.12)';
+          feedback.style.color = '#dc2626';
+          feedback.textContent = `❌ Error al sincronizar con Telegram: ${res.error || res.sync?.error || 'Verifica el Bot Token.'}`;
+        }
+      }
+      await loadAdminSettings();
+    } catch (err) {
+      if (feedback) {
+        feedback.style.background = 'rgba(239, 68, 68, 0.12)';
+        feedback.style.color = '#dc2626';
+        feedback.textContent = `❌ Error de conexión: ${err.message}`;
+      }
+    }
   });
 
   // Guardar configuración de Instagram
