@@ -6487,6 +6487,10 @@ function setupEventListeners() {
       if (outBox) outBox.textContent = '✅ Cuenta de Microsoft vinculada correctamente.';
       await loadAdminSettings();
     }
+    if (ev.data && (ev.data.type === 'SERVIBOT_IG_OAUTH_SUCCESS' || ev.data.type === 'instagram_oauth_connected')) {
+      if (outBox) outBox.textContent = '✅ Cuenta de Instagram vinculada con éxito vía Meta.';
+      await loadAdminSettings();
+    }
   });
 
   // Guardar configuración de Microsoft Teams
@@ -6696,7 +6700,25 @@ function setupEventListeners() {
   });
 
   // Flujo guiado de inicio de sesión y vinculación de Instagram
-  document.getElementById('btn-ig-start-login')?.addEventListener('click', () => {
+  document.getElementById('btn-ig-start-login')?.addEventListener('click', async () => {
+    try {
+      if (outBox) outBox.textContent = 'Iniciando conexión con Meta / Instagram...';
+      const res = await apiFetch('/api/channels/instagram/oauth/init', {
+        method: 'POST',
+        body: JSON.stringify({ origin: window.location.origin })
+      });
+      if (res.ok && res.authUrl) {
+        const popup = window.open(res.authUrl, 'ig_oauth_popup', 'width=620,height=720,scrollbars=yes');
+        if (popup) {
+          popup.focus();
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('OAuth init fallback:', err);
+    }
+
+    // Fallback: abrir Instagram Web y mostrar paso 2
     window.open('https://www.instagram.com/accounts/login/', '_blank');
     const box = document.getElementById('ig-connect-box');
     const step2 = document.getElementById('ig-step2-box');

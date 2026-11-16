@@ -1024,6 +1024,62 @@ function buildMsCallbackHtml({ ok, payload = {}, error = '', allowedOrigin = '*'
 </html>`;
 }
 
+function buildIgCallbackHtml({ ok, payload = {}, error = '', allowedOrigin = '*' }) {
+  const safeMsg = JSON.stringify({
+    type: ok ? 'SERVIBOT_IG_OAUTH_SUCCESS' : 'SERVIBOT_IG_OAUTH_ERROR',
+    account_username: payload.account_username || '',
+    payload,
+    error
+  }).replace(/</g, '\\u003c');
+  const targetOrigin = allowedOrigin && allowedOrigin !== 'null' ? allowedOrigin : '*';
+  const headline = ok ? '✅ Cuenta de Instagram Conectada' : '❌ No se pudo completar el enlace con Instagram';
+  const detail = ok
+    ? `Atendiendo DMs y comentarios como @${escapeHtmlServer((payload.account_username || '').replace(/^@/, ''))}`
+    : escapeHtmlServer(error || 'Autorización cancelada o inválida.');
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Servi-Bot · Conexión Instagram</title>
+  <style>
+    body { margin:0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background:#0b1120; color:#f1f5f9; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:1.25rem; }
+    .card { max-width:440px; width:100%; background:#111827; border:1px solid #334155; border-radius:16px; padding:1.75rem; box-shadow:0 20px 50px rgba(0,0,0,0.45); text-align:center; }
+    h2 { margin:0 0 0.65rem; font-size:1.15rem; color:#f1f5f9; }
+    p { margin:0 0 1.1rem; color:#94a3b8; font-size:0.9rem; line-height:1.5; overflow-wrap:anywhere; }
+    .pills { display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:1.1rem; }
+    .pill { padding:0.35rem 0.7rem; border-radius:999px; font-size:0.78rem; font-weight:600; background:rgba(225,48,108,0.14); border:1px solid rgba(225,48,108,0.4); color:#f472b6; }
+    button { background:linear-gradient(45deg, #f09433, #dc2743, #bc1888); color:#fff; border:none; border-radius:8px; padding:0.65rem 1.2rem; font-weight:600; cursor:pointer; font-size:0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div style="font-size:2rem; margin-bottom:0.5rem;">📸</div>
+    <h2>${headline}</h2>
+    <p>${detail}</p>
+    ${ok ? '<div class="pills"><span class="pill">💬 DMs Activos</span><span class="pill">📸 Comentarios Activos</span></div>' : ''}
+    <button type="button" onclick="window.close()">Cerrar esta ventana</button>
+  </div>
+  <script>
+    (function () {
+      const data = ${safeMsg};
+      const targetOrigin = ${JSON.stringify(targetOrigin)};
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(data, targetOrigin);
+          if (targetOrigin !== '*') {
+            window.opener.postMessage(data, '*');
+          }
+        }
+      } catch (e) {}
+      setTimeout(function () { window.close(); }, ${ok ? 1200 : 4000});
+    })();
+  </script>
+</body>
+</html>`;
+}
+
 async function main() {
   // 1. Iniciar Ollama en puerto 10002
   await ensureOllamaOnPort10002();
@@ -3622,6 +3678,166 @@ async function main() {
       res.status(500).json({ ok: false, error: err.message });
     }
   });
+
+  // --- CANAL INSTAGRAM: OAUTH 2.0 AUTOMÁTICO (META FOR DEVELOPERS) ---
+  function getMetaOAuthAppConfig() {
+    const saved = getSetting('meta_oauth_app', {});
+    return {
+      app_id: String(saved.app_id || process.env.META_APP_ID || '1916155773095068').trim(),
+      app_secret: String(saved.app_secret || process.env.META_APP_SECRET || 'bc5c769233ba6a4890fd19a52e82cd2f').trim(),
+      verify_token: String(saved.verify_token || process.env.META_VERIFY_TOKEN || 'servibot_meta_token').trim()
+    };
+  }
+
+  const igOAuthPendingStates = new Map();
+  function pruneExpiredIgStates() {
+    const now = Date.now();
+    for (const [st, entry] of igOAuthPendingStates.entries()) {
+      if (!entry || now - (entry.createdAt || 0) > 15 * 60 * 1000) {
+        igOAuthPendingStates.delete(st);
+      }
+    }
+  }
+
+  app.post(
+    '/api/channels/instagram/oauth/init',
+    requireFirebaseAuth,
+    requireActiveClientSubscription,
+    (req, res) => {
+      pruneExpiredIgStates();
+      const targetId = getTargetAdminInstanceId(req);
+      const appCfg = getMetaOAuthAppConfig();
+      const stateToken = crypto.randomBytes(24).toString('hex');
+      const origin = sanitizeAllowedOrigin(req.body?.origin || req.headers?.origin || '');
+
+      igOAuthPendingStates.set(stateToken, {
+        instanceId: targetId,
+        origin,
+        adminUid: req.adminAccount?.uid || '',
+        createdAt: Date.now()
+      });
+
+      const backendBase = resolvePublicBackendBaseUrl(req);
+      const authUrl = `${backendBase}/api/channels/instagram/oauth/start?state=${encodeURIComponent(stateToken)}`;
+      const redirectUri = `${backendBase}/api/channels/instagram/oauth/callback`;
+
+      res.json({
+        ok: true,
+        state: stateToken,
+        instance_id: targetId,
+        authUrl,
+        meta_app_configured: Boolean(appCfg.app_id && appCfg.app_secret),
+        redirect_uri: redirectUri
+      });
+    }
+  );
+
+  app.get('/api/channels/instagram/oauth/start', (req, res) => {
+    pruneExpiredIgStates();
+    const stateToken = String(req.query.state || '').trim();
+    const stateEntry = stateToken ? igOAuthPendingStates.get(stateToken) : null;
+    const appCfg = getMetaOAuthAppConfig();
+    const backendBase = resolvePublicBackendBaseUrl(req);
+    const redirectUri = `${backendBase}/api/channels/instagram/oauth/callback`;
+
+    if (appCfg.app_id) {
+      const scope = encodeURIComponent('instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_show_list,pages_read_engagement');
+      const metaAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${encodeURIComponent(appCfg.app_id)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(stateToken)}&scope=${scope}&response_type=code`;
+      return res.redirect(metaAuthUrl);
+    }
+
+    res.status(400).send(buildIgCallbackHtml({ ok: false, error: 'Falta configurar META_APP_ID en el servidor.', allowedOrigin: stateEntry?.origin || '*' }));
+  });
+
+  const handleInstagramOAuthCallback = async (req, res) => {
+    pruneExpiredIgStates();
+    const { code, state, error, error_description } = req.query;
+    const stateEntry = state ? igOAuthPendingStates.get(String(state)) : null;
+    const allowedOrigin = stateEntry?.origin || '*';
+
+    if (error) {
+      return res.status(400).send(buildIgCallbackHtml({ ok: false, error: error_description || error, allowedOrigin }));
+    }
+
+    if (!code || !stateEntry) {
+      return res.status(400).send(buildIgCallbackHtml({ ok: false, error: 'Sesión OAuth de Instagram inválida o expirada. Por favor intenta de nuevo.', allowedOrigin }));
+    }
+
+    igOAuthPendingStates.delete(String(state));
+
+    const appCfg = getMetaOAuthAppConfig();
+    const backendBase = resolvePublicBackendBaseUrl(req);
+    const redirectUri = `${backendBase}/api/channels/instagram/oauth/callback`;
+
+    try {
+      // 1. Intercambiar code por User Access Token
+      const tokenUrl = `https://graph.facebook.com/v18.0/oauth/access_token?client_id=${encodeURIComponent(appCfg.app_id)}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${encodeURIComponent(appCfg.app_secret)}&code=${encodeURIComponent(code)}`;
+      const tokenResp = await fetch(tokenUrl);
+      const tokenData = await tokenResp.json();
+
+      if (!tokenResp.ok || !tokenData.access_token) {
+        const errMsg = tokenData.error?.message || 'Error al obtener Access Token de Meta.';
+        return res.status(400).send(buildIgCallbackHtml({ ok: false, error: errMsg, allowedOrigin }));
+      }
+
+      const userAccessToken = tokenData.access_token;
+
+      // 2. Obtener Páginas de Facebook vinculadas y sus cuentas de Instagram Business
+      let targetIgUsername = '';
+      let pageAccessToken = userAccessToken;
+
+      try {
+        const accountsUrl = `https://graph.facebook.com/v18.0/me/accounts?fields=name,access_token,instagram_business_account{id,username,name}&access_token=${encodeURIComponent(userAccessToken)}`;
+        const accountsResp = await fetch(accountsUrl);
+        const accountsData = await accountsResp.json();
+
+        if (accountsData.data && Array.isArray(accountsData.data)) {
+          for (const page of accountsData.data) {
+            if (page.instagram_business_account && page.instagram_business_account.username) {
+              targetIgUsername = page.instagram_business_account.username;
+              pageAccessToken = page.access_token || userAccessToken;
+              break;
+            }
+          }
+        }
+      } catch (acctErr) {
+        console.warn('[INSTAGRAM ACCOUNTS QUERY WARN]', acctErr.message);
+      }
+
+      // Si no tiene Instagram Business vinculado en las páginas, intentar con /me
+      if (!targetIgUsername) {
+        try {
+          const meResp = await fetch(`https://graph.facebook.com/v18.0/me?fields=id,name&access_token=${encodeURIComponent(userAccessToken)}`);
+          const meData = await meResp.json();
+          targetIgUsername = meData.name || 'usuario_instagram';
+        } catch (meErr) {
+          targetIgUsername = 'usuario_instagram';
+        }
+      }
+
+      const cleanUser = String(targetIgUsername).replace(/^@/, '');
+      const savedConfig = {
+        enabled: true,
+        account_username: cleanUser,
+        access_token: pageAccessToken,
+        user_access_token: userAccessToken,
+        auto_reply_comments: true,
+        auto_reply_dms: true,
+        meta_oauth_connected: true,
+        connected_at: new Date().toISOString()
+      };
+
+      setSetting('instagram_config', savedConfig);
+
+      return res.send(buildIgCallbackHtml({ ok: true, payload: savedConfig, allowedOrigin }));
+    } catch (err) {
+      console.error('[INSTAGRAM OAUTH CALLBACK ERROR]', err);
+      return res.status(500).send(buildIgCallbackHtml({ ok: false, error: err.message, allowedOrigin }));
+    }
+  };
+
+  app.get('/api/channels/instagram/oauth/callback', handleInstagramOAuthCallback);
+  app.post('/api/channels/instagram/oauth/callback', handleInstagramOAuthCallback);
 
   // --- CANAL TIKTOK (COMENTARIOS EN VIDEOS) ---
   app.post('/api/channels/tiktok/webhook', async (req, res) => {
