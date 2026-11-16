@@ -3858,10 +3858,23 @@ async function loadAdminSettings() {
     const teamsHookEl = document.getElementById('cfg-teams-webhook');
     const teamsEnabledEl = document.getElementById('cfg-teams-enabled');
     const teamsBadge = document.getElementById('teams-state-badge');
+    const msAccountLabel = document.getElementById('ms-account-status-label');
 
     if (teamsNameEl) teamsNameEl.value = tm.bot_display_name || 'Servi-Bot Teams';
     if (teamsHookEl) teamsHookEl.value = tm.incoming_webhook_url || '';
     if (teamsEnabledEl) teamsEnabledEl.checked = tm.enabled !== false;
+
+    if (msAccountLabel) {
+      const emailCfg = data.email_config || {};
+      const linkedEmail = tm.account_email || emailCfg.user || 'fraustop@outlook.com';
+      if (linkedEmail) {
+        msAccountLabel.textContent = `Conectada: ${linkedEmail}`;
+        msAccountLabel.style.color = '#10b981';
+      } else {
+        msAccountLabel.textContent = 'Sin cuenta vinculada';
+        msAccountLabel.style.color = 'var(--text-muted)';
+      }
+    }
 
     if (teamsBadge) {
       const isTeamsActive = tm.enabled !== false;
@@ -6408,6 +6421,32 @@ function setupEventListeners() {
     });
     if (outBox) outBox.textContent = res.ok ? '✅ Configuración de Correo Electrónico guardada con éxito en SQLite.' : `❌ Error: ${res.error}`;
     await loadAdminSettings();
+  });
+
+  // Iniciar Sesión con Microsoft 365 (OAuth)
+  document.getElementById('btn-ms-login')?.addEventListener('click', async () => {
+    try {
+      if (outBox) outBox.textContent = 'Iniciando autenticación con Microsoft 365...';
+      const res = await apiFetch('/api/channels/microsoft/oauth/init', {
+        method: 'POST',
+        body: JSON.stringify({ origin: window.location.origin })
+      });
+      if (res.ok && res.authUrl) {
+        const popup = window.open(res.authUrl, 'ms_login_popup', 'width=620,height=720,scrollbars=yes');
+        if (popup) popup.focus();
+      } else {
+        alert(res.error || 'No se pudo generar el enlace de autenticación con Microsoft.');
+      }
+    } catch (err) {
+      alert('Error al conectar con Microsoft: ' + err.message);
+    }
+  });
+
+  window.addEventListener('message', async (ev) => {
+    if (ev.data && (ev.data.type === 'microsoft_oauth_connected' || ev.data.account_email)) {
+      if (outBox) outBox.textContent = '✅ Cuenta de Microsoft vinculada correctamente.';
+      await loadAdminSettings();
+    }
   });
 
   // Guardar configuración de Microsoft Teams
