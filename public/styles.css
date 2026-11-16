@@ -7391,7 +7391,6 @@ dialog.product-form-modal .dialog-inner {
 .admin-main-area .panel-card,
 .admin-main-area .products-sidebar,
 .admin-main-area .products-detail-panel,
-.admin-main-area .bot-soul-container,
 .admin-main-area .order-card {
   background: #111622 !important;
   border: 1px solid #263346 !important;
@@ -7583,7 +7582,6 @@ dialog.product-form-modal .dialog-inner {
 [data-theme="light"] .admin-main-area .panel-card,
 [data-theme="light"] .admin-main-area .products-sidebar,
 [data-theme="light"] .admin-main-area .products-detail-panel,
-[data-theme="light"] .admin-main-area .bot-soul-container,
 [data-theme="light"] .admin-main-area .order-card {
   background: #ffffff !important;
   border: 1px solid #cbd5e1 !important;
