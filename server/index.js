@@ -3499,6 +3499,7 @@ async function main() {
       let senderId = '';
       let senderName = '';
       let postId = '';
+      let commentId = '';
       let isDm = false;
 
       if (body.entry && Array.isArray(body.entry)) {
@@ -3517,6 +3518,7 @@ async function main() {
           senderId = change.from?.id || 'ig_user_01';
           senderName = change.from?.username || 'usuario_instagram';
           postId = change.media?.id || 'post_100';
+          commentId = change.id || '';
           isDm = false;
         }
       } else {
@@ -3524,6 +3526,7 @@ async function main() {
         senderId = body.user_id || body.sender_id || 'ig_user_01';
         senderName = body.username || body.sender_name || 'usuario_instagram';
         postId = body.post_id || '';
+        commentId = body.comment_id || '';
         isDm = Boolean(body.is_dm || !body.post_id);
       }
 
@@ -3542,7 +3545,57 @@ async function main() {
         instance_id: targetId
       });
 
-      res.json({ ok: true, channel: 'instagram', type: isDm ? 'direct_message' : 'comment', reply: agentResult?.reply, servibot: agentResult });
+      // Publicar respuesta real en Instagram vía Meta Graph API si se cuenta con access_token
+      const igCfg = getSetting('instagram_config', {});
+      const accessToken = igCfg.access_token || process.env.INSTAGRAM_ACCESS_TOKEN || '';
+      let metaDispatchResult = null;
+
+      if (accessToken && agentResult?.reply) {
+        try {
+          if (isDm && senderId) {
+            const resp = await fetch('https://graph.facebook.com/v18.0/me/messages', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+              },
+              body: JSON.stringify({
+                recipient: { id: senderId },
+                message: { text: agentResult.reply }
+              })
+            });
+            metaDispatchResult = await resp.json();
+            console.log('[INSTAGRAM DM DISPATCH]', metaDispatchResult);
+          } else if (commentId) {
+            const resp = await fetch(`https://graph.facebook.com/v18.0/${encodeURIComponent(commentId)}/replies`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+              },
+              body: JSON.stringify({
+                message: agentResult.reply
+              })
+            });
+            metaDispatchResult = await resp.json();
+            console.log('[INSTAGRAM COMMENT DISPATCH]', metaDispatchResult);
+          }
+        } catch (dispatchErr) {
+          console.error('[INSTAGRAM DISPATCH ERROR]', dispatchErr.message);
+        }
+      } else if (!accessToken) {
+        console.warn('[INSTAGRAM] Recibido webhook pero no hay access_token configurado en instagram_config.');
+      }
+
+      res.json({
+        ok: true,
+        channel: 'instagram',
+        type: isDm ? 'direct_message' : 'comment',
+        reply: agentResult?.reply,
+        dispatched_to_meta: Boolean(metaDispatchResult && !metaDispatchResult.error),
+        meta_result: metaDispatchResult,
+        servibot: agentResult
+      });
     } catch (err) {
       res.status(500).json({ ok: false, error: err.message });
     }
