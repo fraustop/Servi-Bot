@@ -1747,29 +1747,17 @@
                 <span class="badge-tag" id="wa-state-badge">Verificando...</span>
               </div>
               <p style="font-size:0.85rem; color:var(--text-muted);">
-                Motor Baileys gratuito y sin tokens en puerto <code>10001</code>. Escanea el código QR con tu WhatsApp o usa el simulador inferior.
+                Motor Baileys gratuito y sin tokens en puerto <code>10001</code>. Escanea el código QR con tu aplicación de WhatsApp para conectar tu número al bot.
               </p>
 
               <div id="wa-qr-container" style="text-align:center; margin:1rem 0;">
                 <p style="color:var(--text-muted); font-size:0.85rem;">Cargando estado de instancia <code>servibot-00</code>...</p>
               </div>
 
-              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.5rem;">
                 <button type="button" class="btn btn-outline btn-sm" id="btn-wa-refresh">🔄 Actualizar QR / Estado</button>
                 <button type="button" class="btn btn-danger btn-sm" id="btn-wa-logout">Reiniciar Sesión WA</button>
               </div>
-
-              <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
-              <h4 style="margin:0 0 0.5rem;">🧪 Simulador de Mensaje Entrante de WhatsApp</h4>
-              <div class="field">
-                <label for="sim-wa-phone">Teléfono / Nombre del Prospecto</label>
-                <input type="text" id="sim-wa-phone" value="5218119998877" />
-              </div>
-              <div class="field">
-                <label for="sim-wa-text">Mensaje de WhatsApp</label>
-                <input type="text" id="sim-wa-text" value="Hola, quiero contratar el servicio de Bots Autónomos para mi negocio, soy Laura Gómez, confirma mi pedido." />
-              </div>
-              <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-wa">Disparar Webhook WhatsApp</button>
             </div>
 
             <!-- TELEGRAM BOT -->
@@ -1850,76 +1838,65 @@
               </div>
 
               <div id="tg-sync-feedback" style="display:none; margin-bottom:0.75rem; padding:0.6rem 0.85rem; border-radius:8px; font-size:0.82rem;"></div>
-
-              <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
-              <h4 style="margin:0 0 0.5rem;">🧪 Simular Mensaje Entrante en Telegram</h4>
-              <div class="field">
-                <label for="sim-telegram-user">Usuario de Telegram (@usuario o Nombre)</label>
-                <input type="text" id="sim-telegram-user" value="carlos_director" />
-              </div>
-              <div class="field">
-                <label for="sim-telegram-text">Mensaje del Prospecto</label>
-                <input type="text" id="sim-telegram-text" value="Hola, ¿tienen disponibilidad para implementar un catálogo web y bots para mi empresa?" />
-              </div>
-              <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-telegram">Enviar Mensaje de Telegram</button>
             </div>
 
             <!-- MICROSOFT TEAMS -->
-            <div class="panel-card">
+            <div class="panel-card" id="teams-panel-card">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-                <h3 style="margin:0;">👥 Microsoft Teams (Charlas y Webhook)</h3>
-                <span class="badge-tag" id="teams-state-badge">ACTIVO</span>
+                <h3 style="margin:0;">👥 Microsoft Teams (Charlas y Notificaciones)</h3>
+                <span class="badge-tag" id="teams-state-badge">VERIFICANDO...</span>
               </div>
               <p style="font-size:0.85rem; color:var(--text-muted); margin:0.35rem 0 0.75rem;">
-                Atiende menciones y chats en canales de Microsoft Teams mediante Webhook directo.
+                Atiende conversaciones y notificaciones en Microsoft Teams con Inteligencia Artificial.
               </p>
 
-              <!-- VINCULACIÓN CON CUENTA MICROSOFT 365 -->
-              <div id="ms-login-box" style="margin-bottom:1rem; padding:0.85rem 1rem; background:rgba(0,120,212,0.06); border:1px solid rgba(0,120,212,0.22); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:0.75rem; flex-wrap:wrap;">
-                <div style="display:flex; align-items:center; gap:0.6rem;">
-                  <span style="font-size:1.4rem;">🪟</span>
-                  <div>
-                    <div style="font-weight:600; font-size:0.86rem; color:var(--text-primary, #0f172a);">Cuenta Microsoft 365 / Outlook</div>
-                    <div id="ms-account-status-label" style="font-size:0.78rem; color:#10b981;">Conectada: fraustop@outlook.com</div>
-                  </div>
+              <!-- ESTADO CONECTADO (CONFIRMACIÓN VERDE ELEGANTE) -->
+              <div id="ms-connected-box" style="display:none; padding:1.1rem 1rem; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.35); border-radius:12px; text-align:center; margin-bottom:0.75rem;">
+                <div style="font-size:1.6rem; margin-bottom:0.25rem;">✅</div>
+                <div style="font-weight:700; font-size:0.95rem; color:#10b981; margin-bottom:0.25rem;">
+                  Cuenta Microsoft 365 y Teams Conectada
                 </div>
-                <button type="button" class="btn btn-outline btn-sm" id="btn-ms-login" style="display:inline-flex; align-items:center; gap:0.35rem; border-color:#0078d4; color:#0078d4; font-weight:600;">
-                  <span>🪟</span> Conectar con Microsoft
-                </button>
+                <div style="font-size:0.84rem; color:var(--text-muted); margin-bottom:0.75rem;">
+                  Vinculada como <strong id="teams-active-account" style="color:var(--text-primary, #0f172a);">fraustop@outlook.com</strong>
+                </div>
+                <div style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap;">
+                  <a href="https://teams.microsoft.com" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" style="display:inline-flex; align-items:center; gap:0.35rem;">
+                    <span>👥</span> Abrir Teams Web ↗
+                  </a>
+                  <button type="button" class="btn btn-outline btn-sm" id="btn-ms-login-change">🔄 Cambiar Cuenta</button>
+                </div>
               </div>
 
-              <form id="teams-config-form">
-                <div class="field">
-                  <label for="cfg-teams-name">Nombre del Bot en Teams</label>
-                  <input type="text" id="cfg-teams-name" value="Servi-Bot Teams" />
-                </div>
-                <div class="field">
-                  <label for="cfg-teams-webhook">Incoming Webhook URL de Teams (Para alertas)</label>
-                  <input type="url" id="cfg-teams-webhook" placeholder="https://outlook.office.com/webhook/..." />
-                </div>
-                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; font-size:0.86rem;">
-                  <input type="checkbox" id="cfg-teams-enabled" checked />
-                  <span>Activar atención en Microsoft Teams</span>
-                </label>
-                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                  <button type="submit" class="btn btn-primary btn-sm">Guardar Configuración Teams</button>
+              <!-- ESTADO NO CONECTADO / BOTÓN DIRECTO DE ACCESO -->
+              <div id="ms-connect-box" style="padding:1.15rem 1rem; background:var(--bg-secondary, #f8fafc); border:1px solid var(--border-color); border-radius:12px; margin-bottom:0.75rem; text-align:center;">
+                <div style="font-size:1.6rem; margin-bottom:0.25rem;">🪟</div>
+                <div style="font-weight:700; font-size:0.92rem; margin-bottom:0.35rem;">Conectar con Microsoft 365</div>
+                <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 0.85rem; line-height:1.45;">
+                  Vincula tu cuenta oficial de Microsoft con un solo clic para sincronizar tus canales y chats de Teams.
+                </p>
+                <div style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap;">
+                  <button type="button" class="btn btn-primary btn-sm" id="btn-ms-login" style="background:#0078d4; border-color:#0078d4; display:inline-flex; align-items:center; gap:0.4rem; font-weight:600;">
+                    <span>🪟</span> Conectar con Microsoft
+                  </button>
                   <a href="https://teams.microsoft.com" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" style="display:inline-flex; align-items:center; gap:0.35rem;">
                     <span>👥</span> Abrir Teams Web ↗
                   </a>
                 </div>
-              </form>
+              </div>
 
-              <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
-              <h4 style="margin:0 0 0.5rem;">🧪 Simular Mención en Microsoft Teams</h4>
-              <div class="field">
-                <label for="sim-teams-user">Usuario de Teams</label>
-                <input type="text" id="sim-teams-user" value="Sofía Méndez (Gerente TI)" />
-              </div>
-              <div class="field">
-                <label for="sim-teams-text">Mensaje en Canal de Teams</label>
-                <input type="text" id="sim-teams-text" value="@Servi-Bot queremos contratar el paquete de Bots Autónomos e Interfaz de Catálogo Dinámico para nuestra empresa, confirma el pedido." />
-              </div>
-              <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-teams">Enviar Webhook de Teams</button>
+              <!-- OPCIÓN TÉCNICA WEBHOOK (AVANZADO) -->
+              <details style="font-size:0.8rem; color:var(--text-muted); cursor:pointer; margin-top:0.5rem;">
+                <summary style="font-weight:500;">⚙️ Configuración técnica opcional (Webhook)</summary>
+                <form id="teams-config-form" style="margin-top:0.75rem;">
+                  <div class="field" style="margin-bottom:0.5rem;">
+                    <label for="cfg-teams-webhook" style="font-size:0.78rem;">Incoming Webhook URL de Teams</label>
+                    <input type="url" id="cfg-teams-webhook" placeholder="https://outlook.office.com/webhook/..." style="font-size:0.8rem;" />
+                  </div>
+                  <input type="hidden" id="cfg-teams-name" value="Servi-Bot Teams" />
+                  <input type="hidden" id="cfg-teams-enabled" value="true" />
+                  <button type="submit" class="btn btn-outline btn-xs">Guardar Webhook</button>
+                </form>
+              </details>
             </div>
           </div>
 
@@ -1958,24 +1935,6 @@
                 </label>
                 <button type="submit" class="btn btn-primary btn-sm">Guardar Configuración Instagram</button>
               </form>
-
-              <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
-              <h4 style="margin:0 0 0.5rem;">🧪 Simular Comentario en Publicación de Instagram</h4>
-              <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap:0.5rem;">
-                <div class="field">
-                  <label for="sim-instagram-user">Usuario de Instagram</label>
-                  <input type="text" id="sim-instagram-user" value="mariana_fitness" />
-                </div>
-                <div class="field">
-                  <label for="sim-instagram-post">ID de Post / Reel</label>
-                  <input type="text" id="sim-instagram-post" value="reel_promo_febrero" />
-                </div>
-              </div>
-              <div class="field">
-                <label for="sim-instagram-comment">Comentario en la Publicación</label>
-                <input type="text" id="sim-instagram-comment" value="¿Qué precio tiene el paquete de Bots Autónomos? ¿Hacen factura?" />
-              </div>
-              <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-instagram">Simular Comentario Instagram</button>
             </div>
 
             <!-- TIKTOK COMENTARIOS -->
@@ -2002,24 +1961,6 @@
                 </label>
                 <button type="submit" class="btn btn-primary btn-sm">Guardar Configuración TikTok</button>
               </form>
-
-              <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
-              <h4 style="margin:0 0 0.5rem;">🧪 Simular Comentario en Video de TikTok</h4>
-              <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap:0.5rem;">
-                <div class="field">
-                  <label for="sim-tiktok-user">Usuario de TikTok</label>
-                  <input type="text" id="sim-tiktok-user" value="jorge_tech" />
-                </div>
-                <div class="field">
-                  <label for="sim-tiktok-video">ID de Video</label>
-                  <input type="text" id="sim-tiktok-video" value="video_73849102" />
-                </div>
-              </div>
-              <div class="field">
-                <label for="sim-tiktok-comment">Comentario en el Video</label>
-                <input type="text" id="sim-tiktok-comment" value="¡Está brutal! ¿Cómo puedo contratar este bot para mi clínica?" />
-              </div>
-              <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-tiktok">Simular Comentario TikTok</button>
             </div>
           </div>
 
@@ -2087,30 +2028,10 @@
 
               <button type="submit" class="btn btn-primary btn-sm">💾 Guardar Configuración de Correo</button>
             </form>
-
-            <hr style="border:none; border-top:1px solid var(--border-color); margin:1.25rem 0 1rem;" />
-            <h4 style="margin:0 0 0.5rem;">🧪 Simular Correo Entrante de Cliente</h4>
-            <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap:0.5rem;">
-              <div class="field">
-                <label for="sim-email-from">Correo del Cliente</label>
-                <input type="email" id="sim-email-from" value="director@pyme-industrial.mx" />
-              </div>
-              <div class="field">
-                <label for="sim-email-subject">Asunto del Correo</label>
-                <input type="text" id="sim-email-subject" value="Solicitud de contratación de Bots Autónomos y Catálogo" />
-              </div>
-            </div>
-            <div class="field">
-              <label for="sim-email-body">Cuerpo del Correo</label>
-              <input type="text" id="sim-email-body" value="Buen día, deseo contratar la Interfaz de Catálogo Dinámico y el Bot Autónomo. Soy el Ing. Roberto Díaz, por favor confirmen el pedido y formas de pago." />
-            </div>
-            <button type="button" class="btn btn-emerald btn-sm" id="btn-sim-email">Procesar Correo con IA Python</button>
           </div>
 
-          <div class="panel-card">
-            <h4 style="margin-top:0;">📠 Resultado de la Última Prueba Multicanal</h4>
-            <div class="log-feed" id="channel-test-output">Esperando simulación o mensaje entrante...</div>
-          </div>
+          <!-- Contenedor oculto para logs de canales -->
+          <div id="channel-test-output" style="display:none;"></div>
         </div>
 
         <!-- TAB 4: CONVERSACIONES Y CLOUDFLARE TUNNEL -->

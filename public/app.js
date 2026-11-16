@@ -3858,27 +3858,38 @@ async function loadAdminSettings() {
     const teamsHookEl = document.getElementById('cfg-teams-webhook');
     const teamsEnabledEl = document.getElementById('cfg-teams-enabled');
     const teamsBadge = document.getElementById('teams-state-badge');
+    const msConnectedBox = document.getElementById('ms-connected-box');
+    const msConnectBox = document.getElementById('ms-connect-box');
+    const teamsActiveAccount = document.getElementById('teams-active-account');
     const msAccountLabel = document.getElementById('ms-account-status-label');
 
     if (teamsNameEl) teamsNameEl.value = tm.bot_display_name || 'Servi-Bot Teams';
     if (teamsHookEl) teamsHookEl.value = tm.incoming_webhook_url || '';
     if (teamsEnabledEl) teamsEnabledEl.checked = tm.enabled !== false;
 
-    if (msAccountLabel) {
-      const emailCfg = data.email_config || {};
-      const linkedEmail = tm.account_email || emailCfg.user || 'fraustop@outlook.com';
-      if (linkedEmail) {
-        msAccountLabel.textContent = `Conectada: ${linkedEmail}`;
-        msAccountLabel.style.color = '#10b981';
+    const emailCfg = data.email_config || {};
+    const linkedEmail = tm.account_email || (emailCfg.user && emailCfg.user.includes('@') ? emailCfg.user : null) || 'fraustop@outlook.com';
+    const isConnected = Boolean(tm.account_email || tm.enabled !== false);
+
+    if (msConnectedBox && msConnectBox) {
+      if (isConnected) {
+        msConnectedBox.style.display = 'block';
+        msConnectBox.style.display = 'none';
+        if (teamsActiveAccount) teamsActiveAccount.textContent = linkedEmail;
       } else {
-        msAccountLabel.textContent = 'Sin cuenta vinculada';
-        msAccountLabel.style.color = 'var(--text-muted)';
+        msConnectedBox.style.display = 'none';
+        msConnectBox.style.display = 'block';
       }
     }
 
+    if (msAccountLabel) {
+      msAccountLabel.textContent = isConnected ? `Conectada: ${linkedEmail}` : 'Sin cuenta vinculada';
+      msAccountLabel.style.color = isConnected ? '#10b981' : 'var(--text-muted)';
+    }
+
     if (teamsBadge) {
-      const isTeamsActive = tm.enabled !== false;
-      teamsBadge.textContent = isTeamsActive ? 'ACTIVO' : 'PAUSADO';
+      const isTeamsActive = isConnected && tm.enabled !== false;
+      teamsBadge.textContent = isTeamsActive ? 'ACTIVO' : 'SIN VINCULAR';
       teamsBadge.className = isTeamsActive ? 'badge-tag badge-status-dot-active' : 'badge-tag';
     }
 
@@ -6424,7 +6435,7 @@ function setupEventListeners() {
   });
 
   // Iniciar Sesión con Microsoft 365 (OAuth Oficial Directo)
-  document.getElementById('btn-ms-login')?.addEventListener('click', async () => {
+  const triggerMsLogin = async () => {
     try {
       if (outBox) outBox.textContent = 'Conectando con Microsoft Identity Platform (login.microsoftonline.com)...';
       const res = await apiFetch('/api/channels/microsoft/oauth/init', {
@@ -6440,7 +6451,10 @@ function setupEventListeners() {
     } catch (err) {
       alert('Error al conectar con Microsoft: ' + err.message);
     }
-  });
+  };
+
+  document.getElementById('btn-ms-login')?.addEventListener('click', triggerMsLogin);
+  document.getElementById('btn-ms-login-change')?.addEventListener('click', triggerMsLogin);
 
   window.addEventListener('message', async (ev) => {
     if (ev.data && (ev.data.type === 'microsoft_oauth_connected' || ev.data.account_email)) {
