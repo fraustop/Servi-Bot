@@ -3689,6 +3689,17 @@ async function main() {
     };
   }
 
+  function sanitizeAllowedOrigin(raw) {
+    const str = String(raw || '').trim();
+    if (!str || str === 'null') return '*';
+    try {
+      const u = new URL(str);
+      return u.origin;
+    } catch {
+      return '*';
+    }
+  }
+
   const igOAuthPendingStates = new Map();
   function pruneExpiredIgStates() {
     const now = Date.now();
