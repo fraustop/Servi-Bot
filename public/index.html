@@ -1912,28 +1912,78 @@
 
           <div class="form-grid channels-unified-grid">
             <!-- INSTAGRAM COMENTARIOS -->
-            <div class="panel-card">
+            <div class="panel-card" id="ig-panel-card">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
                 <h3 style="margin:0;">📸 Instagram (Comentarios en Posts / Reels)</h3>
-                <span class="badge-tag" id="ig-state-badge">COMENTARIOS</span>
+                <span class="badge-tag" id="ig-state-badge">SIN VINCULAR</span>
               </div>
-              <p style="font-size:0.85rem; color:var(--text-muted);">
-                Responde comentarios en tus fotos y reels con respuestas ágiles y claras, resolviendo dudas de catálogo o precios.
+              <p style="font-size:0.85rem; color:var(--text-muted); margin:0.35rem 0 0.75rem;">
+                Responde comentarios en tus fotos y reels con respuestas ágiles y claras, resolviendo dudas de catálogo o precios con IA.
               </p>
-              <form id="instagram-config-form">
-                <div class="field">
-                  <label for="cfg-instagram-user">Cuenta de Instagram (@usuario)</label>
-                  <input type="text" id="cfg-instagram-user" placeholder="@tu_marca" />
+
+              <!-- ESTADO ACTIVO (CONFIRMACIÓN DE CUENTA VINCULADA) -->
+              <div id="ig-active-container" style="display:none; padding:1.1rem 1rem; background:rgba(225,48,108,0.08); border:1px solid rgba(225,48,108,0.3); border-radius:12px; text-align:center; margin-bottom:0.75rem;">
+                <div style="font-size:1.6rem; margin-bottom:0.25rem;">📸</div>
+                <div style="font-weight:700; font-size:0.95rem; color:#e1306c; margin-bottom:0.25rem;">
+                  Cuenta de Instagram Conectada y Activa
+                </div>
+                <div style="font-size:0.84rem; color:var(--text-muted); margin-bottom:0.85rem;">
+                  Atendiendo comentarios como <strong id="ig-active-user" style="color:var(--text-primary, #0f172a);">@tu_marca</strong>
+                </div>
+                <div style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap;">
+                  <a id="btn-ig-open-profile" href="https://www.instagram.com" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" style="display:inline-flex; align-items:center; gap:0.35rem;">
+                    <span>📸</span> Ver Perfil en Instagram ↗
+                  </a>
+                  <button type="button" class="btn btn-outline btn-sm" id="btn-ig-reconfig">⚙️ Modificar Cuenta</button>
+                </div>
+              </div>
+
+              <!-- BOTÓN PRINCIPAL: ACCESO DIRECTO A LOGIN DE INSTAGRAM -->
+              <div id="ig-connect-box" style="padding:1.15rem 1rem; background:var(--bg-secondary, #f8fafc); border:1px solid var(--border-color); border-radius:12px; margin-bottom:0.75rem; text-align:center;">
+                <div style="font-size:1.8rem; margin-bottom:0.35rem;">📸</div>
+                <div style="font-weight:700; font-size:0.92rem; margin-bottom:0.35rem;">Iniciar Sesión en Instagram</div>
+                <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 0.85rem; line-height:1.45;">
+                  Abre Instagram para acceder con tu cuenta comercial o de creador y luego vincula tu usuario para activar la atención con IA.
+                </p>
+                <div style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap;">
+                  <a href="https://www.instagram.com/accounts/login/" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm" style="background:linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); border:none; display:inline-flex; align-items:center; gap:0.4rem; font-weight:600; color:#fff; text-decoration:none;">
+                    <span>📸</span> Iniciar Sesión en Instagram ↗
+                  </a>
+                  <button type="button" class="btn btn-outline btn-sm" id="btn-ig-toggle-form">
+                    ¿Ya iniciaste sesión? Vincular @ ➔
+                  </button>
+                </div>
+              </div>
+
+              <!-- FORMULARIO DE VINCULACIÓN SIMPLIFICADO -->
+              <form id="instagram-config-form" style="display:none; margin-bottom:0.75rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+                  <strong style="font-size:0.86rem;">Paso 2: Vincular Cuenta de Instagram</strong>
+                  <button type="button" class="btn btn-outline btn-sm" id="btn-ig-cancel-form" style="padding:0.15rem 0.5rem; font-size:0.75rem;">✕ Volver</button>
                 </div>
                 <div class="field">
-                  <label for="cfg-instagram-token">Token de Acceso / Graph API</label>
-                  <input type="password" id="cfg-instagram-token" placeholder="EAAX..." autocomplete="off" />
+                  <label for="cfg-instagram-user">Usuario de Instagram (@)</label>
+                  <input type="text" id="cfg-instagram-user" placeholder="@tu_marca" autocomplete="off" />
+                  <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-top:0.2rem;">
+                    Escribe el usuario (@) con el que iniciaste sesión.
+                  </span>
                 </div>
-                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; font-size:0.86rem;">
-                  <input type="checkbox" id="cfg-instagram-enabled" />
+                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; font-size:0.84rem;">
+                  <input type="checkbox" id="cfg-instagram-enabled" checked />
                   <span>Activar respuesta automática a comentarios de Instagram</span>
                 </label>
-                <button type="submit" class="btn btn-primary btn-sm">Guardar Configuración Instagram</button>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.5rem;">
+                  <button type="submit" class="btn btn-primary btn-sm" id="btn-ig-submit">💾 Guardar y Conectar</button>
+                  <button type="button" class="btn btn-outline btn-sm" id="btn-ig-cancel-form-2">Cancelar</button>
+                </div>
+
+                <details style="font-size:0.78rem; color:var(--text-muted); cursor:pointer; margin-top:0.6rem;">
+                  <summary style="font-weight:500;">⚙️ Configuración técnica opcional (Meta Graph API)</summary>
+                  <div class="field" style="margin-top:0.5rem;">
+                    <label for="cfg-instagram-token" style="font-size:0.75rem;">Token de Acceso / Graph API (Opcional)</label>
+                    <input type="password" id="cfg-instagram-token" placeholder="EAAX..." autocomplete="off" style="font-size:0.78rem;" />
+                  </div>
+                </details>
               </form>
             </div>
 
