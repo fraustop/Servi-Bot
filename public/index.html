@@ -1773,89 +1773,83 @@
             </div>
 
             <!-- TELEGRAM BOT -->
-            <div class="panel-card">
+            <div class="panel-card" id="tg-panel-card">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
                 <h3 style="margin:0;">✈️ Telegram (Charlas en Bot)</h3>
-                <span class="badge-tag" id="tg-state-badge">CONFIGURACIÓN</span>
+                <span class="badge-tag" id="tg-state-badge">SIN VINCULAR</span>
               </div>
               <p style="font-size:0.85rem; color:var(--text-muted); margin:0.35rem 0 0.75rem;">
-                Atiende conversaciones en Telegram vinculando tu bot creado en <strong>@BotFather</strong>. ServiBot sincroniza automáticamente el Webhook oficial con los servidores de Telegram para recibir mensajes en tiempo real.
+                Atiende conversaciones de Telegram automáticamente con Inteligencia Artificial.
               </p>
 
-              <!-- Webhook URL & Estado Info Box -->
-              <div style="background:var(--bg-secondary, #f8fafc); border:1px solid var(--border-color); border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem;">
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.4rem; flex-wrap:wrap;">
-                  <strong style="font-size:0.83rem;">🔗 Webhook Oficial para Telegram:</strong>
-                  <span id="tg-webhook-status-pill" style="font-size:0.75rem; padding:0.15rem 0.55rem; border-radius:999px; background:rgba(100,116,139,0.15); color:var(--text-muted); font-weight:600;">SIN VINCULAR</span>
-                </div>
-                <div style="display:flex; gap:0.5rem; align-items:center;">
-                  <input type="text" id="cfg-telegram-webhook-url" readonly style="font-family:monospace; font-size:0.82rem; flex:1;" value="https://dqo1j67xmphbf.cloudfront.net/api/channels/telegram/webhook" />
-                  <button type="button" class="btn btn-outline btn-sm" id="btn-copy-tg-webhook" title="Copiar URL del Webhook">📋 Copiar</button>
-                </div>
-                <div id="tg-sync-info-row" style="margin-top:0.45rem; font-size:0.78rem; color:var(--text-muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
-                  <span id="tg-verified-bot-name">🤖 Bot: No vinculado</span>
-                  <span id="tg-last-sync-time">Última sinc: Pendiente</span>
+              <!-- PASO 1: SECCIÓN INTERACTIVA DE INICIO -->
+              <div id="tg-step1-box" style="padding:1.15rem 1rem; background:var(--bg-secondary, #f8fafc); border:1px solid var(--border-color); border-radius:12px; margin-bottom:1rem; text-align:center;">
+                <div style="font-size:1.6rem; margin-bottom:0.25rem;">🤖</div>
+                <div style="font-weight:700; font-size:0.92rem; margin-bottom:0.35rem;">Paso 1: Manda mensaje a @BotFather</div>
+                <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 0.85rem; line-height:1.45;">
+                  Abre Telegram y escribe <code>/newbot</code> a <strong>@BotFather</strong>. Asigna un nombre y un usuario que termine obligatoriamente en <strong>bot</strong> (ej. <code>@TuNegocio_bot</code>).
+                </p>
+                <div style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap;">
+                  <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">💬 Abrir @BotFather</a>
+                  <button type="button" class="btn btn-primary btn-sm" id="btn-tg-toggle-form">¿Ya tienes la API? ➔</button>
                 </div>
               </div>
 
-              <form id="telegram-config-form">
+              <!-- FORMULARIO: INGRESO DE API Y NOMBRE DEL BOT -->
+              <form id="telegram-config-form" style="display:none; margin-bottom:1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+                  <strong style="font-size:0.86rem;">Paso 2: Datos de tu Bot</strong>
+                  <button type="button" class="btn btn-outline btn-sm" id="btn-tg-cancel-form" style="padding:0.15rem 0.5rem; font-size:0.75rem;">✕ Volver</button>
+                </div>
                 <div class="field">
                   <label for="cfg-telegram-name">Nombre del Bot</label>
-                  <input type="text" id="cfg-telegram-name" placeholder="Servi-Bot Telegram" />
+                  <input type="text" id="cfg-telegram-name" placeholder="Ej. Asistente Comercial" />
                 </div>
                 <div class="field">
-                  <label for="cfg-telegram-username">Usuario del Bot (@username)</label>
-                  <input type="text" id="cfg-telegram-username" placeholder="@TuEmpresa_bot" value="" />
-                </div>
-                <div class="field">
-                  <label for="cfg-telegram-token" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.25rem;">
-                    <span>Bot Token de Telegram</span>
-                    <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" style="font-size:0.78rem; color:#0088cc; font-weight:600; text-decoration:none;">🤖 Abrir @BotFather en Telegram ↗</a>
+                  <label for="cfg-telegram-username" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+                    <span>Usuario del Bot (@username) *</span>
+                    <span id="tg-user-format-hint" style="font-size:0.72rem; color:#ef4444; font-weight:600;">Obligatorio terminar en 'bot'</span>
                   </label>
-                  <input type="password" id="cfg-telegram-token" placeholder="123456789:AAFg..." autocomplete="off" />
-                  <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-top:0.25rem;">Escribe <code>/newbot</code> a @BotFather en Telegram para crearlo gratis y obtener este código.</span>
+                  <input type="text" id="cfg-telegram-username" placeholder="@MiEmpresa_bot" autocomplete="off" />
+                  <span style="font-size:0.73rem; color:var(--text-muted); display:block; margin-top:0.2rem;">
+                    Telegram exige que el usuario termine en <code>bot</code> (ej. <code>@ventas_bot</code>).
+                  </span>
                 </div>
-                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; font-size:0.86rem;">
-                  <input type="checkbox" id="cfg-telegram-enabled" />
-                  <span>Activar atención automática en Telegram</span>
+                <div class="field">
+                  <label for="cfg-telegram-token">Token / API del Bot (@BotFather) *</label>
+                  <input type="password" id="cfg-telegram-token" placeholder="123456789:AAFg..." autocomplete="off" />
+                  <span style="font-size:0.73rem; color:var(--text-muted); display:block; margin-top:0.2rem;">
+                    Pega aquí la clave larga generada por BotFather.
+                  </span>
+                </div>
+                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.85rem; font-size:0.84rem;">
+                  <input type="checkbox" id="cfg-telegram-enabled" checked />
+                  <span>Activar atención automática con IA</span>
                 </label>
-                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">
-                  <button type="submit" class="btn btn-primary btn-sm">Guardar y Sincronizar Webhook</button>
-                  <button type="button" class="btn btn-emerald btn-sm" id="btn-tg-sync-webhook">⚡ Sincronizar Webhook en Telegram</button>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                  <button type="submit" class="btn btn-primary btn-sm" id="btn-tg-submit">💾 Guardar Configuración</button>
+                  <button type="button" class="btn btn-outline btn-sm" id="btn-tg-cancel-form-2">Cancelar</button>
                 </div>
               </form>
 
-              <div id="tg-sync-feedback" style="display:none; margin-top:0.75rem; padding:0.6rem 0.85rem; border-radius:6px; font-size:0.83rem;"></div>
-
-              <!-- CÓDIGO QR PARA TELEGRAM (ACCESO DIRECTO t.me) -->
-              <div id="tg-qr-section" style="margin: 1.25rem 0 0.75rem; padding: 1rem; background: var(--bg-secondary, #f8fafc); border: 1px solid var(--border-color); border-radius: 12px; text-align: center;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; flex-wrap:wrap; gap:0.5rem;">
-                  <strong style="font-size:0.9rem; display:flex; align-items:center; gap:0.35rem;">
-                    <span>📱</span> Código QR de Acceso a Telegram
-                  </strong>
-                  <span id="tg-qr-badge" style="font-size:0.75rem; padding:0.15rem 0.55rem; border-radius:999px; background:rgba(100,116,139,0.15); color:var(--text-muted); font-weight:600;">SIN USUARIO</span>
-                </div>
-                <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 0.85rem; text-align:left;">
-                  Escanea el código QR con la cámara de tu teléfono móvil o haz clic en el enlace para iniciar el chat en Telegram de inmediato.
-                </p>
-
-                <div id="tg-qr-container" style="text-align:center; margin:0.5rem 0;">
-                  <div style="padding:1.5rem 1rem; color:var(--text-muted); text-align:center;">
-                    <div style="font-size:2rem; margin-bottom:0.4rem;">📱</div>
-                    <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary, #0f172a); margin-bottom:0.25rem;">
-                      Ingresa el usuario de tu Bot de Telegram
-                    </div>
-                    <p style="font-size:0.82rem; margin:0 auto; max-width:320px; line-height:1.45;">
-                      Escribe el <strong>@username</strong> de tu bot en el campo superior o guarda tu <strong>Bot Token</strong> para generar tu código QR real y evitar enlaces a usuarios inexistentes.
-                    </p>
+              <!-- ESTADO ACTIVO (CONFIRMACIÓN VERDE TIPO WHATSAPP) -->
+              <div id="tg-active-container" style="display:none; margin-bottom:1rem;">
+                <div style="padding:1rem; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); border-radius:12px; text-align:center; margin-bottom:0.75rem;">
+                  <div style="font-size:1.6rem; margin-bottom:0.25rem;">✅</div>
+                  <div style="font-weight:700; font-size:0.95rem; color:#10b981; margin-bottom:0.25rem;">
+                    Telegram Bot Conectado y Activo
+                  </div>
+                  <div style="font-size:0.84rem; color:var(--text-muted);">
+                    Atendiendo con IA como <strong id="tg-active-bot-user" style="color:var(--text-primary, #0f172a);">@TuBot</strong>
                   </div>
                 </div>
-
-                <div style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
-                  <a id="btn-tg-open-chat" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" style="display:none;">✈️ Abrir en Telegram</a>
-                  <button type="button" class="btn btn-outline btn-sm" id="btn-tg-refresh-qr">🔄 Regenerar Código QR</button>
+                <div style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap;">
+                  <a id="btn-tg-open-chat" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">✈️ Abrir en Telegram</a>
+                  <button type="button" class="btn btn-outline btn-sm" id="btn-tg-reconfig">⚙️ Modificar Configuración</button>
                 </div>
               </div>
+
+              <div id="tg-sync-feedback" style="display:none; margin-bottom:0.75rem; padding:0.6rem 0.85rem; border-radius:8px; font-size:0.82rem;"></div>
 
               <hr style="border:none; border-top:1px solid var(--border-color); margin:1rem 0;" />
               <h4 style="margin:0 0 0.5rem;">🧪 Simular Mensaje Entrante en Telegram</h4>
