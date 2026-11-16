@@ -3799,84 +3799,50 @@ async function loadWhatsAppStatus() {
   }
 }
 
-function renderTelegramQr(username, qrBase64, deepLink) {
+function renderTelegramQr(username, qrBase64, deepLink, isDefault = false) {
   const container = document.getElementById('tg-qr-container');
   const openBtn = document.getElementById('btn-tg-open-chat');
   const badge = document.getElementById('tg-qr-badge');
   if (!container) return;
 
-  const cleanUser = String(username || '').replace(/^@+/, '').trim();
-  const link = deepLink || (cleanUser ? `https://t.me/${cleanUser}` : '');
+  const cleanUser = String(username || '').replace(/^@+/, '').trim() || 'ServiBot_bot';
+  const link = deepLink || `https://t.me/${cleanUser}`;
+  const qrFallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(link)}`;
+  const qrImgSrc = qrBase64 || qrFallbackUrl;
 
-  if (cleanUser && qrBase64) {
-    container.innerHTML = `
-      <div class="qr-box">
-        <img src="${qrBase64}" alt="Código QR de Telegram para @${escapeHtml(cleanUser)}" />
-      </div>
-      <div style="font-size:0.83rem; color:var(--text-muted); margin-top:0.35rem;">
-        Usuario: <strong>@${escapeHtml(cleanUser)}</strong> · Enlace directo: <a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" style="color:#0088cc; font-weight:600; text-decoration:underline;">t.me/${escapeHtml(cleanUser)}</a>
-      </div>
-    `;
-    if (openBtn) {
-      openBtn.href = link;
-      openBtn.style.display = 'inline-flex';
-    }
-    if (badge) {
-      badge.textContent = `@${cleanUser}`;
-      badge.style.background = 'rgba(0,136,204,0.15)';
-      badge.style.color = '#0088cc';
-    }
-  } else if (cleanUser) {
-    container.innerHTML = `
-      <div style="padding:1.5rem; color:var(--text-muted); font-size:0.84rem;">
-        ⏳ Generando código QR para <strong>@${escapeHtml(cleanUser)}</strong>...
-      </div>
-    `;
-    loadTelegramQr(cleanUser);
-  } else {
-    container.innerHTML = `
-      <p style="color:var(--text-muted); font-size:0.84rem; margin:0.75rem 0;">
-        Configura y guarda el usuario de tu bot (<code>@TuEmpresa_bot</code>) arriba para generar su código QR automático.
-      </p>
-    `;
-    if (openBtn) openBtn.style.display = 'none';
-    if (badge) {
-      badge.textContent = 'SIN USUARIO';
-      badge.style.background = 'rgba(100,116,139,0.15)';
-      badge.style.color = 'var(--text-muted)';
-    }
+  container.innerHTML = `
+    <div class="qr-box">
+      <img src="${qrImgSrc}" alt="Código QR de Telegram para @${escapeHtml(cleanUser)}" onerror="if(this.src!=='${qrFallbackUrl}'){this.src='${qrFallbackUrl}';}" />
+    </div>
+    <div style="font-size:0.83rem; color:var(--text-muted); margin-top:0.35rem;">
+      Usuario: <strong>@${escapeHtml(cleanUser)}</strong> ${isDefault ? '<span style="color:#f59e0b; font-size:0.75rem; font-weight:600;">(Vista Previa)</span>' : ''} · Enlace: <a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" style="color:#0088cc; font-weight:600; text-decoration:underline;">t.me/${escapeHtml(cleanUser)}</a>
+    </div>
+  `;
+
+  if (openBtn) {
+    openBtn.href = link;
+    openBtn.style.display = 'inline-flex';
+  }
+  if (badge) {
+    badge.textContent = `@${cleanUser}`;
+    badge.style.background = 'rgba(0,136,204,0.15)';
+    badge.style.color = '#0088cc';
   }
 }
 
 async function loadTelegramQr(username) {
-  const container = document.getElementById('tg-qr-container');
-  const cleanUser = String(username || '').replace(/^@+/, '').trim();
-  if (!cleanUser) {
-    renderTelegramQr('', null, null);
-    return;
-  }
+  const cleanUser = String(username || '').replace(/^@+/, '').trim() || 'ServiBot_bot';
+  const isDefault = cleanUser === 'ServiBot_bot' && !username;
 
   try {
     const res = await apiFetch(`/api/channels/telegram/qr?username=${encodeURIComponent(cleanUser)}`);
     if (res.ok && res.qr_base64) {
-      renderTelegramQr(res.username, res.qr_base64, res.deep_link);
+      renderTelegramQr(res.username, res.qr_base64, res.deep_link, isDefault);
     } else {
-      if (container) {
-        container.innerHTML = `
-          <div style="padding:1rem; color:#fda4af; font-size:0.84rem;">
-            ⚠️ No se pudo generar el código QR: ${escapeHtml(res?.error || 'Error desconocido')}
-          </div>
-        `;
-      }
+      renderTelegramQr(cleanUser, null, `https://t.me/${cleanUser}`, isDefault);
     }
   } catch (err) {
-    if (container) {
-      container.innerHTML = `
-        <div style="padding:1rem; color:#fda4af; font-size:0.84rem;">
-          ❌ Error al contactar servidor para QR: ${escapeHtml(err.message)}
-        </div>
-      `;
-    }
+    renderTelegramQr(cleanUser, null, `https://t.me/${cleanUser}`, isDefault);
   }
 }
 
@@ -3955,7 +3921,7 @@ async function loadAdminSettings() {
     const tgSyncTimeLabel = document.getElementById('tg-last-sync-time');
 
     if (tgNameEl) tgNameEl.value = tg.bot_name || 'Servi-Bot Telegram';
-    if (tgUserEl) tgUserEl.value = tg.bot_username || '';
+    if (tgUserEl) tgUserEl.value = tg.bot_username || 'ServiBot_bot';
     if (tgTokenEl) tgTokenEl.value = tg.bot_token || '';
     if (tgEnabledEl) tgEnabledEl.checked = Boolean(tg.enabled);
 
@@ -4020,9 +3986,9 @@ async function loadAdminSettings() {
     }
 
     // Renderizar código QR de Telegram (deep link t.me/botusername)
-    const rawTgUser = String(tg.bot_username || '').trim();
-    const cleanTgUser = rawTgUser.replace(/^@+/, '');
-    renderTelegramQr(cleanTgUser, tg.qr_base64, tg.deep_link);
+    const rawTgUser = String(tg.bot_username || tgUserEl?.value || '').trim();
+    const cleanTgUser = rawTgUser.replace(/^@+/, '') || 'ServiBot_bot';
+    renderTelegramQr(cleanTgUser, tg.qr_base64, tg.deep_link, !tg.bot_username);
 
     // 4. Instagram (Comentarios)
     const ig = data.instagram_config || {};
@@ -6640,6 +6606,15 @@ function setupEventListeners() {
     const userInput = document.getElementById('cfg-telegram-username');
     const username = userInput ? userInput.value.trim() : '';
     await loadTelegramQr(username);
+  });
+
+  // Actualización en tiempo real del QR mientras el usuario escribe su @username
+  document.getElementById('cfg-telegram-username')?.addEventListener('input', (e) => {
+    const val = e.target.value.trim().replace(/^@+/, '');
+    clearTimeout(window.__tgQrDebounce);
+    window.__tgQrDebounce = setTimeout(() => {
+      loadTelegramQr(val || 'ServiBot_bot');
+    }, 300);
   });
 
   // Guardar configuración de Instagram

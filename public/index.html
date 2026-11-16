@@ -1805,7 +1805,7 @@
                 </div>
                 <div class="field">
                   <label for="cfg-telegram-username">Usuario del Bot (@username)</label>
-                  <input type="text" id="cfg-telegram-username" placeholder="@TuEmpresa_bot" />
+                  <input type="text" id="cfg-telegram-username" placeholder="@TuEmpresa_bot" value="ServiBot_bot" />
                 </div>
                 <div class="field">
                   <label for="cfg-telegram-token">Bot Token de Telegram (@BotFather)</label>
@@ -1836,11 +1836,16 @@
                 </p>
 
                 <div id="tg-qr-container" style="text-align:center; margin:0.5rem 0;">
-                  <p style="color:var(--text-muted); font-size:0.84rem;">Configura y guarda el usuario de tu bot (<code>@TuEmpresa_bot</code>) para generar su código QR automático.</p>
+                  <div class="qr-box">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=https://t.me/ServiBot_bot" alt="Código QR de Telegram para @ServiBot_bot" />
+                  </div>
+                  <div style="font-size:0.83rem; color:var(--text-muted); margin-top:0.35rem;">
+                    Usuario: <strong>@ServiBot_bot</strong> <span style="color:#f59e0b; font-size:0.75rem; font-weight:600;">(Vista Previa)</span> · Enlace: <a href="https://t.me/ServiBot_bot" target="_blank" rel="noopener noreferrer" style="color:#0088cc; font-weight:600; text-decoration:underline;">t.me/ServiBot_bot</a>
+                  </div>
                 </div>
 
                 <div style="display:flex; justify-content:center; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
-                  <a id="btn-tg-open-chat" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" style="display:none;">✈️ Abrir en Telegram</a>
+                  <a id="btn-tg-open-chat" href="https://t.me/ServiBot_bot" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" style="display:inline-flex;">✈️ Abrir en Telegram</a>
                   <button type="button" class="btn btn-outline btn-sm" id="btn-tg-refresh-qr">🔄 Regenerar Código QR</button>
                 </div>
               </div>
