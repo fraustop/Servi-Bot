@@ -1874,6 +1874,20 @@
                 Atiende menciones y chats en canales de Microsoft Teams mediante Webhook directo.
               </p>
 
+              <!-- VINCULACIÓN CON CUENTA MICROSOFT 365 -->
+              <div id="ms-login-box" style="margin-bottom:1rem; padding:0.85rem 1rem; background:rgba(0,120,212,0.06); border:1px solid rgba(0,120,212,0.22); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:0.75rem; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:0.6rem;">
+                  <span style="font-size:1.4rem;">🪟</span>
+                  <div>
+                    <div style="font-weight:600; font-size:0.86rem; color:var(--text-primary, #0f172a);">Cuenta Microsoft 365 / Outlook</div>
+                    <div id="ms-account-status-label" style="font-size:0.78rem; color:#10b981;">Conectada: fraustop@outlook.com</div>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-outline btn-sm" id="btn-ms-login" style="display:inline-flex; align-items:center; gap:0.35rem; border-color:#0078d4; color:#0078d4; font-weight:600;">
+                  <span>🪟</span> Conectar con Microsoft
+                </button>
+              </div>
+
               <form id="teams-config-form">
                 <div class="field">
                   <label for="cfg-teams-name">Nombre del Bot en Teams</label>
