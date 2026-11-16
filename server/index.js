@@ -1914,6 +1914,36 @@ async function main() {
     }
   });
 
+  app.delete('/api/orders/:id', requireFirebaseAuth, requireActiveClientSubscription, (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const targetId = getTargetAdminInstanceId(req);
+      const botDb = getBotDb(targetId);
+      const existing = botDb.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+      if (!existing) return res.status(404).json({ ok: false, error: 'Pedido no encontrado.' });
+      botDb.prepare('DELETE FROM orders WHERE id = ?').run(id);
+      res.json({ ok: true, instance_id: targetId, deleted_id: id });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  app.patch('/api/orders/:id/archive', requireFirebaseAuth, requireActiveClientSubscription, (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const targetId = getTargetAdminInstanceId(req);
+      const botDb = getBotDb(targetId);
+      const existing = botDb.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+      if (!existing) return res.status(404).json({ ok: false, error: 'Pedido no encontrado.' });
+      const nextStatus = existing.status === 'archived' ? 'completed' : 'archived';
+      botDb.prepare('UPDATE orders SET status = ? WHERE id = ?').run(nextStatus, id);
+      const updated = botDb.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+      res.json({ ok: true, instance_id: targetId, order: updated });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   // --- CONVERSACIONES E HISTORIAL AISLADO DEL BOT (OCULTANDO LISTA NEGRA / PRIORIDAD BLANCA) ---
   app.get('/api/conversations', requireFirebaseAuth, (req, res) => {
     const targetId = getTargetAdminInstanceId(req);

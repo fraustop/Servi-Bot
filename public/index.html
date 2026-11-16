@@ -74,9 +74,15 @@
           </li>
 
           <li class="admin-nav-item hidden">
-            <button type="button" class="nav-btn nav-btn-logout" id="btn-header-logout">
-              <span class="nav-icon" aria-hidden="true">🚪</span>
-              <span>Cerrar Sesión</span>
+            <button type="button" class="nav-btn" id="btn-view-store" title="Ir al Sitio Público">
+              <span class="nav-icon" aria-hidden="true">🌐</span>
+              <span>Sitio Público</span>
+            </button>
+          </li>
+          <li class="admin-nav-item hidden">
+            <button type="button" class="nav-btn admin-theme-toggle-btn" id="btn-admin-theme" title="Alternar Modo Claro / Modo Oscuro" aria-label="Alternar Modo Claro / Modo Oscuro">
+              <span class="nav-icon" id="admin-theme-icon" aria-hidden="true">🌓</span>
+              <span id="admin-theme-text" class="visually-hidden">Modo Claro</span>
             </button>
           </li>
         </ul>
@@ -1518,14 +1524,6 @@
               <span class="admin-user-avatar" aria-hidden="true">👤</span>
               <div class="admin-user-details">
                 <span class="admin-user-email" id="admin-sidebar-email">Administrador</span>
-                <span class="badge-tag" id="admin-role-badge">Cargando rol...</span>
-              </div>
-            </div>
-
-            <div id="admin-role-banner" class="admin-instance-card">
-              <div class="admin-instance-meta">
-                <span class="admin-instance-title" id="admin-instance-label">Bot Propio: —</span>
-                <span id="admin-expiry-badge" class="admin-expiry-badge"></span>
               </div>
             </div>
           </div>
@@ -1579,29 +1577,10 @@
               </li>
             </ul>
 
-            <span class="admin-nav-section-title" style="margin-top: 1.25rem;">AJUSTES Y ACCIONES</span>
+            <span class="admin-nav-section-title" style="margin-top: 1.25rem;">SESIÓN</span>
             <ul class="admin-sidebar-menu">
               <li>
-                <!-- BOTÓN PARA ALTERNAR MODO CLARO / OSCURO DENTRO DEL ADMIN -->
-                <button type="button" class="admin-nav-link admin-theme-toggle-btn" id="btn-admin-theme" title="Alternar Modo Claro / Modo Oscuro">
-                  <span class="admin-nav-icon" id="admin-theme-icon">🌓</span>
-                  <span id="admin-theme-text">Modo Claro / Oscuro</span>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="admin-nav-link" id="btn-view-store">
-                  <span class="admin-nav-icon" aria-hidden="true">🌐</span>
-                  <span>Sitio Público</span>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="admin-nav-link" id="btn-refresh-admin">
-                  <span class="admin-nav-icon" aria-hidden="true">🔄</span>
-                  <span>Actualizar</span>
-                </button>
-              </li>
-              <li>
-                <button type="button" class="admin-nav-link admin-logout-btn" id="btn-logout">
+                <button type="button" class="admin-nav-link admin-logout-btn" id="btn-logout" title="Cerrar Sesión">
                   <span class="admin-nav-icon" aria-hidden="true">🚪</span>
                   <span>Cerrar Sesión</span>
                 </button>
@@ -1621,9 +1600,14 @@
                   <h3 class="products-sidebar-title">Productos y Servicios</h3>
                   <span class="badge-tag" id="catalog-items-count">0 items</span>
                 </div>
-                <button type="button" class="btn btn-primary btn-sm btn-new-product" id="btn-open-create-catalog">
-                  ➕ Nuevo Producto
-                </button>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                  <button type="button" class="btn btn-primary btn-sm btn-new-product" id="btn-open-create-catalog" style="flex: 1 1 auto;">
+                    ➕ Nuevo Producto
+                  </button>
+                  <button type="button" class="btn btn-outline btn-sm" id="btn-open-promotions" style="flex: 1 1 auto;">
+                    🏷️ Promociones
+                  </button>
+                </div>
               </div>
 
               <!-- Filtro rápido de productos -->
@@ -1704,34 +1688,6 @@
             </section>
           </div>
 
-          <div class="panel-card" style="margin-top: 1.5rem;">
-            <h3>🏷️ Promociones de este Bot</h3>
-            <p class="panel-desc" style="color:var(--text-muted); font-size:0.88rem; margin-top:-0.25rem;">
-              Crea promociones controladas y envíalas explícitamente a tu Bot. El Bot nunca inventará ofertas fuera de esta lista.
-            </p>
-            <form id="promotion-form" class="form-grid" style="margin-top:0.75rem;">
-              <div class="field">
-                <label for="promo-title">Título de la Promoción *</label>
-                <input type="text" id="promo-title" placeholder="Ej. Mes de Lanzamiento 10% OFF en Página Web" required />
-              </div>
-              <div class="field">
-                <label for="promo-discount">Descuento o Beneficio</label>
-                <input type="text" id="promo-discount" placeholder="Ej. 10% OFF o 1er mes incluido" />
-              </div>
-              <div class="field">
-                <label for="promo-price">Precio Promocional (opcional MXN)</label>
-                <input type="number" id="promo-price" min="0" step="0.01" placeholder="Opcional" />
-              </div>
-              <div class="field" style="grid-column: 1 / -1;">
-                <label for="promo-desc">Condiciones y Detalle Exacto</label>
-                <textarea id="promo-desc" rows="2" placeholder="Describe exactamente qué incluye, vigencia y condiciones..."></textarea>
-              </div>
-              <div style="grid-column: 1 / -1; display:flex; gap:0.65rem; flex-wrap:wrap; justify-content:flex-end;">
-                <button type="submit" class="btn btn-outline btn-sm">💾 Guardar Borrador</button>
-                <button type="button" class="btn btn-primary btn-sm" id="btn-save-send-promo">🤖 Guardar y Enviar Promoción a mi Bot</button>
-              </div>
-            </form>
-            <div id="admin-promotions-list" class="promotions-admin-list" style="margin-top:1rem;"></div>
           </div>
         </div>
 
@@ -1758,6 +1714,7 @@
                   <th>Total</th>
                   <th>Estado</th>
                   <th>Fecha</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody id="orders-tbody"></tbody>
@@ -2090,9 +2047,17 @@
 
         <!-- TAB 4: CONVERSACIONES Y CLOUDFLARE TUNNEL -->
         <div id="tab-conversations" class="admin-tab-pane hidden">
-          <div class="form-grid">
-            <div class="panel-card">
-              <h3 style="margin-top:0;">🌐 Túnel Cloudflare y Conexión Backend</h3>
+          <div class="panel-card" style="margin-bottom: 1rem;">
+            <h3 style="margin-top:0;">💬 Historial de Conversaciones Multicanal</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-top:-0.25rem;">
+              Mensajes entrantes y salientes de tus clientes a través de WhatsApp, Correo, Teams y Web.
+            </p>
+            <div id="conversations-list" style="max-height:480px; overflow-y:auto; display:grid; gap:0.5rem; margin-top:0.75rem;"></div>
+          </div>
+
+          <details class="panel-card" style="padding: 1rem 1.25rem; font-size: 0.88rem; cursor: pointer;">
+            <summary style="font-weight: 600; color: var(--text-muted);">⚙️ Configuración Técnica Avanzada de Enlace (Túnel)</summary>
+            <div style="margin-top: 1rem;">
               <p style="font-size:0.85rem; color:var(--text-muted);">
                 Configuración de enlace entre la interfaz web y el servidor local en puerto <code>10000</code>.
               </p>
@@ -2114,234 +2079,108 @@
                 <button type="button" class="btn btn-outline btn-sm" id="btn-apply-api-override">Aplicar URL Manual</button>
               </div>
             </div>
-
-            <div class="panel-card">
-              <h3 style="margin-top:0;">💬 Historial de Conversaciones Multicanal</h3>
-              <div id="conversations-list" style="max-height:320px; overflow-y:auto; display:grid; gap:0.5rem;"></div>
-            </div>
-          </div>
+          </details>
         </div>
 
         <!-- TAB 5: LISTAS DE CONTROL (BLANCA / OMISIONES / NEGRA) -->
         <div id="tab-lists" class="admin-tab-pane hidden">
-          <div class="panel-card">
-            <h3>🛡️ Control de Contactos: Lista Blanca, Omisiones y Lista Negra</h3>
-            <p class="panel-desc" style="color:var(--text-muted); font-size:0.88rem; margin-top:-0.25rem;">
-              Estas reglas aplican estrictamente al Bot seleccionado (aisladas por base de datos).
-            </p>
-            <form id="contact-rule-form" class="form-grid" style="margin-top:0.75rem;">
-              <div class="field">
-                <label for="rule-contact-value">Teléfono o Identificador *</label>
-                <input type="text" id="rule-contact-value" placeholder="Ej. +5215512345678 o web-visitor" required />
-              </div>
-              <div class="field">
-                <label for="rule-list-type">Tipo de Lista *</label>
-                <select id="rule-list-type">
-                  <option value="whitelist">⭐ Lista Blanca (Respuesta prioritaria)</option>
-                  <option value="omission">🔕 Omisiones (No contestar · Visible)</option>
-                  <option value="blacklist">⛔ Lista Negra (No contestar · Ocultar mensajes)</option>
-                </select>
-              </div>
-              <div class="field">
-                <label for="rule-label">Etiqueta / Nota</label>
-                <input type="text" id="rule-label" placeholder="Ej. Cliente VIP / Prospecto interno / Spam" />
-              </div>
-              <div style="grid-column: 1 / -1; display:flex; justify-content:flex-end;">
-                <button type="submit" class="btn btn-primary btn-sm">➕ Guardar en Lista</button>
-              </div>
-            </form>
-          </div>
-
           <div class="lists-columns-grid">
             <div class="panel-card list-bucket-card list-bucket-white">
-              <h4>⭐ Lista Blanca (Prioridad)</h4>
+              <div class="list-bucket-header" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                <h4 style="margin:0;">⭐ Lista Blanca (Prioridad)</h4>
+                <button type="button" class="btn btn-primary btn-xs btn-add-rule-trigger" data-type="whitelist">➕ Agregar</button>
+              </div>
               <p class="list-bucket-hint">El bot atiende estos números primero en la cola y marca su conversación como prioritaria.</p>
               <div id="rules-whitelist" class="rules-list-body"></div>
             </div>
             <div class="panel-card list-bucket-card list-bucket-omission">
-              <h4>🔕 Lista de Omisiones</h4>
+              <div class="list-bucket-header" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                <h4 style="margin:0;">🔕 Lista de Omisiones</h4>
+                <button type="button" class="btn btn-outline btn-xs btn-add-rule-trigger" data-type="omission">➕ Agregar</button>
+              </div>
               <p class="list-bucket-hint">El bot recibe el mensaje en bandeja, pero NO responde al remitente.</p>
               <div id="rules-omission" class="rules-list-body"></div>
             </div>
             <div class="panel-card list-bucket-card list-bucket-black">
-              <h4>⛔ Lista Negra (Bloqueo Total)</h4>
+              <div class="list-bucket-header" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                <h4 style="margin:0;">⛔ Lista Negra (Bloqueo Total)</h4>
+                <button type="button" class="btn btn-danger btn-xs btn-add-rule-trigger" data-type="blacklist">➕ Agregar</button>
+              </div>
               <p class="list-bucket-hint">El bot NO responde en lo absoluto y oculta mensajes/conversaciones entrantes.</p>
               <div id="rules-blacklist" class="rules-list-body"></div>
             </div>
           </div>
         </div>
 
-        <!-- TAB 6: CUENTAS, PROSPECTOS Y BOTS VIP (SOLO ADMIN 0: fraustop@outlook.com) -->
+        <!-- TAB 6: CUENTAS, PROSPECTOS Y BOTS VIP (SOLO SUPERADMIN) -->
         <div id="tab-accounts" class="admin-tab-pane hidden" data-superadmin-only="1">
-          <div class="form-grid" style="grid-template-columns: minmax(300px, 420px) 1fr;">
-            <div class="panel-card">
-              <h3 style="margin-top:0;">➕ Crear Nueva Cuenta</h3>
-              <p style="font-size:0.85rem; color:var(--text-muted); margin-top:-0.3rem;">
-                Registra nuevos usuarios en Firebase Authentication sin cerrar tu sesión actual.
-              </p>
-
-              <form id="create-account-form">
-                <div class="field">
-                  <label for="new-acc-name">Nombre completo</label>
-                  <input
-                    type="text"
-                    id="new-acc-name"
-                    name="full-name"
-                    autocomplete="name"
-                    enterkeyhint="next"
-                    placeholder="Ej. María Fernanda López"
-                    required
-                  />
+          <div class="accounts-master-detail">
+            <!-- PANEL IZQUIERDO: LISTADO DE CUENTAS Y CLIENTES VIP -->
+            <aside class="accounts-sidebar" aria-label="Directorio de Cuentas y Bots VIP">
+              <div class="accounts-sidebar-header">
+                <div class="accounts-sidebar-title-row">
+                  <h3 class="accounts-sidebar-title">👥 Cuentas y VIP</h3>
+                  <span class="badge-tag" id="accounts-total-count">0 cuentas</span>
                 </div>
-
-                <div class="field">
-                  <label for="new-acc-email">Correo electrónico</label>
-                  <input
-                    type="email"
-                    id="new-acc-email"
-                    name="email"
-                    autocomplete="username"
-                    spellcheck="false"
-                    enterkeyhint="next"
-                    placeholder="colaborador@empresa.com"
-                    required
-                  />
+                <div class="accounts-header-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                  <button type="button" class="btn btn-primary btn-sm" id="btn-open-create-account" style="flex: 1 1 auto;">
+                    ➕ Nueva Cuenta
+                  </button>
+                  <button type="button" class="btn btn-emerald btn-sm" id="btn-open-register-vip" style="flex: 1 1 auto;">
+                    👑 Registrar VIP
+                  </button>
                 </div>
-
-                <div class="field">
-                  <label for="new-acc-role">Rol en Servi-Bot</label>
-                  <select id="new-acc-role" name="role">
-                    <option value="admin">Administrador</option>
-                    <option value="operator">Operador de Ventas</option>
-                  </select>
-                </div>
-
-                <div class="field">
-                  <label for="new-acc-password">Contraseña (mínimo 6 caracteres)</label>
-                  <div class="password-input-wrap">
-                    <input
-                      type="password"
-                      id="new-acc-password"
-                      name="new-password"
-                      autocomplete="new-password"
-                      minlength="6"
-                      enterkeyhint="done"
-                      placeholder="Mínimo 6 caracteres"
-                      required
-                    />
-                    <button
-                      type="button"
-                      class="toggle-pw-btn"
-                      id="btn-toggle-new-pw"
-                      aria-pressed="false"
-                      aria-controls="new-acc-password"
-                    >
-                      Mostrar
-                    </button>
-                  </div>
-                </div>
-
-                <div class="cfg-two-col">
-                  <div class="field">
-                    <label for="account-instance-select">Instancia Baileys Asignada</label>
-                    <select id="account-instance-select"></select>
-                  </div>
-                  <div class="field">
-                    <label for="account-sub-days">Vigencia Plan Estándar (días)</label>
-                    <input type="number" id="account-sub-days" min="1" max="365" value="30" />
-                  </div>
-                </div>
-
-                <div id="create-account-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
-
-                <button type="submit" class="btn btn-emerald" id="btn-create-account">Crear cuenta</button>
-              </form>
-            </div>
-
-            <div class="panel-card">
-              <h3 style="margin-top:0;">👥 Cuentas con Acceso Administrativo</h3>
-              <div tabindex="0" role="region" aria-labelledby="accounts-table-caption" class="table-wrapper">
-                <table class="accounts-table">
-                  <caption id="accounts-table-caption">Directorio de cuentas registradas para el Panel Admin</caption>
-                  <thead>
-                    <tr>
-                      <th>Nombre</th>
-                      <th>Correo</th>
-                      <th>Rol</th>
-                      <th>Creada por</th>
-                      <th>Fecha</th>
-                    </tr>
-                  </thead>
-                  <tbody id="accounts-tbody"></tbody>
-                </table>
               </div>
-            </div>
-          </div>
 
-          <div class="form-grid" style="grid-template-columns: minmax(320px, 460px) 1fr; margin-top: 1.5rem;">
-            <div class="panel-card">
-              <h3>👑 Registrar Bot VIP (Servidor Dedicado)</h3>
-              <p style="font-size:0.84rem; color:var(--text-muted); margin-top:-0.25rem;">
-                Los folios VIP operan en su propio servidor, base separada, Admin personalizado y APIs dedicadas.
-              </p>
-              <form id="vip-instance-form" style="margin-top:0.75rem;">
-                <div class="cfg-two-col">
-                  <div class="field">
-                    <label for="vip-folio">Folio VIP</label>
-                    <input type="text" id="vip-folio" placeholder="Ej. VIP-001 (auto si vacío)" />
-                  </div>
-                  <div class="field">
-                    <label for="vip-price">Costo Mensual (MXN)</label>
-                    <input type="number" id="vip-price" min="0" step="100" value="5000" />
-                  </div>
-                </div>
-                <div class="field">
-                  <label for="vip-business">Empresa / Proyecto *</label>
-                  <input type="text" id="vip-business" placeholder="Ej. Corporativo Delta SA" required />
-                </div>
-                <div class="cfg-two-col">
-                  <div class="field">
-                    <label for="vip-client-name">Cliente Titular</label>
-                    <input type="text" id="vip-client-name" placeholder="Nombre del titular" />
-                  </div>
-                  <div class="field">
-                    <label for="vip-client-contact">Contacto</label>
-                    <input type="text" id="vip-client-contact" placeholder="WhatsApp / Teléfono" />
-                  </div>
-                </div>
-                <div class="field">
-                  <label for="vip-server-url">URL Servidor Dedicado Separado *</label>
-                  <input type="url" id="vip-server-url" placeholder="https://vip-cliente.midominio.com" required />
-                </div>
-                <div class="cfg-two-col">
-                  <div class="field">
-                    <label for="vip-admin-url">URL Admin Personalizado</label>
-                    <input type="url" id="vip-admin-url" placeholder="https://admin-vip.midominio.com" />
-                  </div>
-                  <div class="field">
-                    <label for="vip-admin-email">Correo Admin VIP</label>
-                    <input type="email" id="vip-admin-email" placeholder="admin@corporativo.com" />
-                  </div>
-                </div>
-                <div class="field">
-                  <label for="vip-api-config">APIs Específicas del Proyecto (JSON)</label>
-                  <textarea id="vip-api-config" rows="2" placeholder='{"crm_webhook": "https://...", "erp_api": "..."}'>{}</textarea>
-                </div>
-                <div class="field">
-                  <label for="vip-notes">Notas Técnicas</label>
-                  <input type="text" id="vip-notes" placeholder="Instancia aislada y SLA dedicado" />
-                </div>
-                <div id="vip-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
-                <button type="submit" class="btn btn-primary btn-sm">👑 Guardar Folio VIP</button>
-              </form>
-            </div>
+              <!-- Filtro rápido de cuentas -->
+              <div class="accounts-search-box">
+                <input type="search" id="accounts-search-input" placeholder="Buscar por nombre, correo o empresa..." aria-label="Buscar cuenta o VIP" />
+              </div>
 
-            <div class="panel-card">
-              <h3>🌐 Folios VIP Activos y Prospectos (Rotación 1–50)</h3>
-              <div id="vip-instances-list" class="vip-list-container" style="margin-bottom:1.25rem;"></div>
-              <h4 style="margin:1rem 0 0.5rem; font-size:0.95rem; color:var(--text-secondary);">🔄 Base de Datos de Prospectos Archivados</h4>
-              <div id="admin-prospects-list" class="prospects-list-container"></div>
-            </div>
+              <!-- Filtros por tipo de cuenta -->
+              <div class="accounts-filter-pills" style="display: flex; gap: 0.4rem; margin-top: 0.2rem;">
+                <button type="button" class="btn btn-outline btn-xs is-active" data-filter="all" id="btn-acc-filter-all">Todos</button>
+                <button type="button" class="btn btn-outline btn-xs" data-filter="standard" id="btn-acc-filter-std">Estándar</button>
+                <button type="button" class="btn btn-outline btn-xs" data-filter="vip" id="btn-acc-filter-vip">👑 VIP</button>
+              </div>
+
+              <!-- Lista scrolleable de cuentas -->
+              <div id="admin-accounts-list" class="accounts-list-group" role="listbox" aria-label="Directorio de cuentas">
+                <!-- Se inyecta dinámicamente con JavaScript -->
+              </div>
+            </aside>
+
+            <!-- PANEL DERECHO: DETALLE DE LA CUENTA O FOLIO VIP SELECCIONADO -->
+            <section class="accounts-detail-panel" id="account-detail-panel" aria-label="Detalle de cuenta" aria-live="polite">
+              <!-- ESTADO VACÍO -->
+              <div id="account-detail-empty" class="account-detail-empty">
+                <div class="account-detail-empty-icon" aria-hidden="true">👤</div>
+                <h3>Detalle de Cuenta o Folio VIP</h3>
+                <p>Selecciona una cuenta o cliente VIP de la lista a la izquierda para consultar sus accesos, vigencia, servidor asignado y configuraciones específicas.</p>
+                <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-top: 1.25rem;">
+                  <button type="button" class="btn btn-primary" id="btn-empty-create-account">➕ Crear Nueva Cuenta</button>
+                  <button type="button" class="btn btn-emerald" id="btn-empty-register-vip">👑 Registrar Bot VIP</button>
+                </div>
+              </div>
+
+              <!-- VISTA DETALLE ACTIVA -->
+              <div id="account-detail-view" class="account-detail-view hidden">
+                <div class="account-detail-header">
+                  <div class="account-detail-title-group">
+                    <div class="account-detail-tags">
+                      <span class="badge-tag" id="acc-detail-type-badge">Cuenta Estándar</span>
+                      <span class="badge-tag" id="acc-detail-role-badge">Admin</span>
+                      <span class="badge-tag badge-tag-custom hidden" id="acc-detail-instance-badge"></span>
+                    </div>
+                    <h2 id="acc-detail-name" class="account-detail-name">Nombre de Usuario</h2>
+                    <p id="acc-detail-sub" class="account-detail-sub">correo@dominio.com</p>
+                  </div>
+                  <div class="account-detail-actions" id="acc-detail-actions"></div>
+                </div>
+
+                <div class="account-detail-body" id="acc-detail-body"></div>
+              </div>
+            </section>
           </div>
         </div>
 
@@ -2417,29 +2256,13 @@
                   <button
                     type="button"
                     class="soul-tab-btn"
-                    id="admin-soul-tab-catalog"
-                    data-pane="admin-soul-pane-catalog"
-                    role="tab"
-                    aria-selected="false"
-                    aria-controls="admin-soul-pane-catalog"
-                  >
-                    <span class="soul-tab-badge" aria-hidden="true">4</span>
-                    <div class="soul-tab-info">
-                      <span class="soul-tab-title">Catálogo</span>
-                      <span class="soul-tab-desc">Servicios y productos</span>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    class="soul-tab-btn"
                     id="admin-soul-tab-faq"
                     data-pane="admin-soul-pane-faq"
                     role="tab"
                     aria-selected="false"
                     aria-controls="admin-soul-pane-faq"
                   >
-                    <span class="soul-tab-badge" aria-hidden="true">5</span>
+                    <span class="soul-tab-badge" aria-hidden="true">4</span>
                     <div class="soul-tab-info">
                       <span class="soul-tab-title">Preguntas Frecuentes</span>
                       <span class="soul-tab-desc">Respuestas fijas del bot</span>
@@ -2455,7 +2278,7 @@
                     aria-selected="false"
                     aria-controls="admin-soul-pane-apps"
                   >
-                    <span class="soul-tab-badge" aria-hidden="true">6</span>
+                    <span class="soul-tab-badge" aria-hidden="true">5</span>
                     <div class="soul-tab-info">
                       <span class="soul-tab-title">📱 Aplicaciones</span>
                       <span class="soul-tab-desc">Integraciones (All Time)</span>
@@ -2623,56 +2446,7 @@
                   </div>
                 </div>
 
-                <!-- SUBSECCIÓN 4: CATÁLOGO DE PRODUCTOS / SERVICIOS -->
-                <div class="soul-pane hidden" id="admin-soul-pane-catalog" role="tabpanel" aria-labelledby="admin-soul-tab-catalog" hidden>
-                  <div class="soul-pane-header">
-                    <h4 class="soul-pane-heading">Catálogo de Productos y Servicios</h4>
-                    <p class="soul-pane-intro">Registra tus servicios y productos con precio y descripción para que tu ServiBot cotice e informe con exactitud.</p>
-                  </div>
-
-                  <div class="catalog-add-card">
-                    <div class="catalog-add-grid">
-                      <div class="field field-compact">
-                        <label for="admin-cat-item-name">Nombre del servicio o producto <span aria-hidden="true">*</span></label>
-                        <input type="text" id="admin-cat-item-name" placeholder="Ej.: Limpieza Dental Ultrasónica" />
-                      </div>
-                      <div class="field field-compact">
-                        <label for="admin-cat-item-type">Tipo</label>
-                        <select id="admin-cat-item-type">
-                          <option value="service" selected>Servicio</option>
-                          <option value="product">Producto</option>
-                        </select>
-                      </div>
-                      <div class="field field-compact">
-                        <label for="admin-cat-item-price">Precio (MXN) <span aria-hidden="true">*</span></label>
-                        <input type="number" id="admin-cat-item-price" min="0" step="1" placeholder="Ej.: 600" />
-                      </div>
-                      <div class="field field-compact">
-                        <label for="admin-cat-item-cycle">Modalidad de cobro</label>
-                        <input type="text" id="admin-cat-item-cycle" placeholder="Ej.: por sesión, pago único, mensual" />
-                      </div>
-                    </div>
-                    <div class="field field-compact field-cat-desc">
-                      <label for="admin-cat-item-desc">Descripción o detalles incluidos</label>
-                      <input type="text" id="admin-cat-item-desc" placeholder="Ej.: Profilaxis completa con ultrasonido, pulido dental y diagnóstico preventivo." />
-                    </div>
-                    <div class="catalog-add-actions">
-                      <button type="button" class="btn btn-primary btn-sm" id="btn-admin-add-catalog-item">
-                        + Agregar al Catálogo
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="catalog-items-wrap">
-                    <div class="catalog-items-header">
-                      <span class="catalog-items-count" id="admin-catalog-items-count">0 productos/servicios registrados</span>
-                    </div>
-                    <div class="catalog-items-grid" id="admin-catalog-items-grid">
-                    </div>
-                  </div>
-                </div>
-
-                <!-- SUBSECCIÓN 5: PREGUNTAS Y RESPUESTAS (FAQ) -->
+                <!-- SUBSECCIÓN 4: PREGUNTAS Y RESPUESTAS (FAQ) -->
                 <div class="soul-pane hidden" id="admin-soul-pane-faq" role="tabpanel" aria-labelledby="admin-soul-tab-faq" hidden>
                   <div class="soul-pane-header">
                     <h4 class="soul-pane-heading">Preguntas Frecuentes y Respuestas Oficiales</h4>
@@ -2888,6 +2662,246 @@
             <button type="submit" class="btn btn-outline" id="btn-save-catalog">💾 Solo Guardar</button>
             <button type="button" class="btn btn-primary" id="btn-save-send-to-bot">🤖 Guardar y Enviar a mi Bot</button>
           </div>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Modal Dinámico para Promociones -->
+  <dialog id="promotions-modal" class="product-form-modal" closedby="any" aria-labelledby="promotions-modal-title">
+    <div class="dialog-inner">
+      <div class="dialog-header">
+        <h2 id="promotions-modal-title">🏷️ Promociones de este Bot</h2>
+        <form method="dialog">
+          <button type="submit" class="btn btn-outline btn-sm" aria-label="Cerrar ventana">✕</button>
+        </form>
+      </div>
+      <p class="panel-desc" style="color:var(--text-muted); font-size:0.88rem; margin-top:-0.25rem;">
+        Crea promociones controladas y envíalas explícitamente a tu Bot. El Bot nunca inventará ofertas fuera de esta lista.
+      </p>
+      <form id="promotion-form" class="form-grid" style="margin-top:0.75rem;">
+        <div class="field">
+          <label for="promo-title">Título de la Promoción *</label>
+          <input type="text" id="promo-title" placeholder="Ej. Mes de Lanzamiento 10% OFF en Página Web" required />
+        </div>
+        <div class="field">
+          <label for="promo-discount">Descuento o Beneficio</label>
+          <input type="text" id="promo-discount" placeholder="Ej. 10% OFF o 1er mes incluido" />
+        </div>
+        <div class="field">
+          <label for="promo-price">Precio Promocional (opcional MXN)</label>
+          <input type="number" id="promo-price" min="0" step="0.01" placeholder="Opcional" />
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label for="promo-desc">Condiciones y Detalle Exacto</label>
+          <textarea id="promo-desc" rows="2" placeholder="Describe exactamente qué incluye, vigencia y condiciones..."></textarea>
+        </div>
+        <div style="grid-column: 1 / -1; display:flex; gap:0.65rem; flex-wrap:wrap; justify-content:flex-end;">
+          <button type="submit" class="btn btn-outline btn-sm">💾 Guardar Borrador</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-save-send-promo">🤖 Guardar y Enviar Promoción a mi Bot</button>
+        </div>
+      </form>
+      <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+        <h4 style="margin: 0 0 0.5rem;">Promociones Registradas</h4>
+        <div id="admin-promotions-list" class="promotions-admin-list"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Modal para Agregar Regla de Lista (Blanca, Omisión, Negra) -->
+  <dialog id="modal-contact-rule" class="product-form-modal" closedby="any" aria-labelledby="contact-rule-title">
+    <div class="dialog-inner">
+      <div class="dialog-header">
+        <h2 id="contact-rule-title">🛡️ Agregar Número o Contacto</h2>
+        <form method="dialog">
+          <button type="submit" class="btn btn-outline btn-sm" aria-label="Cerrar ventana">✕</button>
+        </form>
+      </div>
+      <p class="panel-desc" style="color:var(--text-muted); font-size:0.88rem; margin-top:-0.25rem;">
+        Esta regla se aplica estrictamente al bot seleccionado.
+      </p>
+      <form id="contact-rule-form" class="form-grid" style="margin-top:0.75rem;">
+        <div class="field">
+          <label for="rule-contact-value">Teléfono o Identificador *</label>
+          <input type="text" id="rule-contact-value" placeholder="Ej. +5215512345678 o web-visitor" required />
+        </div>
+        <div class="field">
+          <label for="rule-list-type">Tipo de Lista *</label>
+          <select id="rule-list-type">
+            <option value="whitelist">⭐ Lista Blanca (Respuesta prioritaria)</option>
+            <option value="omission">🔕 Omisiones (No contestar · Visible)</option>
+            <option value="blacklist">⛔ Lista Negra (No contestar · Ocultar mensajes)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="rule-label">Etiqueta / Nota</label>
+          <input type="text" id="rule-label" placeholder="Ej. Cliente VIP / Prospecto interno / Spam" />
+        </div>
+        <div style="grid-column: 1 / -1; display:flex; justify-content:flex-end; gap:0.5rem; margin-top:0.5rem;">
+          <button type="button" class="btn btn-outline btn-sm" id="btn-cancel-contact-rule">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-sm">➕ Guardar en Lista</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Modal para Crear Nueva Cuenta de Usuario -->
+  <dialog id="modal-create-account" class="product-form-modal" closedby="any" aria-labelledby="create-account-title">
+    <div class="dialog-inner">
+      <div class="dialog-header">
+        <h2 id="create-account-title">➕ Crear Nueva Cuenta de Acceso</h2>
+        <form method="dialog">
+          <button type="submit" class="btn btn-outline btn-sm" aria-label="Cerrar ventana">✕</button>
+        </form>
+      </div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-top:-0.3rem;">
+        Registra nuevos usuarios en Firebase Authentication sin cerrar tu sesión actual.
+      </p>
+      <form id="create-account-form">
+        <div class="field">
+          <label for="new-acc-name">Nombre completo</label>
+          <input
+            type="text"
+            id="new-acc-name"
+            name="full-name"
+            autocomplete="name"
+            enterkeyhint="next"
+            placeholder="Ej. María Fernanda López"
+            required
+          />
+        </div>
+
+        <div class="field">
+          <label for="new-acc-email">Correo electrónico</label>
+          <input
+            type="email"
+            id="new-acc-email"
+            name="email"
+            autocomplete="username"
+            spellcheck="false"
+            enterkeyhint="next"
+            placeholder="colaborador@empresa.com"
+            required
+          />
+        </div>
+
+        <div class="field">
+          <label for="new-acc-role">Rol en Servi-Bot</label>
+          <select id="new-acc-role" name="role">
+            <option value="admin">Administrador</option>
+            <option value="operator">Operador de Ventas</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="new-acc-password">Contraseña (mínimo 6 caracteres)</label>
+          <div class="password-input-wrap">
+            <input
+              type="password"
+              id="new-acc-password"
+              name="new-password"
+              autocomplete="new-password"
+              minlength="6"
+              enterkeyhint="done"
+              placeholder="Mínimo 6 caracteres"
+              required
+            />
+            <button
+              type="button"
+              class="toggle-pw-btn"
+              id="btn-toggle-new-pw"
+              aria-pressed="false"
+              aria-controls="new-acc-password"
+            >
+              Mostrar
+            </button>
+          </div>
+        </div>
+
+        <div class="cfg-two-col">
+          <div class="field">
+            <label for="account-instance-select">Instancia Baileys Asignada</label>
+            <select id="account-instance-select"></select>
+          </div>
+          <div class="field">
+            <label for="account-sub-days">Vigencia Plan Estándar (días)</label>
+            <input type="number" id="account-sub-days" min="1" max="365" value="30" />
+          </div>
+        </div>
+
+        <div id="create-account-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem;">
+          <button type="button" class="btn btn-outline btn-sm" id="btn-cancel-create-account">Cancelar</button>
+          <button type="submit" class="btn btn-emerald" id="btn-create-account">Crear cuenta</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Modal para Registrar Folio VIP -->
+  <dialog id="modal-register-vip" class="product-form-modal" closedby="any" aria-labelledby="register-vip-title">
+    <div class="dialog-inner">
+      <div class="dialog-header">
+        <h2 id="register-vip-title">👑 Registrar Bot VIP (Servidor Dedicado)</h2>
+        <form method="dialog">
+          <button type="submit" class="btn btn-outline btn-sm" aria-label="Cerrar ventana">✕</button>
+        </form>
+      </div>
+      <p style="font-size:0.84rem; color:var(--text-muted); margin-top:-0.25rem;">
+        Los folios VIP operan en su propio servidor, base separada, Admin personalizado y APIs dedicadas.
+      </p>
+      <form id="vip-instance-form" style="margin-top:0.75rem;">
+        <div class="cfg-two-col">
+          <div class="field">
+            <label for="vip-folio">Folio VIP</label>
+            <input type="text" id="vip-folio" placeholder="Ej. VIP-001 (auto si vacío)" />
+          </div>
+          <div class="field">
+            <label for="vip-price">Costo Mensual (MXN)</label>
+            <input type="number" id="vip-price" min="0" step="100" value="5000" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="vip-business">Empresa / Proyecto *</label>
+          <input type="text" id="vip-business" placeholder="Ej. Corporativo Delta SA" required />
+        </div>
+        <div class="cfg-two-col">
+          <div class="field">
+            <label for="vip-client-name">Cliente Titular</label>
+            <input type="text" id="vip-client-name" placeholder="Nombre del titular" />
+          </div>
+          <div class="field">
+            <label for="vip-client-contact">Contacto</label>
+            <input type="text" id="vip-client-contact" placeholder="WhatsApp / Teléfono" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="vip-server-url">URL Servidor Dedicado Separado *</label>
+          <input type="url" id="vip-server-url" placeholder="https://vip-cliente.midominio.com" required />
+        </div>
+        <div class="cfg-two-col">
+          <div class="field">
+            <label for="vip-admin-url">URL Admin Personalizado</label>
+            <input type="url" id="vip-admin-url" placeholder="https://admin-vip.midominio.com" />
+          </div>
+          <div class="field">
+            <label for="vip-admin-email">Correo Admin VIP</label>
+            <input type="email" id="vip-admin-email" placeholder="admin@corporativo.com" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="vip-api-config">APIs Específicas del Proyecto (JSON)</label>
+          <textarea id="vip-api-config" rows="2" placeholder='{"crm_webhook": "https://...", "erp_api": "..."}'>{}</textarea>
+        </div>
+        <div class="field">
+          <label for="vip-notes">Notas Técnicas</label>
+          <input type="text" id="vip-notes" placeholder="Instancia aislada y SLA dedicado" />
+        </div>
+        <div id="vip-feedback" class="auth-feedback" role="status" aria-live="polite"></div>
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem;">
+          <button type="button" class="btn btn-outline btn-sm" id="btn-cancel-register-vip">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-sm">👑 Guardar Folio VIP</button>
         </div>
       </form>
     </div>

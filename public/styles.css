@@ -7842,3 +7842,431 @@ dialog.product-form-modal .dialog-inner {
   border-color: #0369a1 !important;
   color: #ffffff !important;
 }
+
+/* ==================== MODO CLARO: ALTO CONTRASTE ENCABEZADOS Y ALMA DEL BOT ==================== */
+[data-theme="light"] .site-header,
+[data-theme="light"] body.is-admin-session .site-header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] .brand-title {
+  color: #0f172a !important;
+  font-weight: 800 !important;
+}
+
+[data-theme="light"] .brand-subtitle {
+  color: #334155 !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] .admin-user-pill {
+  background: #e0f2fe !important;
+  border: 1px solid #7dd3fc !important;
+  color: #075985 !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .menu-button {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .site-header.is-wide .site-menu,
+[data-theme="light"] .site-menu {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .site-header .nav-btn,
+[data-theme="light"] .site-menu li .nav-btn {
+  color: #0f172a !important;
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] .site-header .nav-btn:hover,
+[data-theme="light"] .site-menu li .nav-btn:hover {
+  background: #e2e8f0 !important;
+  border-color: #0284c7 !important;
+  color: #0284c7 !important;
+}
+
+[data-theme="light"] .admin-logout-btn {
+  color: #b91c1c !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] .admin-logout-btn:hover {
+  background: #fee2e2 !important;
+  color: #991b1b !important;
+}
+
+[data-theme="light"] .nav-count-pill {
+  background: #dcfce7 !important;
+  border: 1px solid #86efac !important;
+  color: #166534 !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .account-filter-btn {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #475569 !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] .account-filter-btn:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .account-filter-btn.active {
+  background: #0284c7 !important;
+  border-color: #0369a1 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .bot-soul-header {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .bot-soul-title {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .bot-soul-subtitle {
+  color: #475569 !important;
+}
+
+[data-theme="light"] #soul-instance-pill,
+[data-theme="light"] .bot-soul-instance-pill .badge-tag-custom {
+  background: #e0f2fe !important;
+  color: #0369a1 !important;
+  border: 1px solid #7dd3fc !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .badge-tag {
+  background: #e0f2fe !important;
+  color: #0369a1 !important;
+  border: 1px solid #7dd3fc !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .badge-tag-accent {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+  border: 1px solid #86efac !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .badge-tag-custom {
+  background: #f3e8ff !important;
+  color: #6b21a8 !important;
+  border: 1px solid #d8b4fe !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .admin-main-area table {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .admin-main-area th {
+  background: #f8fafc !important;
+  color: #1e293b !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] .admin-main-area td {
+  border-bottom: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .order-status-select {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* ==================== MASTER-DETAIL CUENTAS Y VIP ==================== */
+.accounts-master-detail {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+  min-block-size: 580px;
+}
+
+@media (max-width: 920px) {
+  .accounts-master-detail {
+    grid-template-columns: 1fr;
+  }
+}
+
+.accounts-sidebar {
+  background: linear-gradient(175deg, #121722, #0b0e14);
+  border: 1px solid var(--metal-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.65);
+}
+
+.accounts-sidebar-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.accounts-sidebar-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.accounts-sidebar-title {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  margin: 0;
+  color: var(--text-main);
+}
+
+.accounts-search-box input {
+  inline-size: 100%;
+  background: var(--bg-dark);
+  border: 1px solid var(--metal-border);
+  color: var(--text-main);
+  padding: 0.6rem 0.85rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  box-sizing: border-box;
+}
+
+.accounts-search-box input:focus-visible {
+  outline: 2px solid var(--outlook-blue-bright);
+  border-color: transparent;
+}
+
+.accounts-list-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-block-size: 520px;
+  overflow-y: auto;
+  padding-inline-end: 0.25rem;
+}
+
+.account-list-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--metal-border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  inline-size: 100%;
+}
+
+.account-list-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--outlook-blue-bright);
+}
+
+.account-list-card.active {
+  background: rgba(2, 132, 199, 0.14);
+  border-color: var(--outlook-blue-bright);
+  box-shadow: inset 3px 0 0 var(--outlook-blue-bright);
+}
+
+.account-card-avatar {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  inline-size: 38px;
+  block-size: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.account-card-info {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.account-card-name {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-card-meta {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.accounts-detail-panel {
+  background: linear-gradient(175deg, #121722, #0b0e14);
+  border: 1px solid var(--metal-border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  min-block-size: 580px;
+  box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.65);
+}
+
+.account-detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4rem 1.5rem;
+  color: var(--text-muted);
+}
+
+.account-detail-empty-icon {
+  font-size: 3.5rem;
+  margin-bottom: 1rem;
+  opacity: 0.6;
+}
+
+.account-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--metal-border);
+  margin-bottom: 1.25rem;
+}
+
+.account-detail-name {
+  margin: 0.35rem 0 0.15rem;
+  font-size: 1.35rem;
+  color: var(--text-main);
+}
+
+.account-detail-sub {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.account-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.account-info-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--metal-border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+}
+
+.account-info-label {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.25rem;
+}
+
+.account-info-val {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+/* Modo claro para accounts-master-detail */
+[data-theme="light"] .accounts-sidebar,
+[data-theme="light"] .accounts-detail-panel {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .accounts-sidebar-title {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .accounts-search-box input {
+  background: #ffffff !important;
+  border: 1px solid #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .account-list-card {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .account-list-card:hover {
+  background: #f8fafc !important;
+  border-color: #0284c7 !important;
+}
+
+[data-theme="light"] .account-list-card.active {
+  background: #e0f2fe !important;
+  border-color: #0284c7 !important;
+  box-shadow: inset 3px 0 0 #0284c7, 0 4px 14px rgba(2, 132, 199, 0.12) !important;
+}
+
+[data-theme="light"] .account-card-name {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .account-card-meta {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .account-detail-name {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .account-detail-sub {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .account-info-item {
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] .account-info-label {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .account-info-val {
+  color: #0f172a !important;
+}

@@ -3688,15 +3688,16 @@ async function loadAdminOrders() {
   if (headerOrdersCount) headerOrdersCount.textContent = String(orders.length);
 
   if (!orders.length) {
-    tbody.innerHTML = `<tr><th scope="row">—</th><td colspan="6" style="color:var(--text-muted);">Aún no hay pedidos registrados. Prueba el chat IA o los simuladores de canales para cerrar una venta.</td></tr>`;
+    tbody.innerHTML = `<tr><th scope="row">—</th><td colspan="7" style="color:var(--text-muted);">Aún no hay pedidos registrados. Prueba el chat IA o los simuladores de canales para cerrar una venta.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = orders
     .map((o) => {
       const itemsText = (o.items || []).map((i) => i.name).join(', ') || 'Servicio Servi-Bot';
+      const isArchived = o.status === 'archived';
       return `
-        <tr>
+        <tr class="${isArchived ? 'order-row-archived' : ''}">
           <th scope="row">${escapeHtml(o.order_code)}</th>
           <td>
             <strong>${escapeHtml(o.customer_name)}</strong>
@@ -3714,10 +3715,21 @@ async function loadAdminOrders() {
               <option value="confirmed" ${o.status === 'confirmed' ? 'selected' : ''}>✅ Confirmado</option>
               <option value="in_progress" ${o.status === 'in_progress' ? 'selected' : ''}>⚙️ En Implementación</option>
               <option value="completed" ${o.status === 'completed' ? 'selected' : ''}>🎉 Completado</option>
+              <option value="archived" ${o.status === 'archived' ? 'selected' : ''}>📦 Archivado</option>
               <option value="cancelled" ${o.status === 'cancelled' ? 'selected' : ''}>❌ Cancelado</option>
             </select>
           </td>
           <td style="font-size:0.8rem; color:var(--text-muted);">${escapeHtml(o.created_at)}</td>
+          <td>
+            <div style="display:flex; gap:0.35rem; align-items:center;">
+              <button type="button" class="btn btn-outline btn-xs btn-archive-order" data-id="${o.id}" data-archived="${isArchived ? '1' : '0'}" title="${isArchived ? 'Restaurar pedido' : 'Archivar pedido'}">
+                ${isArchived ? '📦 Restaurar' : '📦 Archivar'}
+              </button>
+              <button type="button" class="btn btn-danger btn-xs btn-delete-order" data-id="${o.id}" data-code="${escapeHtml(o.order_code)}" title="Eliminar pedido permanentemente">
+                🗑️
+              </button>
+            </div>
+          </td>
         </tr>
       `;
     })
@@ -3729,7 +3741,27 @@ async function loadAdminOrders() {
         method: 'PATCH',
         body: JSON.stringify({ status: sel.value })
       });
+      await loadAdminOrders();
       await refreshHealth();
+    });
+  });
+
+  tbody.querySelectorAll('.btn-archive-order').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      await apiFetch(buildAdminEndpoint(`/api/orders/${btn.dataset.id}/archive`), {
+        method: 'PATCH'
+      });
+      await loadAdminOrders();
+    });
+  });
+
+  tbody.querySelectorAll('.btn-delete-order').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm(`¿Eliminar permanentemente el pedido ${btn.dataset.code}?`)) return;
+      await apiFetch(buildAdminEndpoint(`/api/orders/${btn.dataset.id}`), {
+        method: 'DELETE'
+      });
+      await loadAdminOrders();
     });
   });
 }
@@ -3941,68 +3973,295 @@ async function loadAdminConversations() {
     .join('');
 }
 
-async function loadAdminAccounts() {
-  const tbody = document.getElementById('accounts-tbody');
-  if (!tbody) return;
-  if (!currentAdminMeta?.is_superadmin) {
-    tbody.innerHTML = '';
+let adminAccountsCache = [];
+let adminVipCache = [];
+let selectedAccountItem = null;
+let activeAccountsFilter = 'all';
+
+function renderAdminAccountsList(searchTerm = '') {
+  const container = document.getElementById('admin-accounts-list');
+  const countBadge = document.getElementById('accounts-total-count');
+  if (!container) return;
+
+  const term = searchTerm.toLowerCase();
+
+  let filteredAccounts = [...adminAccountsCache];
+  let filteredVips = [...adminVipCache];
+
+  if (activeAccountsFilter === 'standard') {
+    filteredVips = [];
+  } else if (activeAccountsFilter === 'vip') {
+    filteredAccounts = [];
+  }
+
+  if (term) {
+    filteredAccounts = filteredAccounts.filter((a) =>
+      (a.display_name || '').toLowerCase().includes(term) ||
+      (a.email || '').toLowerCase().includes(term) ||
+      (a.role || '').toLowerCase().includes(term) ||
+      (a.assigned_instance_id || '').toLowerCase().includes(term)
+    );
+    filteredVips = filteredVips.filter((v) =>
+      (v.business_name || '').toLowerCase().includes(term) ||
+      (v.folio || '').toLowerCase().includes(term) ||
+      (v.client_name || '').toLowerCase().includes(term) ||
+      (v.admin_email || '').toLowerCase().includes(term)
+    );
+  }
+
+  const totalCount = filteredAccounts.length + filteredVips.length;
+  if (countBadge) countBadge.textContent = `${totalCount} ${totalCount === 1 ? 'cuenta' : 'cuentas'}`;
+
+  if (!totalCount) {
+    container.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem; padding:1.5rem 0.5rem; text-align:center;">No se encontraron cuentas con el criterio actual.</p>`;
     return;
   }
 
-  try {
-    const data = await apiFetch('/api/admin/accounts');
-    if (!data.ok) {
-      tbody.innerHTML = `<tr><th scope="row">—</th><td colspan="4" style="color:#fda4af;">${escapeHtml(data.error || 'No se pudieron consultar las cuentas.')}</td></tr>`;
-      return;
+  const standardHtml = filteredAccounts.map((acc) => {
+    const isMaster = acc.role === 'superadmin' || String(acc.email || '').toLowerCase() === 'fraustop@outlook.com';
+    const roleLabel = isMaster ? 'SuperAdmin' : acc.role === 'operator' ? 'Operador' : 'Admin';
+    const isSelected = selectedAccountItem?.type === 'standard' && selectedAccountItem?.data?.uid === acc.uid;
+    return `
+      <div class="account-list-card ${isSelected ? 'active' : ''}" data-type="standard" data-uid="${escapeHtml(acc.uid)}">
+        <div class="account-card-avatar" aria-hidden="true">${isMaster ? '👑' : '👤'}</div>
+        <div class="account-card-info">
+          <div class="account-card-name">${escapeHtml(acc.display_name || acc.email)}</div>
+          <div class="account-card-meta">${escapeHtml(acc.email)} · <span class="badge-tag">${escapeHtml(roleLabel)}</span></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const vipHtml = filteredVips.map((v) => {
+    const isSelected = selectedAccountItem?.type === 'vip' && selectedAccountItem?.data?.folio === v.folio;
+    return `
+      <div class="account-list-card ${isSelected ? 'active' : ''}" data-type="vip" data-folio="${escapeHtml(v.folio)}">
+        <div class="account-card-avatar" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;" aria-hidden="true">⭐</div>
+        <div class="account-card-info">
+          <div class="account-card-name">${escapeHtml(v.business_name)}</div>
+          <div class="account-card-meta">${escapeHtml(v.folio)} · <span class="badge-tag badge-tag-accent">VIP $${Number(v.monthly_price || 0).toLocaleString('es-MX')}</span></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = standardHtml + vipHtml;
+
+  container.querySelectorAll('.account-list-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      const type = card.dataset.type;
+      if (type === 'standard') {
+        const acc = adminAccountsCache.find((a) => a.uid === card.dataset.uid);
+        if (acc) selectAccountItem('standard', acc);
+      } else if (type === 'vip') {
+        const vip = adminVipCache.find((v) => v.folio === card.dataset.folio);
+        if (vip) selectAccountItem('vip', vip);
+      }
+    });
+  });
+}
+
+function selectAccountItem(type, data) {
+  selectedAccountItem = { type, data };
+  const emptyState = document.getElementById('account-detail-empty');
+  const detailView = document.getElementById('account-detail-view');
+  if (emptyState) emptyState.classList.add('hidden');
+  if (detailView) detailView.classList.remove('hidden');
+
+  const typeBadge = document.getElementById('acc-detail-type-badge');
+  const roleBadge = document.getElementById('acc-detail-role-badge');
+  const instBadge = document.getElementById('acc-detail-instance-badge');
+  const nameEl = document.getElementById('acc-detail-name');
+  const subEl = document.getElementById('acc-detail-sub');
+  const actionsEl = document.getElementById('acc-detail-actions');
+  const bodyEl = document.getElementById('acc-detail-body');
+
+  if (type === 'standard') {
+    const isMaster = data.role === 'superadmin' || String(data.email || '').toLowerCase() === 'fraustop@outlook.com';
+    const roleLabel = isMaster ? 'SuperAdmin' : data.role === 'operator' ? 'Operador' : 'Admin Estándar';
+
+    if (typeBadge) {
+      typeBadge.textContent = 'Cuenta Estándar';
+      typeBadge.className = 'badge-tag';
+    }
+    if (roleBadge) {
+      roleBadge.textContent = roleLabel;
+      roleBadge.className = isMaster ? 'badge-tag badge-tag-accent' : 'badge-tag';
+    }
+    if (instBadge) {
+      if (data.assigned_instance_id) {
+        instBadge.textContent = `Instancia: ${data.assigned_instance_id}`;
+        instBadge.classList.remove('hidden');
+      } else {
+        instBadge.classList.add('hidden');
+      }
+    }
+    if (nameEl) nameEl.textContent = data.display_name || data.email;
+    if (subEl) subEl.textContent = data.email;
+
+    if (actionsEl) {
+      if (!isMaster && data.uid) {
+        actionsEl.innerHTML = `<button type="button" class="btn btn-danger btn-sm" id="btn-detail-del-account">🗑️ Eliminar Cuenta</button>`;
+        document.getElementById('btn-detail-del-account')?.addEventListener('click', async () => {
+          if (!confirm(`¿Eliminar la cuenta ${data.email}?`)) return;
+          await apiFetch(`/api/admin/accounts/${encodeURIComponent(data.uid)}`, { method: 'DELETE' });
+          selectedAccountItem = null;
+          await loadAdminAccounts();
+        });
+      } else {
+        actionsEl.innerHTML = `<span class="badge-tag" style="background:rgba(255,255,255,0.06);">Cuenta Principal Inmutable</span>`;
+      }
     }
 
-    const accounts = data.accounts || [];
-    if (!accounts.length) {
-      tbody.innerHTML = `<tr><th scope="row">—</th><td colspan="4" style="color:var(--text-muted);">No hay cuentas registradas aún.</td></tr>`;
-      return;
+    if (bodyEl) {
+      const expDate = data.subscription_expires_at ? new Date(data.subscription_expires_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Sin vencimiento (Permanente)';
+      bodyEl.innerHTML = `
+        <div class="account-info-grid">
+          <div class="account-info-item">
+            <span class="account-info-label">Identificador de Usuario (UID)</span>
+            <div class="account-info-val"><code>${escapeHtml(data.uid || '—')}</code></div>
+          </div>
+          <div class="account-info-item">
+            <span class="account-info-label">Rol y Permisos</span>
+            <div class="account-info-val">${escapeHtml(roleLabel)}</div>
+          </div>
+          <div class="account-info-item">
+            <span class="account-info-label">Instancia Baileys Vinculada</span>
+            <div class="account-info-val">${escapeHtml(data.assigned_instance_id || 'servibot-00')}</div>
+          </div>
+          <div class="account-info-item">
+            <span class="account-info-label">Vigencia del Plan</span>
+            <div class="account-info-val">${escapeHtml(expDate)}</div>
+          </div>
+          <div class="account-info-item">
+            <span class="account-info-label">Creada por</span>
+            <div class="account-info-val">${escapeHtml(data.created_by || 'Firebase Auth')}</div>
+          </div>
+          <div class="account-info-item">
+            <span class="account-info-label">Fecha de Registro</span>
+            <div class="account-info-val">${escapeHtml(data.created_at || '—')}</div>
+          </div>
+        </div>
+      `;
     }
+  } else if (type === 'vip') {
+    if (typeBadge) {
+      typeBadge.textContent = '⭐ Bot VIP Dedicado';
+      typeBadge.className = 'badge-tag badge-tag-accent';
+    }
+    if (roleBadge) {
+      roleBadge.textContent = `Folio: ${data.folio}`;
+      roleBadge.className = 'badge-tag badge-tag-custom';
+    }
+    if (instBadge) {
+      instBadge.textContent = `$${Number(data.monthly_price || 0).toLocaleString('es-MX')} MXN/mes`;
+      instBadge.classList.remove('hidden');
+    }
+    if (nameEl) nameEl.textContent = data.business_name;
+    if (subEl) subEl.textContent = `Titular: ${data.client_name || 'No especificado'} · ${data.client_contact || ''}`;
 
-    tbody.innerHTML = accounts
-      .map((acc) => {
-        const isMaster = acc.role === 'superadmin' || String(acc.email || '').toLowerCase() === 'fraustop@outlook.com';
-        const roleLabel = isMaster
-          ? '👑 SuperAdmin (Bot 0)'
-          : acc.role === 'operator'
-            ? 'Operador'
-            : 'Admin Estándar';
-        const instBadge = acc.assigned_instance_id
-          ? `<span class="badge-tag badge-tag-custom" style="margin-left:0.35rem;">${escapeHtml(acc.assigned_instance_id)}</span>`
-          : '';
-        const expText = acc.subscription_expires_at
-          ? `<div style="font-size:0.74rem; color:var(--text-muted);">Vigencia: ${escapeHtml(new Date(acc.subscription_expires_at).toLocaleDateString('es-MX'))}</div>`
-          : '';
-        const delBtn = !isMaster && acc.uid
-          ? `<button type="button" class="btn btn-outline btn-sm btn-del-account" data-uid="${escapeHtml(acc.uid)}" data-email="${escapeHtml(acc.email)}" style="margin-top:0.3rem; border-color:rgba(244,63,94,0.45); color:#fda4af;">Eliminar</button>`
-          : '';
-        return `
-          <tr>
-            <th scope="row">${escapeHtml(acc.display_name || acc.email)}</th>
-            <td>${escapeHtml(acc.email)}${expText}</td>
-            <td><span class="badge-tag">${escapeHtml(roleLabel)}</span>${instBadge}</td>
-            <td>${escapeHtml(acc.created_by || 'Firebase Auth')}</td>
-            <td style="font-size:0.8rem; color:var(--text-muted);">
-              <div>${escapeHtml(acc.created_at || '—')}</div>
-              ${delBtn}
-            </td>
-          </tr>
-        `;
-      })
-      .join('');
-
-    tbody.querySelectorAll('.btn-del-account').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        if (!confirm(`¿Eliminar la cuenta admin ${btn.dataset.email}?`)) return;
-        await apiFetch(`/api/admin/accounts/${encodeURIComponent(btn.dataset.uid)}`, { method: 'DELETE' });
+    if (actionsEl) {
+      actionsEl.innerHTML = `<button type="button" class="btn btn-danger btn-sm" id="btn-detail-del-vip">🗑️ Eliminar Folio VIP</button>`;
+      document.getElementById('btn-detail-del-vip')?.addEventListener('click', async () => {
+        if (!confirm(`¿Eliminar registro VIP ${data.folio}?`)) return;
+        await apiFetch(`/api/vip-instances/${encodeURIComponent(data.folio)}`, { method: 'DELETE' });
+        selectedAccountItem = null;
         await loadAdminAccounts();
       });
-    });
+    }
+
+    if (bodyEl) {
+      const apiFormatted = typeof data.api_config === 'object' ? JSON.stringify(data.api_config, null, 2) : String(data.api_config || '{}');
+      bodyEl.innerHTML = `
+        <div class="account-info-grid">
+          <div class="account-info-item">
+            <span class="account-info-label">Folio VIP</span>
+            <div class="account-info-val"><code>${escapeHtml(data.folio)}</code></div>
+          </div>
+          <div class="account-info-item">
+            <span class="account-info-label">Empresa / Proyecto</span>
+            <div class="account-info-val">${escapeHtml(data.business_name)}</div>
+          </div>
+          <div class="account-info-item">
+            <span class="account-info-label">Titular y Contacto</span>
+            <div class="account-info-val">${escapeHtml(data.client_name || '—')} · ${escapeHtml(data.client_contact || '')}</div>
+          </div>
+          <div class="account-info-item">
+            <span class="account-info-label">Correo Administrador VIP</span>
+            <div class="account-info-val">${escapeHtml(data.admin_email || '—')}</div>
+          </div>
+          <div class="account-info-item">
+            <span class="account-info-label">Servidor Dedicado Separado</span>
+            <div class="account-info-val">
+              ${data.server_url ? `<a href="${escapeHtml(data.server_url)}" target="_blank" rel="noopener noreferrer" style="color:var(--outlook-blue-bright);">${escapeHtml(data.server_url)} ↗</a>` : '—'}
+            </div>
+          </div>
+          <div class="account-info-item">
+            <span class="account-info-label">Panel Admin Personalizado</span>
+            <div class="account-info-val">
+              ${data.custom_admin_url ? `<a href="${escapeHtml(data.custom_admin_url)}" target="_blank" rel="noopener noreferrer" style="color:var(--outlook-blue-bright);">${escapeHtml(data.custom_admin_url)} ↗</a>` : '—'}
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:1rem;">
+          <span class="account-info-label">APIs y Webhooks Dedicados</span>
+          <pre style="background:var(--bg-dark); border:1px solid var(--metal-border); border-radius:10px; padding:0.85rem; font-size:0.8rem; overflow-x:auto;"><code>${escapeHtml(apiFormatted)}</code></pre>
+        </div>
+        ${data.notes ? `
+          <div style="margin-top:0.75rem;">
+            <span class="account-info-label">Notas Técnicas</span>
+            <p style="font-size:0.88rem; color:var(--text-secondary); margin:0.25rem 0 0;">${escapeHtml(data.notes)}</p>
+          </div>
+        ` : ''}
+      `;
+    }
+  }
+
+  document.querySelectorAll('.account-list-card').forEach((card) => {
+    const isThis = (type === 'standard' && card.dataset.uid === data.uid) ||
+                   (type === 'vip' && card.dataset.folio === data.folio);
+    card.classList.toggle('active', isThis);
+  });
+}
+
+async function loadAdminAccounts() {
+  if (!currentAdminMeta?.is_superadmin) return;
+
+  try {
+    const [accData, vipData] = await Promise.all([
+      apiFetch('/api/admin/accounts'),
+      apiFetch('/api/vip-instances').catch(() => ({ ok: false, vip_instances: [] }))
+    ]);
+
+    adminAccountsCache = accData?.accounts || [];
+    adminVipCache = vipData?.vip_instances || [];
+
+    renderAdminAccountsList(document.getElementById('accounts-search-input')?.value.trim() || '');
+
+    if (selectedAccountItem) {
+      if (selectedAccountItem.type === 'standard') {
+        const found = adminAccountsCache.find((a) => a.uid === selectedAccountItem.data.uid);
+        if (found) selectAccountItem('standard', found);
+        else {
+          selectedAccountItem = null;
+          document.getElementById('account-detail-empty')?.classList.remove('hidden');
+          document.getElementById('account-detail-view')?.classList.add('hidden');
+        }
+      } else if (selectedAccountItem.type === 'vip') {
+        const found = adminVipCache.find((v) => v.folio === selectedAccountItem.data.folio);
+        if (found) selectAccountItem('vip', found);
+        else {
+          selectedAccountItem = null;
+          document.getElementById('account-detail-empty')?.classList.remove('hidden');
+          document.getElementById('account-detail-view')?.classList.add('hidden');
+        }
+      }
+    }
   } catch (err) {
-    tbody.innerHTML = `<tr><th scope="row">—</th><td colspan="4" style="color:#fda4af;">Error cargando cuentas: ${escapeHtml(err.message)}</td></tr>`;
+    const container = document.getElementById('admin-accounts-list');
+    if (container) {
+      container.innerHTML = `<p style="color:#fda4af; padding:1.5rem 0.5rem; text-align:center;">Error cargando cuentas: ${escapeHtml(err.message)}</p>`;
+    }
   }
 }
 
@@ -4893,6 +5152,7 @@ function setupEventListeners() {
       const subDaysInput = document.getElementById('account-sub-days');
       if (subDaysInput) subDaysInput.value = '30';
       resetPasswordToggle('btn-toggle-new-pw', 'new-acc-password');
+      setTimeout(() => document.getElementById('modal-create-account')?.close(), 800);
       await loadAdminAccounts();
     } catch (err) {
       setFeedback('create-account-feedback', `Error de conexión: ${err.message}`, false);
@@ -5824,6 +6084,12 @@ function setupEventListeners() {
     await saveCatalogFormItem(true);
   });
 
+  // Modal de Promociones dinámico per UX optimizado
+  document.getElementById('btn-open-promotions')?.addEventListener('click', () => {
+    loadAdminPromotions();
+    document.getElementById('promotions-modal')?.showModal();
+  });
+
   // Promociones reales en interfaz aislada por Bot
   async function savePromotionFormItem(sentToBot) {
     const title = document.getElementById('promo-title')?.value.trim() || '';
@@ -5860,7 +6126,25 @@ function setupEventListeners() {
     await savePromotionFormItem(true);
   });
 
-  // Listas de Control: Lista Blanca, Omisiones y Lista Negra
+  // Listas de Control: Botones en cada lista para abrir modal con tipo preseleccionado
+  document.querySelectorAll('.btn-add-rule-trigger').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.type || 'whitelist';
+      const sel = document.getElementById('rule-list-type');
+      if (sel) sel.value = type;
+      const inp = document.getElementById('rule-contact-value');
+      if (inp) {
+        inp.value = '';
+        setTimeout(() => inp.focus(), 60);
+      }
+      document.getElementById('modal-contact-rule')?.showModal();
+    });
+  });
+
+  document.getElementById('btn-cancel-contact-rule')?.addEventListener('click', () => {
+    document.getElementById('modal-contact-rule')?.close();
+  });
+
   document.getElementById('contact-rule-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const contact_value = document.getElementById('rule-contact-value')?.value.trim() || '';
@@ -5874,7 +6158,51 @@ function setupEventListeners() {
     });
 
     document.getElementById('contact-rule-form')?.reset();
+    document.getElementById('modal-contact-rule')?.close();
     await loadAdminContactRules();
+  });
+
+  // Controles de Master-Detail para Cuentas y VIP
+  document.getElementById('accounts-search-input')?.addEventListener('input', (e) => {
+    renderAdminAccountsList(e.target.value.trim());
+  });
+
+  const accFilterBtns = [
+    { id: 'btn-acc-filter-all', filter: 'all' },
+    { id: 'btn-acc-filter-std', filter: 'standard' },
+    { id: 'btn-acc-filter-vip', filter: 'vip' }
+  ];
+  accFilterBtns.forEach(({ id, filter }) => {
+    document.getElementById(id)?.addEventListener('click', () => {
+      activeAccountsFilter = filter;
+      accFilterBtns.forEach((b) => {
+        const btn = document.getElementById(b.id);
+        if (btn) btn.classList.toggle('is-active', b.filter === filter);
+      });
+      renderAdminAccountsList(document.getElementById('accounts-search-input')?.value.trim() || '');
+    });
+  });
+
+  const openCreateAccountModal = () => {
+    document.getElementById('create-account-form')?.reset();
+    setFeedback('create-account-feedback', '');
+    document.getElementById('modal-create-account')?.showModal();
+  };
+  document.getElementById('btn-open-create-account')?.addEventListener('click', openCreateAccountModal);
+  document.getElementById('btn-empty-create-account')?.addEventListener('click', openCreateAccountModal);
+  document.getElementById('btn-cancel-create-account')?.addEventListener('click', () => {
+    document.getElementById('modal-create-account')?.close();
+  });
+
+  const openRegisterVipModal = () => {
+    document.getElementById('vip-instance-form')?.reset();
+    setFeedback('vip-feedback', '');
+    document.getElementById('modal-register-vip')?.showModal();
+  };
+  document.getElementById('btn-open-register-vip')?.addEventListener('click', openRegisterVipModal);
+  document.getElementById('btn-empty-register-vip')?.addEventListener('click', openRegisterVipModal);
+  document.getElementById('btn-cancel-register-vip')?.addEventListener('click', () => {
+    document.getElementById('modal-register-vip')?.close();
   });
 
   // Registro de Folios VIP en Servidores Dedicados (solo SuperAdmin)
@@ -5922,7 +6250,8 @@ function setupEventListeners() {
 
     setFeedback('vip-feedback', `✅ Folio VIP ${res.vip?.folio || ''} guardado.`, true);
     document.getElementById('vip-instance-form')?.reset();
-    await loadAdminVipInstances();
+    setTimeout(() => document.getElementById('modal-register-vip')?.close(), 800);
+    await loadAdminAccounts();
   });
 
   document.getElementById('btn-cancel-edit')?.addEventListener('click', () => {
